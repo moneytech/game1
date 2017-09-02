@@ -47,6 +47,7 @@ const int MAX_TEXTURES_PER_MESH = 4;
 struct Mesh {
     Texture *textures[MAX_TEXTURES_PER_MESH];
     Material *material;
+    u32 buffer_id;
     Array<Vector3> vertices;
     Array<Vector3> normals;
     Array<Vector2> tex_coords;
@@ -121,6 +122,10 @@ struct GL_Renderer {
 
     Shader *render_to_gbuffer;
     Shader *render_light_using_gbuffer;
+    Shader *render_plain_texture;
+
+    Matrix4 projection_matrix;
+    Matrix4 view_matrix;
 
     #ifdef WIN32
     // GL API
@@ -181,6 +186,24 @@ struct GL_Renderer {
     PFNGLGETUNIFORMFVPROC glGetUniformfv;
     PFNGLGETUNIFORMIVPROC glGetUniformiv;
     PFNGLGETACTIVEUNIFORMPROC glGetActiveUniform;
+
+    PFNGLBINDBUFFERPROC glBindBuffer;
+    PFNGLDELETEBUFFERSPROC glDeleteBuffers;
+    PFNGLGENBUFFERSPROC glGenBuffers;
+    PFNGLISBUFFERPROC glIsBuffer;
+    PFNGLBUFFERDATAPROC glBufferData;
+    PFNGLBUFFERSUBDATAPROC glBufferSubData;
+    PFNGLGETBUFFERSUBDATAPROC glGetBufferSubData;
+
+    PFNGLDISABLEVERTEXATTRIBARRAYPROC glDisableVertexAttribArray;
+    PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray;
+
+    PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer;
+
+    PFNGLGENVERTEXARRAYSPROC glGenVertexArrays;
+    PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays;
+    PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
+
     #endif
 
     void init(int width, int height);
@@ -188,6 +211,7 @@ struct GL_Renderer {
     void create_texture(Texture *tex, u16 width, u16 height, void *data);
     void delete_texture(Texture *tex);
     Shader *compile_shader_source(const char *vertex, const char* pixel);
+    void store_mesh_in_buffer(Mesh *m);
 
     void set_projection_ortho(float l, float r, float t, float b, float n, float f);
 

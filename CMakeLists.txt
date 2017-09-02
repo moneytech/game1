@@ -27,6 +27,8 @@ else()
 	)
 endif()
 
+add_definitions(-DDEBUG=1)
+
 add_executable(renderer ${EDITOR_SRCS})
 
 # ${X11_LIBRARIES}

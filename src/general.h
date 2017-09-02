@@ -183,6 +183,13 @@ struct Hash_Map {
 
 // vector math
 
+struct Vector4 {
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
 struct Vector3 {
     float x;
     float y;
@@ -270,6 +277,8 @@ inline float dot(const Vector2 &a, const Vector2 &b) {
     return a.x*b.x + a.y*b.y;
 }
 
+// matrix
+
 struct Matrix {
     float m[16];
 
@@ -278,3 +287,287 @@ struct Matrix {
         return m[index];
     }
 };
+
+#include <cmath>
+
+struct Matrix4 {
+
+    union {
+        float m[4][4];
+        float flat[16];
+    };
+
+    Matrix4() {}
+
+    Matrix4(const Matrix4& mat) {
+        for(int i = 0; i < 4; i++) {
+            for(int j = 0; j < 4; j++) {
+                m[i][j] = mat.m[i][j];
+            }
+        }
+    }
+
+    float& operator[](unsigned int index) {
+        assert(index >= 0 && index < 16);
+        return flat[index];
+    }
+
+    float at(unsigned int index) const {
+        return flat[index];
+    }
+
+    float determinate() const {
+        return
+        m[0][3] * m[1][2] * m[2][1] * m[3][0] - m[0][2] * m[1][3] * m[2][1] * m[3][0] -
+
+        m[0][3] * m[1][1] * m[2][2] * m[3][0] + m[0][1] * m[1][3] * m[2][2] * m[3][0] +
+
+        m[0][2] * m[1][1] * m[2][3] * m[3][0] - m[0][1] * m[1][2] * m[2][3] * m[3][0] -
+
+        m[0][3] * m[1][2] * m[2][0] * m[3][1] + m[0][2] * m[1][3] * m[2][0] * m[3][1] +
+
+        m[0][3] * m[1][0] * m[2][2] * m[3][1] - m[0][0] * m[1][3] * m[2][2] * m[3][1] -
+
+        m[0][2] * m[1][0] * m[2][3] * m[3][1] + m[0][0] * m[1][2] * m[2][3] * m[3][1] +
+
+        m[0][3] * m[1][1] * m[2][0] * m[3][2] - m[0][1] * m[1][3] * m[2][0] * m[3][2] -
+
+        m[0][3] * m[1][0] * m[2][1] * m[3][2] + m[0][0] * m[1][3] * m[2][1] * m[3][2] +
+
+        m[0][1] * m[1][0] * m[2][3] * m[3][2] - m[0][0] * m[1][1] * m[2][3] * m[3][2] -
+
+        m[0][2] * m[1][1] * m[2][0] * m[3][3] + m[0][1] * m[1][2] * m[2][0] * m[3][3] +
+
+        m[0][2] * m[1][0] * m[2][1] * m[3][3] - m[0][0] * m[1][2] * m[2][1] * m[3][3] -
+
+        m[0][1] * m[1][0] * m[2][2] * m[3][3] + m[0][0] * m[1][1] * m[2][2] * m[3][3];
+    }
+
+    //TODO(josh) better calculations
+    Matrix4 inverse() const {
+        Matrix4 result;
+        result.m[0][0] = m[1][1]*m[2][2]*m[3][3] + m[1][2]*m[2][3]*m[3][1] + m[1][3]*m[2][1]*m[3][2] -
+                                m[1][1]*m[2][3]*m[3][2] - m[1][2]*m[2][1]*m[3][3] - m[1][3]*m[2][2]*m[3][1];
+        result.m[0][1] = m[0][1]*m[2][3]*m[3][2] + m[0][2]*m[2][1]*m[3][3] + m[0][3]*m[2][2]*m[3][1] -
+                                m[0][1]*m[2][2]*m[3][3] - m[0][2]*m[2][3]*m[3][1] - m[0][3]*m[2][1]*m[3][2];
+        result.m[0][2] = m[0][1]*m[1][2]*m[3][3] + m[0][2]*m[1][3]*m[3][1] + m[0][3]*m[1][1]*m[3][2] -
+                                m[0][1]*m[1][3]*m[3][2] - m[0][2]*m[1][1]*m[3][3] - m[0][3]*m[1][2]*m[3][1];
+        result.m[0][3] = m[0][1]*m[1][3]*m[2][2] + m[0][2]*m[1][1]*m[2][3] + m[0][3]*m[1][2]*m[2][1] -
+                                m[0][1]*m[1][2]*m[2][3] - m[0][2]*m[1][3]*m[2][1] - m[0][3]*m[1][1]*m[2][2];
+
+
+        result.m[1][0] = m[1][0]*m[2][3]*m[3][2] + m[1][2]*m[2][0]*m[3][3] + m[1][3]*m[2][2]*m[3][0] -
+                                m[1][0]*m[2][2]*m[3][3] - m[1][2]*m[2][3]*m[3][0] - m[1][3]*m[2][0]*m[3][2];
+        result.m[1][1] = m[0][0]*m[2][2]*m[3][3] + m[0][2]*m[2][3]*m[3][0] + m[0][3]*m[2][0]*m[3][2] -
+                                m[0][0]*m[2][3]*m[3][2] - m[0][2]*m[2][0]*m[3][3] - m[0][3]*m[2][2]*m[3][0];
+        result.m[1][2] = m[0][0]*m[1][3]*m[3][2] + m[0][2]*m[1][0]*m[3][3] + m[0][3]*m[1][2]*m[3][0] -
+                                m[0][0]*m[1][2]*m[3][3] - m[0][2]*m[1][3]*m[3][0] - m[0][3]*m[1][0]*m[3][2];
+        result.m[1][3] = m[0][0]*m[1][2]*m[2][3] + m[0][2]*m[1][3]*m[2][0] + m[0][3]*m[1][0]*m[2][2] -
+                                m[0][0]*m[1][3]*m[2][2] - m[0][2]*m[1][0]*m[2][3] - m[0][3]*m[1][2]*m[2][1];
+
+        result.m[2][0] = m[1][0]*m[2][1]*m[3][3] + m[1][1]*m[2][3]*m[3][0] + m[1][3]*m[2][0]*m[3][1] -
+                                m[1][0]*m[2][3]*m[3][1] - m[1][1]*m[2][0]*m[3][3] - m[1][3]*m[2][1]*m[3][0];
+        result.m[2][1] = m[0][0]*m[2][3]*m[3][1] + m[0][1]*m[2][0]*m[3][3] + m[0][3]*m[2][1]*m[3][0] -
+                                m[0][0]*m[2][1]*m[3][3] - m[0][1]*m[2][3]*m[3][0] - m[0][3]*m[2][0]*m[3][1];
+        result.m[2][2] = m[0][0]*m[1][1]*m[3][3] + m[0][1]*m[1][3]*m[3][0] + m[0][3]*m[1][0]*m[3][1] -
+                                m[0][0]*m[1][3]*m[3][1] - m[0][1]*m[1][0]*m[3][3] - m[0][3]*m[1][1]*m[3][0];
+        result.m[2][3] = m[0][0]*m[1][3]*m[2][1] + m[0][1]*m[1][0]*m[2][3] + m[0][3]*m[1][1]*m[2][0] -
+                                m[0][0]*m[1][1]*m[2][3] - m[0][1]*m[1][3]*m[2][0] - m[0][3]*m[1][0]*m[2][1];
+
+        result.m[3][0] = m[1][0]*m[2][2]*m[3][1] + m[1][1]*m[2][0]*m[3][2] + m[1][2]*m[2][1]*m[3][0] -
+                                m[1][0]*m[2][1]*m[3][2] - m[1][1]*m[2][2]*m[3][0] - m[1][2]*m[2][0]*m[3][1];
+        result.m[3][1] = m[0][0]*m[2][1]*m[3][2] + m[0][1]*m[2][2]*m[3][0] + m[0][2]*m[2][0]*m[3][1] -
+                                m[0][0]*m[2][2]*m[3][1] - m[0][1]*m[2][0]*m[3][2] - m[0][2]*m[2][1]*m[3][0];
+        result.m[3][2] = m[0][0]*m[1][2]*m[3][1] + m[0][1]*m[1][0]*m[3][2] + m[0][2]*m[1][1]*m[3][0] -
+                                m[0][0]*m[1][1]*m[3][2] - m[0][1]*m[1][2]*m[3][0] - m[0][2]*m[1][0]*m[3][1];
+        result.m[3][3] = m[0][0]*m[1][1]*m[2][2] + m[0][1]*m[1][2]*m[2][0] + m[0][2]*m[1][0]*m[2][1] -
+                                m[0][0]*m[1][2]*m[2][1] + m[0][1]*m[1][0]*m[2][2] + m[0][2]*m[1][1]*m[2][0];
+
+        float det = 1.0f/result.determinate();
+        if (det != 0.0f) {
+            for (int i = 0; i < 16; ++i) {
+                result[i] *= det;
+            }
+        }
+        return result;
+    }
+
+    Matrix4 transpose() const {
+        Matrix4 result = *this;
+
+        result.m[1][0] = m[0][1];
+        result.m[2][0] = m[0][2];
+        result.m[3][0] = m[0][3];
+
+        result.m[0][1] = m[1][0];
+        result.m[2][1] = m[1][2];
+        result.m[3][1] = m[1][3];
+
+        result.m[1][2] = m[2][1];
+        result.m[0][2] = m[2][0];
+        result.m[3][2] = m[2][3];
+
+        result.m[1][3] = m[3][1];
+        result.m[2][3] = m[3][2];
+        result.m[0][3] = m[3][0];
+        return result;
+    }
+
+    Vector4 operator*(const Vector4& v) {
+        Vector4 result;
+        result.x = m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z + m[0][3] * v.w;
+        result.y = m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z + m[1][3] * v.w;
+        result.z = m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z + m[2][3] * v.w;
+
+        result.w = m[3][0] * v.x + m[3][1] * v.y + m[3][2] * v.z + m[3][3] * v.w;
+
+        return result;
+    }
+
+    Matrix4 operator*(const Matrix4& mat) {
+        Matrix4 result;
+        result[0] = m[0][0] * mat.m[0][0] + m[0][1] * mat.m[1][0] + m[0][2] * mat.m[2][0] + m[0][3] * mat.m[3][0];
+        result[1] = m[0][0] * mat.m[0][1] + m[0][1] * mat.m[1][1] + m[0][2] * mat.m[2][1] + m[0][3] * mat.m[3][1];
+        result[2] = m[0][0] * mat.m[0][2] + m[0][1] * mat.m[1][2] + m[0][2] * mat.m[2][2] + m[0][3] * mat.m[3][2];
+        result[3] = m[0][0] * mat.m[0][3] + m[0][1] * mat.m[1][3] + m[0][2] * mat.m[2][3] + m[0][3] * mat.m[3][3];
+
+        result[4] = m[1][0] * mat.m[0][0] + m[1][1] * mat.m[1][0] + m[1][2] * mat.m[2][0] + m[1][3] * mat.m[3][0];
+        result[5] = m[1][0] * mat.m[0][1] + m[1][1] * mat.m[1][1] + m[1][2] * mat.m[2][1] + m[1][3] * mat.m[3][1];
+        result[6] = m[1][0] * mat.m[0][2] + m[1][1] * mat.m[1][2] + m[1][2] * mat.m[2][2] + m[1][3] * mat.m[3][2];
+        result[7] = m[1][0] * mat.m[0][3] + m[1][1] * mat.m[1][3] + m[1][2] * mat.m[2][3] + m[1][3] * mat.m[3][3];
+
+        result[8] = m[2][0] * mat.m[0][0] + m[2][1] * mat.m[1][0] + m[2][2] * mat.m[2][0] + m[2][3] * mat.m[3][0];
+        result[9] = m[2][0] * mat.m[0][1] + m[2][1] * mat.m[1][1] + m[2][2] * mat.m[2][1] + m[2][3] * mat.m[3][1];
+        result[10] = m[2][0] * mat.m[0][2] + m[2][1] * mat.m[1][2] + m[2][2] * mat.m[2][2] + m[2][3] * mat.m[3][2];
+        result[11] = m[2][0] * mat.m[0][3] + m[2][1] * mat.m[1][3] + m[2][2] * mat.m[2][3] + m[2][3] * mat.m[3][3];
+
+        result[12] = m[3][0] * mat.m[0][0] + m[3][1] * mat.m[1][0] + m[3][2] * mat.m[2][0] + m[3][3] * mat.m[3][0];
+        result[13] = m[3][0] * mat.m[0][1] + m[3][1] * mat.m[1][1] + m[3][2] * mat.m[2][1] + m[3][3] * mat.m[3][1];
+        result[14] = m[3][0] * mat.m[0][2] + m[3][1] * mat.m[1][2] + m[3][2] * mat.m[2][2] + m[3][3] * mat.m[3][2];
+        result[15] = m[3][0] * mat.m[0][3] + m[3][1] * mat.m[1][3] + m[3][2] * mat.m[2][3] + m[3][3] * mat.m[3][3];
+
+        return result;
+    }
+
+    static Matrix4 screenSpace(float halfWidth, float halfHeight) {
+        Matrix4 mat;
+        identity(&mat);
+
+        mat.m[0][0] = halfWidth;
+        mat.m[1][1] =-halfHeight;
+        mat.m[0][3] = halfWidth;
+        mat.m[1][3] = halfHeight;
+        return mat;
+    }
+
+    static Matrix4 viewport(float x, float y, float width, float height) {
+        Matrix4 scale = Matrix4::scale(width, height, 0.5f);
+        Matrix4 trans = Matrix4::translate(x + x + width, y + y + height, 0.0f);
+        Matrix4 correction = Matrix4::translate(-(1.0f / width), -(1.0f / height), 1.0f);
+        return trans * scale * correction;
+    }
+
+    static Matrix4 rotate(double degrees, float tx, float ty, float tz) {
+        Matrix4 result;
+        identity(&result);
+
+        float x = tx, y = ty, z = tz;
+        float length = sqrt(x * x + y * y + z * z);
+        if(length == 0.0f) return result; //NOTE use length == 0.0?
+        x /= length;
+        y /= length;
+        z /= length;
+
+        double angle = degrees * (3.14159265359 / 180.0);
+        float c = (float) cos(angle);
+        float omc = 1.0f - c;
+        float s = (float) sin(angle);
+
+        result[0] = x * x * omc + c;
+        result[1] = x * y * omc - z * s;
+        result[2] = x * z * omc + y * s;
+
+        result[4] = y * x * omc + z * s;
+        result[5] = y * y * omc + c;
+        result[6] = y * z * omc - x * s;
+
+        result.m[2][0] = x * z * omc - y * s;
+        result.m[2][1] = y * z * omc + x * s;
+        result.m[2][2] = z * z * omc + c;
+        return result;
+    }
+
+    static Matrix4 translate(float x, float y, float z) {
+        Matrix4 mat;
+        identity(&mat);
+        mat.m[0][3] = x;
+        mat.m[1][3] = y;
+        mat.m[2][3] = z;
+        return mat;
+    }
+
+    static Matrix4 scale(float x, float y, float z) {
+        Matrix4 mat;
+        identity(&mat);
+        mat.m[0][0] = x;
+        mat.m[1][1] = y;
+        mat.m[2][2] = z;
+        return mat;
+    }
+
+    static Matrix4 perspective(float fov, float aspect, float _near, float _far) {
+        float t = (float) tan(fov * 3.14159 / 360.0) * _near;
+        float b = -t;
+        float l = aspect * b;
+        float r = aspect * t;
+        return frustum(l, r, b, t, _near, _far);
+    }
+
+    static Matrix4 frustum(float left, float right, float bottom, float top, float _near, float _far) {
+        Matrix4 mat;
+        identity(&mat);
+
+        float A = (right + left) / (right - left);
+        float B = (top + bottom) / (top - bottom);
+        float C = - (_far + _near) / (_far - _near);
+        float D = - (2 * _far * _near) / (_far - _near);
+        
+        mat.m[0][0] = 2 * _near / (right - left);
+        mat.m[0][2] = A;
+        mat.m[1][1] = 2 * _near / (top - bottom);
+        mat.m[1][2] = B;
+        mat.m[2][2] = C;
+        mat.m[2][3] = D;
+        mat.m[3][2] = -1.0f;
+        mat.m[3][3] = 0.0f;
+        return mat;
+    }
+    
+    static Matrix4 ortho(float left, float right, float bottom, float top, float _near, float _far) {
+        Matrix4 mat;
+        identity(&mat);
+        mat.m[0][0] = 2.0f / (right - left);
+        mat.m[0][3] = - (right + left) / (right - left);
+        mat.m[1][1] = 2.0f / (top - bottom);
+        mat.m[1][3] = - (top + bottom) / (top - bottom);
+        mat.m[2][2] = - 2.0f / (_far - _near);
+        mat.m[2][3] = - (_far + _near) / (_far - _near);
+        return mat;
+    }
+    
+    static Matrix4 identity() {
+        Matrix4 mat;
+        identity(&mat);
+        return mat;
+    }
+
+
+    static void identity(Matrix4 *mat) {
+        memset(mat, 0, sizeof(Matrix4));
+        mat->m[0][0] = 1.0f;
+        mat->m[1][1] = 1.0f;
+        mat->m[2][2] = 1.0f;
+        mat->m[3][3] = 1.0f;
+    }
+};
+

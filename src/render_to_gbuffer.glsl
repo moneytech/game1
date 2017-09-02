@@ -42,8 +42,9 @@ uniform sampler2D specular_texture;
 void main() {
     g_position = frag_pos;
     g_normal = normalize(normal);
-    g_albedospec.rgb = texture(diffuse_texture, tex_coords).rgb;
-    g_albedospec.a = texture(specular_texture, tex_coords).r;
+    //g_albedospec.rgb = texture(diffuse_texture, tex_coords).rgb;
+    //g_albedospec.a = texture(specular_texture, tex_coords).r;
+    g_albedospec = vec4(1, 0, 0, 1);
 }
 
 ); // GLSL_SOURCE

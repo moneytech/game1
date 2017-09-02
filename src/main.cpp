@@ -15,14 +15,15 @@ void report_error(int err, const char *err_str, int line, int char_num);
 #include "lexer.h"
 #include "html_parser.h"
 
-const int WINDOW_WIDTH = 1920;
-const int WINDOW_HEIGHT = 1080;
+const int WINDOW_WIDTH = 1280;
+const int WINDOW_HEIGHT = 720;
 
 float x = 0, y = 0;
 
 Texture *tex = nullptr;
 GL_Renderer *renderer = nullptr;
 Font *font = nullptr;
+Model *__model = nullptr;
 
 struct Html_Phase {
     float text_x = 0;
@@ -73,15 +74,16 @@ void render_html_dom(Html_Dom *dom) {
 }
 
 void render() {
+    renderer->set_projection_fov(90.0f, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1f, 100.0f);
     renderer->start_scene();
     renderer->clear_screen(0.0, 0.0, 0.0, 1.0);
-    renderer->set_projection_fov(90.0f, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1f, 100.0f);
     // renderer->draw_cube(0, 0, -2, 1);
     renderer->draw_model(__model);
     renderer->finish_scene();
 
 
     renderer->set_projection_ortho(0, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT, 0, -1, 1);
+    /*
     Bitmap_Frame frame = {0};
     frame.tex_coords.width = 14.0f / (float)tex->width;
     frame.tex_coords.height = 14.0f / (float)tex->height;
@@ -94,6 +96,7 @@ void render() {
     sp.dimensions.width = 100.0;
     sp.dimensions.height = 100.0;
     sp.texture = tex;
+    */
     // renderer->draw_sprite(&sp);
     // renderer->draw_text(font, "Hello World!", 32, 32);
     // render_html_dom(dom);
@@ -446,7 +449,12 @@ struct Asset_Manager {
 
     Model *load_model(const char *filepath) {
         char *obj_source = slurp_file(filepath);
-        return model_loader_parse_obj(game, obj_source, filepath);
+        Model *mod = model_loader_parse_obj(game, obj_source, filepath);
+        for (int i = 0; i < mod->meshes.count; ++i) {
+            auto it = mod->meshes[i];
+            game->renderer->store_mesh_in_buffer(it);
+        }
+        return mod;
     }
 };
 
@@ -516,10 +524,10 @@ int main(int argc, char **argv) {
     game.renderer = &rdr;
     game.asset_man = &asset_man;
 
-    Font fnt;
-    my_stbtt_initfont(&fnt);
-    rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
-    font = &fnt;
+    // Font fnt;
+    // my_stbtt_initfont(&fnt);
+    // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
+    // font = &fnt;
 
     __model = asset_man.load_model("assets/monkey.obj");
 

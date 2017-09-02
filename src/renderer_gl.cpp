@@ -77,12 +77,38 @@ void GL_Renderer::init(int screen_width, int screen_height) {
     LOAD(PFNGLGETUNIFORMFVPROC, glGetUniformfv);
     LOAD(PFNGLGETUNIFORMIVPROC, glGetUniformiv);
     LOAD(PFNGLGETACTIVEUNIFORMPROC, glGetActiveUniform);
+
+    LOAD(PFNGLBINDBUFFERPROC, glBindBuffer);
+    LOAD(PFNGLDELETEBUFFERSPROC, glDeleteBuffers);
+    LOAD(PFNGLGENBUFFERSPROC, glGenBuffers);
+    LOAD(PFNGLISBUFFERPROC, glIsBuffer);
+    LOAD(PFNGLBUFFERDATAPROC, glBufferData);
+    LOAD(PFNGLBUFFERSUBDATAPROC, glBufferSubData);
+    LOAD(PFNGLGETBUFFERSUBDATAPROC, glGetBufferSubData);
+
+    LOAD(PFNGLDISABLEVERTEXATTRIBARRAYPROC, glDisableVertexAttribArray);
+    LOAD(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray);
+    LOAD(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer);
+
+    LOAD(PFNGLGENVERTEXARRAYSPROC, glGenVertexArrays);
+    LOAD(PFNGLDELETEVERTEXARRAYSPROC, glDeleteVertexArrays);
+    LOAD(PFNGLBINDVERTEXARRAYPROC, glBindVertexArray);
+
     PFNGLDEBUGMESSAGECALLBACKPROC glDebugMessageCallback;
     LOAD(PFNGLDEBUGMESSAGECALLBACKPROC, glDebugMessageCallback);
     #undef LOAD
 #endif
 
     glDebugMessageCallback(debug_callback, nullptr);
+
+    // @Temporary
+    // @Temporary
+    // @Temporary
+    // @Temporary
+    // @Temporary
+    GLuint VertexArrayID;
+    glGenVertexArrays(1, &VertexArrayID);
+    glBindVertexArray(VertexArrayID);
 
     glGenFramebuffers(1, &gbuffer_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
@@ -121,8 +147,9 @@ void GL_Renderer::init(int screen_width, int screen_height) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    printf("'%s\n'", render_to_gbuffer_vert);
     render_to_gbuffer = compile_shader_source(render_to_gbuffer_vert, render_to_gbuffer_frag);
+    render_light_using_gbuffer = compile_shader_source(render_light_using_gbuffer_vert, render_light_using_gbuffer_frag);
+    render_plain_texture = compile_shader_source(render_light_using_gbuffer_vert, render_plain_texture_frag);
 }
 
 void GL_Renderer::create_texture(Texture *tex, u16 width, u16 height, void *data) {
@@ -200,18 +227,12 @@ Shader *GL_Renderer::compile_shader_source(const char *vertex, const char* pixel
 }
 
 void GL_Renderer::set_projection_ortho(float l, float r, float t, float b, float n, float f) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(l, r, t, b, n, f);
-    glMatrixMode(GL_MODELVIEW);
+    projection_matrix = Matrix4::ortho(l, r, t, b, n, f);
 }
 
 
 void GL_Renderer::set_projection_frustum(float l, float r, float b, float t, float n, float f) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glFrustum(l, r, b, t, n, f);
-    glMatrixMode(GL_MODELVIEW);
+    projection_matrix = Matrix4::frustum(l, r, b, t, n, f);
 }
 void GL_Renderer::set_projection_fov(float fov, float aspect, float n, float f) {
     float t = tan(fov * 3.14159f / 360.0f) * n;
@@ -225,8 +246,8 @@ void GL_Renderer::clear_screen(float r, float g, float b, float a) {
     glClearColor(r, g, b, a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK);
 }
 
 void GL_Renderer::draw_rect(Rectangle &rect) {
@@ -258,50 +279,44 @@ void GL_Renderer::draw_rect(float x, float y, float width, float height) {
 }
 
 void GL_Renderer::draw_textured_rect(Texture *tex, float x, float y, float width, float height) {
-    glEnable(GL_TEXTURE_2D);
-    if (tex) glBindTexture(GL_TEXTURE_2D, tex->id);
-    glColor3f(1.0, 1.0, 1.0);
+    if (tex) {
+        glUseProgram(render_plain_texture->id);
+        glBindTexture(GL_TEXTURE_2D, tex->id);
+    }
 
     float xw = x+width;
     float yh = y+height;
-    glBegin(GL_QUADS);
-        glTexCoord2f(0, 0);
-        glVertex2f(x, y);
-        glTexCoord2f(1, 0);
-        glVertex2f(xw, y);
-        glTexCoord2f(1, 1);
-        glVertex2f(xw, yh);
-        glTexCoord2f(0, 1);
-        glVertex2f(x, yh);
-    glEnd();
 
-    glDisable(GL_TEXTURE_2D);
+    float arr[] = {
+        x, y, 0, 0,
+        xw, y, 1, 0,
+        xw, yh, 1, 1,
+
+        xw, yh, 1, 1,
+        x, yh, 0, 1,
+        x, y, 0, 0,
+    };
+
+    u32 buf;
+    glGenBuffers(1, &buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(arr), &arr[0], GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*4, 0);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float)*4, (void *)(sizeof(float)*2));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(2);
+    glDeleteBuffers(1, &buf);
 }
 
 void GL_Renderer::draw_textured_rect(Texture *tex, Rectangle &rect) {
-    glEnable(GL_TEXTURE_2D);
-    if (tex) glBindTexture(GL_TEXTURE_2D, tex->id);
-    glColor3f(1.0, 1.0, 1.0);
-
-    float x = rect.x;
-    float y = rect.y;
-    float width = rect.width;
-    float height = rect.height;
-
-    float xw = x+width;
-    float yh = y+height;
-    glBegin(GL_QUADS);
-        glTexCoord2f(0, 1);
-        glVertex2f(x, y);
-        glTexCoord2f(0, 0);
-        glVertex2f(x, yh);
-        glTexCoord2f(1, 0);
-        glVertex2f(xw, yh);
-        glTexCoord2f(1, 1);
-        glVertex2f(xw, y);
-    glEnd();
-
-    glDisable(GL_TEXTURE_2D);
+    draw_textured_rect(tex, rect.x, rect.y, rect.width, rect.height);
 }
 
 void GL_Renderer::draw_sprite(Sprite *sp) {
@@ -407,6 +422,7 @@ void GL_Renderer::start_scene() {
     clear_screen(0, 0, 0, 1);
 
     glUseProgram(render_to_gbuffer->id);
+    view_matrix = Matrix4::translate(0, 0, -3);
 }
 
 void GL_Renderer::finish_scene() {
@@ -420,32 +436,30 @@ void GL_Renderer::finish_scene() {
     glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuffer_position);
-    draw_textured_rect(nullptr, 0, 0, 1, 1);
 
     glUseProgram(render_light_using_gbuffer->id);
+    GLint proj = glGetUniformLocation(render_light_using_gbuffer->id, "projection");
+    GLint tex_normal = glGetUniformLocation(render_light_using_gbuffer->id, "g_normal");
+    GLint tex_pos = glGetUniformLocation(render_light_using_gbuffer->id, "g_position");
+    GLint tex_albedo = glGetUniformLocation(render_light_using_gbuffer->id, "g_albedospec");
+    glUniformMatrix4fv(proj, 1, GL_TRUE, &projection_matrix[0]);
+    glUniform1i(tex_pos, 0);
+    glUniform1i(tex_normal, 1);
+    glUniform1i(tex_albedo, 2);
+    draw_textured_rect(nullptr, 0, 0, 1, 1);
 
     for (int i = 0; i < lights.count; ++i) {
 
     }
+
+    glUseProgram(0);
 }
 
 void GL_Renderer::draw_cube(float x, float y, float z, float size) {
-    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-    GLfloat mat_shininess[] = { 50.0 };
-    GLfloat light_position[] = { 0.0, 0.0, -0.5, 1.0 };
-    glClearColor (0.0, 0.0, 0.0, 0.0);
-    glShadeModel (GL_SMOOTH);
-
-    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-    glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
 
     glEnable(GL_DEPTH_TEST);
-    glPushMatrix();
-    glTranslatef(x, y, z);
+
+    Matrix4 t = Matrix4::translate(x, y, z);
 
     float hs = size/2.0f;
     glBegin(GL_QUADS);
@@ -487,49 +501,56 @@ void GL_Renderer::draw_cube(float x, float y, float z, float size) {
 
     glEnd();
 
-    glPopMatrix();
     glDisable(GL_DEPTH_TEST);
-
-    glDisable(GL_LIGHT0);
-    glDisable(GL_LIGHTING);
 }
 
 void GL_Renderer::draw_mesh(Mesh *m) {
-    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-    GLfloat mat_shininess[] = { 50.0 };
-    GLfloat light_position[] = { 0.0, 0.0, -0.5, 1.0 };
-    glClearColor (0.0, 0.0, 0.0, 0.0);
-    glShadeModel (GL_SMOOTH);
-
-    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-    glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-
     glEnable(GL_DEPTH_TEST);
 
     static float r = 0;
-    r += 0.01f;
+    r += 0.5f;
+    Matrix4 t =  Matrix4::rotate(r, 0, 1, 0);
 
-    glPushMatrix();
-    glTranslatef(0, 0, -3);
-    glRotatef(r, 0, 1, 0);
-    glBegin(GL_TRIANGLES);
-        for (int i = 0; i < m->vertices.count; ++i) {
-            Vector3 &v = m->vertices[i];
-            Vector3 &vn = m->normals[i];
-            glNormal3f(vn.x, vn.y, vn.z);
-            glVertex3f(v.x, v.y, v.z);
-        }
-    glEnd();
-    glPopMatrix();
+    GLint proj = glGetUniformLocation(render_to_gbuffer->id, "projection");
+    GLint view = glGetUniformLocation(render_to_gbuffer->id, "view");
+    GLint model = glGetUniformLocation(render_to_gbuffer->id, "model");
+    glUniformMatrix4fv(proj, 1, GL_TRUE, &projection_matrix[0]);
+    glUniformMatrix4fv(view, 1, GL_TRUE, &view_matrix[0]);
+    glUniformMatrix4fv(model, 1, GL_TRUE, &t[0]);
+
+    glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+
+    u32 vertex_size = m->vertices.count * sizeof(Vector3);
+    u32 normal_size = m->normals.count * sizeof(Vector3);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)vertex_size);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size));
+
+    glDrawArrays(GL_TRIANGLES, 0, m->vertices.count);
+
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    glDisableVertexAttribArray(2);
 
     glDisable(GL_DEPTH_TEST);
+}
 
-    glDisable(GL_LIGHT0);
-    glDisable(GL_LIGHTING);
+void GL_Renderer::store_mesh_in_buffer(Mesh *m) {
+    glGenBuffers(1, &m->buffer_id);
+    glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
+
+    u32 vertex_size = m->vertices.count * sizeof(Vector3);
+    u32 normal_size = m->normals.count * sizeof(Vector3);
+    u32 tex_size    = m->tex_coords.count * sizeof(Vector2);
+    u32 total_size = vertex_size + tex_size + normal_size;
+
+    glBufferData(GL_ARRAY_BUFFER, total_size, nullptr, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m->vertices.data);
+    glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m->normals.data);
+    glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m->tex_coords.data);
 }
 
 void GL_Renderer::draw_model(Model *m) {
