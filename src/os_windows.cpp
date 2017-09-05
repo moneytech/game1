@@ -415,6 +415,7 @@ void os_watch_dir(const char *path) {
     }
 
     dir.name = copy_c_string(path);
+    convert_slashes(dir.name);
     if (dir.name[strlen(path)-1] != '/') {
         char *n = dir.name;
         dir.name = concatenate(n, "/");
@@ -446,11 +447,12 @@ void os_pump_file_notifications(file_notif_func *callback, void *userdata) {
             buf[len] = 0;
 
             char *path = concatenate(it.name, buf);
+            convert_slashes(path);
             printf("%s\n", path);
             File_Notification f;
             copy_c_string(&f.name[0], path);
             FREE_MEMORY(path);
-            if (info->Action == FILE_ACTION_MODIFIED) file_changes.add(f);
+            file_changes.add(f);
 
             if (info->NextEntryOffset) {
                 char *data = (char *)info;

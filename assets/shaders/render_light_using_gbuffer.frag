@@ -1,21 +1,4 @@
-
-GLSL_SOURCE(render_light_using_gbuffer_vert,
-
-layout (location = 0) in vec3 in_pos;
-layout (location = 2) in vec2 in_tex_coords;
-
-out vec2 tex_coords;
-
-uniform mat4 projection;
-
-void main() {
-    tex_coords = in_tex_coords;
-    gl_Position = projection * vec4(in_pos, 1.0);
-}
-
-); // GLSL_SOURCE
-
-GLSL_SOURCE(render_light_using_gbuffer_frag,
+#version 330 core
 
 out vec4 frag_color;
 
@@ -57,22 +40,6 @@ void main() {
     vec3 light_dir = normalize(light_pos-frag_pos);  
     // @TODO
     float nl = max(dot(normal, light_dir), 0.0);
-    frag_color = vec4(diffuse, 1) * nl;
+    // frag_color = vec4(diffuse, 1) * nl;
+    frag_color = vec4(1, 0, 0, 1);
 }
-
-); // GLSL_SOURCE
-
-GLSL_SOURCE(render_plain_texture_frag,
-
-out vec4 frag_color;
-
-in vec2 tex_coords;
-
-uniform sampler2D in_texture;
-
-void main() {
-
-    frag_color = texture(in_texture, tex_coords);
-}
-
-); // GLSL_SOURCE

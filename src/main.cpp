@@ -40,7 +40,7 @@ void render_html_center(Html_Phase *phs, Html_Node *n) {
     // to the parent-most center node
     bool update = !phs->centered;
     phs->centered = true;
-    for (int i = 0; i < n->children.count; ++i) {
+    for (u32 i = 0; i < n->children.count; ++i) {
         auto c = n->children[i];
         render_html_node(phs, c);
     }
@@ -58,7 +58,7 @@ void render_html_node(Html_Phase *phs, Html *node) {
             render_html_center(phs, n);
             return;
         }
-        for (int i = 0; i < n->children.count; ++i) {
+        for (u32 i = 0; i < n->children.count; ++i) {
             auto c = n->children[i];
             render_html_node(phs, c);
         }
@@ -67,7 +67,7 @@ void render_html_node(Html_Phase *phs, Html *node) {
 
 void render_html_dom(Html_Dom *dom) {
     Html_Phase phs;
-    for (int i = 0; i < dom->children.count; ++i) {
+    for (u32 i = 0; i < dom->children.count; ++i) {
         auto c = dom->children[i];
         render_html_node(&phs, c);
     }
@@ -109,7 +109,7 @@ char *slurp_file(const char *path) {
     if (!file) return nullptr;
 
     fseek(file, 0, SEEK_END);
-    u64 len = ftell(file);
+    size_t len = ftell(file);
     fseek(file, 0, SEEK_SET);
 
     char *out = GET_MEMORY_SIZED(len+1);
@@ -326,6 +326,8 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 char *p = path_of(obj_filepath);
                 filepath = concatenate(p, filepath);
                 char *lib_src = slurp_file(filepath);
+
+                // @TODO this should hook into asset_man
                 model_loader_parse_mtl(game, lib_src, lib, filepath);
 
                 ml_get_token(&st, &tok);
@@ -416,11 +418,16 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
     return mod;
 }
 
+struct Shader_Info {
+    Array<Shader *> dependencies; // shaders linked using this one
+};
+
 struct Asset_Manager {
     Hash_Map<Texture *> textures;
     Hash_Map<Model *> models;
     Hash_Map<Material_Lib *> materials;
     Hash_Map<Font *> fonts;
+    Hash_Map<Shader_Info> shader_catalog;
 
     Game *game;
 
@@ -450,11 +457,42 @@ struct Asset_Manager {
     Model *load_model(const char *filepath) {
         char *obj_source = slurp_file(filepath);
         Model *mod = model_loader_parse_obj(game, obj_source, filepath);
-        for (int i = 0; i < mod->meshes.count; ++i) {
+        for (u32 i = 0; i < mod->meshes.count; ++i) {
             auto it = mod->meshes[i];
             game->renderer->store_mesh_in_buffer(it);
         }
+        if (models[filepath]) {
+            // @TODO free old model
+        }
+        models[filepath] = mod;
         return mod;
+    }
+
+    void reload_shader(const char *path) {
+        auto &deps = shader_catalog[path].dependencies;
+        for (u32 i = 0; i < deps.count; ++i) {
+            auto it = deps[i];
+            // kind of wastefull, we can speed this up by detecting which shader it is early (extension check)
+            char *vsrc = slurp_file(it->vert_path);
+            char *fsrc = slurp_file(it->frag_path);
+            game->renderer->compile_shader_source(it, vsrc, fsrc);
+            FREE_MEMORY(vsrc);
+            FREE_MEMORY(fsrc);
+        }
+    }
+
+    // Load vert/frag pair as a new shader
+    Shader *load_shader_pair(const char *vpath, const char *fpath) {
+        char *vert = slurp_file(vpath);
+        char *frag = slurp_file(fpath);
+        Shader *sh = game->renderer->compile_shader_source(vert, frag);
+        shader_catalog[vpath].dependencies.add(sh);
+        shader_catalog[fpath].dependencies.add(sh);
+        sh->vert_path = copy_c_string(vpath);
+        sh->frag_path = copy_c_string(fpath);
+        FREE_MEMORY(vert);
+        FREE_MEMORY(frag);
+        return sh;
     }
 };
 
@@ -464,6 +502,9 @@ void file_update_callback(File_Notification *notif, void *userdata) {
     if (g->asset_man->textures.contains_key(&notif->name[0])) {
         printf("Updating file: %s\n", &notif->name[0]);
         g->asset_man->load_image(notif->name);
+    } else if (g->asset_man->shader_catalog.contains_key(&notif->name[0])) {
+        printf("Reloading shader: %s\n", notif->name);
+        g->asset_man->reload_shader(notif->name);
     } else {
         printf("No key for %s\n", &notif->name[0]);
     }
@@ -509,7 +550,8 @@ void print_token(ML_Token *tok) {
 int main(int argc, char **argv) {
     os_init_platform();
     setcwd(os_get_executable_path());
-    // os_watch_dir("assets");
+    os_watch_dir("assets");
+    // os_watch_dir("assets/shaders");
 
     OS_Window win = os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
     OS_GL_Context ctx = os_create_gl_context(win);
@@ -517,12 +559,19 @@ int main(int argc, char **argv) {
     os_set_vsync(true);
 
     GL_Renderer rdr;
+    Game game;
+    game.renderer = &rdr;
+    Asset_Manager asset_man (&game);
+    game.asset_man = &asset_man;
+
+    rdr.game = &game;
     rdr.init(WINDOW_WIDTH, WINDOW_HEIGHT);
     renderer = &rdr;
-    Game game;
-    Asset_Manager asset_man (&game);
-    game.renderer = &rdr;
-    game.asset_man = &asset_man;
+
+    rdr.render_to_gbuffer = asset_man.load_shader_pair("assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
+    rdr.render_light_using_gbuffer = asset_man.load_shader_pair("assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
+    rdr.render_plain_texture = asset_man.load_shader_pair("assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
+    
 
     // Font fnt;
     // my_stbtt_initfont(&fnt);
@@ -534,7 +583,7 @@ int main(int argc, char **argv) {
     while (true) {
         bool exit = false;
 
-        for (int i = 0; i < input_events.count; ++i) {
+        for (u32 i = 0; i < input_events.count; ++i) {
             Input_Event &ev = input_events[i];
             if (ev.type == Event_Type::QUIT) {
                 exit = true;
@@ -556,7 +605,7 @@ int main(int argc, char **argv) {
         if (exit) break;
 
         if (file_changes.count) Sleep(10);
-        for (int i = 0; i < file_changes.count; ++i) {
+        for (u32 i = 0; i < file_changes.count; ++i) {
             auto &it = file_changes[i];
             file_update_callback(&it, &game);
         }

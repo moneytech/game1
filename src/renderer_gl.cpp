@@ -8,10 +8,6 @@
 
 #include <cmath>
 
-// each shader generates a name_vert and name_frag set
-#define GLSL_SOURCE(name, str) static const char *name = "#version 330 core\n" #str
-#include "render_to_gbuffer.glsl"
-#include "render_light_using_gbuffer.glsl"
 
 #include <cstdio>
 void APIENTRY debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam) {
@@ -146,10 +142,6 @@ void GL_Renderer::init(int screen_width, int screen_height) {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) assert(0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    render_to_gbuffer = compile_shader_source(render_to_gbuffer_vert, render_to_gbuffer_frag);
-    render_light_using_gbuffer = compile_shader_source(render_light_using_gbuffer_vert, render_light_using_gbuffer_frag);
-    render_plain_texture = compile_shader_source(render_light_using_gbuffer_vert, render_plain_texture_frag);
 }
 
 void GL_Renderer::create_texture(Texture *tex, u16 width, u16 height, void *data) {
@@ -224,6 +216,36 @@ Shader *GL_Renderer::compile_shader_source(const char *vertex, const char* pixel
 
     out->id = program;
     return out;
+}
+
+void GL_Renderer::compile_shader_source(Shader *out, const char *vertex, const char *pixel) {
+    u32 vert = compile_shader(this, GL_VERTEX_SHADER, vertex);
+    u32 frag = compile_shader(this, GL_FRAGMENT_SHADER, pixel);
+    u32 program = glCreateProgram();
+    glAttachShader(program, vert);
+    glAttachShader(program, frag);
+    glLinkProgram(program);
+
+    GLint status;
+    glGetProgramiv(program, GL_LINK_STATUS, &status);
+    if (status == GL_FALSE) {
+        GLint len;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
+        char *buf = (char *)GET_MEMORY_SIZED(len);
+        glGetProgramInfoLog(program, len, &len, &buf[0]);
+        printf("ERROR: %s\n", buf);
+        FREE_MEMORY(buf);
+
+        glDeleteProgram(program);
+        glDeleteShader(vert);
+        glDeleteShader(frag);
+        return ;
+    }
+
+    glDetachShader(program, vert);
+    glDetachShader(program, frag);
+
+    out->id = program;
 }
 
 void GL_Renderer::set_projection_ortho(float l, float r, float t, float b, float n, float f) {
@@ -512,7 +534,7 @@ void GL_Renderer::draw_mesh(Mesh *m) {
     Quaternion q;
     q.set_angle_vector(0, 1, 0, 0);
     Quaternion b;
-    b.set_angle_vector(3.14, 1, 0, 0);
+    b.set_angle_vector(3.14f, 1, 0, 0);
     Matrix4 t =  Matrix4::rotate(nlerp(clamp(r, 0, 1), q, b));
 
     GLint proj = glGetUniformLocation(render_to_gbuffer->id, "projection");
@@ -521,6 +543,18 @@ void GL_Renderer::draw_mesh(Mesh *m) {
     glUniformMatrix4fv(proj, 1, GL_TRUE, &projection_matrix[0]);
     glUniformMatrix4fv(view, 1, GL_TRUE, &view_matrix[0]);
     glUniformMatrix4fv(model, 1, GL_TRUE, &t[0]);
+
+    // material
+    GLint mat_diffuse = glGetUniformLocation(render_to_gbuffer->id, "material.diffuse");
+    GLint use_material_diffuse = glGetUniformLocation(render_to_gbuffer->id, "use_material_color");
+
+    if (m->material && m->textures[0] == nullptr) {
+        glUniform1i(use_material_diffuse, 1);
+        Color diffuse = m->material->diffuse;
+        glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
+    } else {
+        glUniform1i(use_material_diffuse, 0);
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
     glEnableVertexAttribArray(0);

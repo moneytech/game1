@@ -102,6 +102,10 @@ struct Light {
 
 struct Shader {
     u32 id;
+
+    // for hot reloading
+    const char *vert_path;
+    const char *frag_path;
 };
 
 struct Camera {
@@ -116,7 +120,11 @@ struct Camera {
 #include "glext.h"
 #endif
 
+struct Game;
+
 struct GL_Renderer {
+    Game *game;
+
     Array<Light> lights;
 
     u32 gbuffer_framebuffer;
@@ -216,6 +224,7 @@ struct GL_Renderer {
     void create_texture(Texture *tex, u16 width, u16 height, void *data);
     void delete_texture(Texture *tex);
     Shader *compile_shader_source(const char *vertex, const char* pixel);
+    void compile_shader_source(Shader *sh, const char *vertex, const char *pixel);
     void store_mesh_in_buffer(Mesh *m);
 
     void set_projection_ortho(float l, float r, float t, float b, float n, float f);

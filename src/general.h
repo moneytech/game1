@@ -36,10 +36,12 @@ inline void *__get_cleared_mem(size_t size) {
 template <typename T>
 struct Array {
 	T *data = nullptr;
-	int reserved = 0;
-	int count = 0;
+    size_t reserved = 0;
+	size_t count = 0;
 
-	void reserve(int amount) {
+	void reserve(size_t amount) {
+        assert(amount >= 0);
+
 		if (amount <= count) assert(0);
 
 		T *new_data = (T *)malloc(sizeof(T) * amount);
@@ -49,7 +51,7 @@ struct Array {
 		reserved = amount;
 	}
 
-	T &operator[] (int index) {
+	T &operator[] (s64 index) {
 		assert(index >= 0 && index < count);
 		return data[index];
 	}
@@ -60,7 +62,7 @@ struct Array {
 		count++;
 	}
 
-	void remove(int index) {
+	void remove(s64 index) {
 		assert(index >= 0 && index < count);
 		if ((count-(index+1)) > 0)
 			memmove(&data[index], &data[index+1], sizeof(T) * (count-(index+1)));
@@ -110,6 +112,13 @@ inline char *concatenate(const char *a, const char *b) {
     return out;
 }
 
+// convert '\' to /
+inline void convert_slashes(char *str) {
+    while (*str++) {
+        if (*str == '\\') *str = '/';
+    }
+}
+
 template <typename T>
 struct Hash_Map {
     struct Hash_Entry {
@@ -149,7 +158,7 @@ struct Hash_Map {
             e = e->next;
         }
 
-        return e != nullptr;
+        return e->key != nullptr;
     }
 
     T &operator[](const char *str) {
