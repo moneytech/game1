@@ -40,6 +40,6 @@ void main() {
     vec3 light_dir = normalize(light_pos-frag_pos);  
     // @TODO
     float nl = max(dot(normal, light_dir), 0.0);
-    // frag_color = vec4(diffuse, 1) * nl;
-    frag_color = vec4(1, 0, 0, 1);
+    frag_color = vec4(diffuse, 1) * nl;
+    //frag_color = vec4(1, 0, 0, 1);
 }

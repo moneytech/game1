@@ -190,7 +190,7 @@ struct Hash_Map {
     }
 };
 
-#include <cmath>
+#include <math.h>
 
 // vector math
 

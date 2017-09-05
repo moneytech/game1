@@ -6,9 +6,6 @@
 #include <GL/gl.h>
 #include "glext.h"
 
-#include <cmath>
-
-
 #include <cstdio>
 void APIENTRY debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam) {
     printf("DEBUG:%s\n", message);
@@ -546,23 +543,26 @@ void GL_Renderer::draw_mesh(Mesh *m) {
 
     // material
     GLint mat_diffuse = glGetUniformLocation(render_to_gbuffer->id, "material.diffuse");
-    GLint use_material_diffuse = glGetUniformLocation(render_to_gbuffer->id, "use_material_color");
+    GLint mat_spec_exp = glGetUniformLocation(render_to_gbuffer->id, "material.specular_exp");
+    GLint use_diffuse_map = glGetUniformLocation(render_to_gbuffer->id, "use_diffuse_map");
+    GLint use_normal_map = glGetUniformLocation(render_to_gbuffer->id, "use_normal_map");
 
-    if (m->material && m->textures[0] == nullptr) {
-        glUniform1i(use_material_diffuse, 1);
-        Color diffuse = m->material->diffuse;
-        glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
-    } else {
-        glUniform1i(use_material_diffuse, 0);
-    }
+
+    assert(m->material);
+    Material *mat = m->material;
+    glUniform1i(use_diffuse_map, m->textures[0] ? 1 : 0);
+
+    Color &diffuse = mat->diffuse;
+    glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
+    glUniform1f(mat_spec_exp, mat->specular_exp);
 
     glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
 
-    u32 vertex_size = m->vertices.count * sizeof(Vector3);
-    u32 normal_size = m->normals.count * sizeof(Vector3);
+    u64 vertex_size = m->vertices.count * sizeof(Vector3);
+    u64 normal_size = m->normals.count * sizeof(Vector3);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)vertex_size);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size));

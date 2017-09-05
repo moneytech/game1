@@ -13,21 +13,24 @@ uniform sampler2D specular_texture;
 
 struct Material {
     vec3 diffuse;
+    float specular_exp;
 };
 
 uniform Material material;
-uniform bool use_material_color;
+uniform bool use_diffuse_map;
+uniform bool use_normal_map;
 
 void main() {
     g_position = frag_pos;
     g_normal = normalize(normal);
 
 
-    // if (use_material_color) {
-        g_albedospec.rgb = material.diffuse.rgb;
+    if (use_diffuse_map) {
+        // i think this is right...
+        g_albedospec.rgb = material.diffuse.rgb * texture(diffuse_texture, tex_coords).rgb;
+        g_albedospec.a = material.specular_exp; // not sure what to do here, especially if we dont have a spec map
+    } else {
+    	g_albedospec.rgb = material.diffuse.rgb;
         g_albedospec.a = 1;
-//     } else {
-//         g_albedospec.rgb = texture(diffuse_texture, tex_coords).rgb;
-//         g_albedospec.a = texture(specular_texture, tex_coords).r;
-//     }
+    }
 }

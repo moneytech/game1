@@ -9,9 +9,6 @@
 #define MACH_LEXER_IMPLEMENTATION
 #define MACH_LEXER_ENABLE_HTML
 
-#define MACH_LEXER_REPORT_ERROR report_error
-void report_error(int err, const char *err_str, int line, int char_num);
-
 #include "lexer.h"
 #include "html_parser.h"
 
