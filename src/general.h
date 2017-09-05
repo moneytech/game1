@@ -181,7 +181,13 @@ struct Hash_Map {
     }
 };
 
+#include <cmath>
+
 // vector math
+
+inline float clamp(float val, float min, float max) {
+    return (val > max) ? max : (val < min) ? min : val;
+}
 
 struct Vector4 {
     float x;
@@ -240,6 +246,10 @@ inline Vector3 cross(const Vector3 &a, const Vector3 &b) {
     return out;
 }
 
+inline float length(const Vector3 &v) {
+    return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+}
+
 struct Vector2 {
     float x;
     float y;
@@ -277,18 +287,107 @@ inline float dot(const Vector2 &a, const Vector2 &b) {
     return a.x*b.x + a.y*b.y;
 }
 
-// matrix
 
-struct Matrix {
-    float m[16];
+struct Quaternion {
+    float w;
+    float x;
+    float y;
+    float z;
 
-    float &operator[](int index) {
-        assert(index >= 0 && index < 16);
-        return m[index];
+    // Radians
+    void set_angle_vector(float angle, float vx, float vy, float vz) {
+        float s = sin(angle / 2);
+        w = cos(angle / 2);
+        x = vx * s;
+        y = vy * s;
+        z = vz * s;
     }
 };
 
-#include <cmath>
+inline Quaternion operator*(const Quaternion &q0, const Quaternion &q1) {
+    Quaternion o;
+    float dot = q0.x*q1.x + q0.y*q1.y + q0.z*q1.z;
+    o.w = q0.w*q1.w - dot;
+    o.x = q0.w*q1.x + q1.w*q0.x + (q0.y*q1.z - q0.z*q1.y);
+    o.y = q0.w*q1.y + q1.w*q0.y + (q0.z*q1.x - q0.x*q1.z);
+    o.z = q0.w*q1.z + q1.w*q0.z + (q0.x*q1.y - q0.y*q1.x);
+    return o;
+}
+
+inline Quaternion operator*(const Quaternion &q, float s) {
+    Quaternion o;
+    o.w = q.w * s;
+    o.x = q.x * s;
+    o.y = q.y * s;
+    o.z = q.z * s;
+    return o;
+}
+
+inline Quaternion operator*(float s, const Quaternion &q) {
+    Quaternion o;
+    o.w = q.w * s;
+    o.x = q.x * s;
+    o.y = q.y * s;
+    o.z = q.z * s;
+    return o;
+}
+
+inline Quaternion operator+(const Quaternion &q0, const Quaternion &q1) {
+    Quaternion o;
+    o.w = q0.w + q1.w;
+    o.x = q0.x + q1.x;
+    o.y = q0.y + q1.y;
+    o.z = q0.z + q1.z;
+    return o;
+}
+
+inline Quaternion operator-(const Quaternion &q0, const Quaternion &q1) {
+    Quaternion o;
+    o.w = q0.w - q1.w;
+    o.x = q0.x - q1.x;
+    o.y = q0.y - q1.y;
+    o.z = q0.z - q1.z;
+    return o;
+}
+
+inline float length(const Quaternion &q) {
+    return sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+}
+
+inline Quaternion inverse(const Quaternion &q) {
+    Quaternion o;
+    float len_squared = q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z;
+    o.w = q.w / len_squared;
+    o.x = -q.x / len_squared;
+    o.y = -q.y / len_squared;
+    o.z = -q.z / len_squared;
+    return o;
+}
+
+inline Quaternion normalize(const Quaternion &q) {
+    Quaternion o;
+    float len = length(q);
+    o.w = q.w / len;
+    o.x = q.x / len;
+    o.y = q.y / len;
+    o.z = q.z / len;
+    return o;
+}
+
+inline float dot(const Quaternion &a, const Quaternion &b) {
+    return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+// t 0..1
+inline Quaternion slerp(float t, Quaternion &q0, Quaternion &q1) {
+    float theta = acos(dot(q0, q1)) * t;
+    return cos(theta)*q0 + sin(theta)*q1;
+}
+
+// t 0..1
+inline Quaternion nlerp(float t, Quaternion &q0, Quaternion &q1) {
+    return normalize((1 - t) * q0 + t * q1);
+}
 
 struct Matrix4 {
 
@@ -449,7 +548,7 @@ struct Matrix4 {
         return result;
     }
 
-    static Matrix4 screenSpace(float halfWidth, float halfHeight) {
+    static Matrix4 screen_space(float halfWidth, float halfHeight) {
         Matrix4 mat;
         identity(&mat);
 
@@ -473,7 +572,7 @@ struct Matrix4 {
 
         float x = tx, y = ty, z = tz;
         float length = sqrt(x * x + y * y + z * z);
-        if(length == 0.0f) return result; //NOTE use length == 0.0?
+        if(length == 0.0f) return result;
         x /= length;
         y /= length;
         z /= length;
@@ -495,6 +594,18 @@ struct Matrix4 {
         result.m[2][1] = y * z * omc + x * s;
         result.m[2][2] = z * z * omc + c;
         return result;
+    }
+
+    static Matrix4 rotate(Quaternion &q) {
+        float rta = sqrt(1 - q.w*q.w);
+        if (rta == 0) {
+            return Matrix4::identity();
+        }
+        float theta = acos(q.w) * 2;
+        float x = q.x / rta;
+        float y = q.y / rta;
+        float z = q.z / rta;
+        return rotate(theta * (180.0 /3.14159265359), x, y, z);
     }
 
     static Matrix4 translate(float x, float y, float z) {
@@ -570,4 +681,3 @@ struct Matrix4 {
         mat->m[3][3] = 1.0f;
     }
 };
-

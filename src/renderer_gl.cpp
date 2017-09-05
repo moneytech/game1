@@ -508,8 +508,12 @@ void GL_Renderer::draw_mesh(Mesh *m) {
     glEnable(GL_DEPTH_TEST);
 
     static float r = 0;
-    r += 0.5f;
-    Matrix4 t =  Matrix4::rotate(r, 0, 1, 0);
+    r += 0.001f;
+    Quaternion q;
+    q.set_angle_vector(0, 1, 0, 0);
+    Quaternion b;
+    b.set_angle_vector(3.14, 1, 0, 0);
+    Matrix4 t =  Matrix4::rotate(nlerp(clamp(r, 0, 1), q, b));
 
     GLint proj = glGetUniformLocation(render_to_gbuffer->id, "projection");
     GLint view = glGetUniformLocation(render_to_gbuffer->id, "view");

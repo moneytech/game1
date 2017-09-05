@@ -104,6 +104,11 @@ struct Shader {
     u32 id;
 };
 
+struct Camera {
+    Vector3 position;
+    Quaternion rotation;
+};
+
 
 #ifdef WIN32
 // for function pointer types, gl functions should never be called outside renderer_gl.cpp!
