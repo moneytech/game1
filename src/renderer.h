@@ -33,7 +33,11 @@ struct Color {
     float b;
 };
 
+const int MAX_TEXTURES_PER_MESH = 4;
+const int TEXTURE_DIFFUSE_INDEX = 0;
+
 struct Material {
+    Texture *textures[MAX_TEXTURES_PER_MESH];
     float specular_exp;
     Color ambient;
     Color diffuse;
@@ -42,10 +46,7 @@ struct Material {
     float transparency;
 };
 
-const int MAX_TEXTURES_PER_MESH = 4;
-
 struct Mesh {
-    Texture *textures[MAX_TEXTURES_PER_MESH];
     Material *material;
     u32 buffer_id;
     Array<Vector3> vertices;

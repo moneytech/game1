@@ -130,10 +130,116 @@ void my_stbtt_initfont(Font *font)
 }
 
 
+struct Shader_Info {
+    Array<Shader *> dependencies; // shaders linked using this one
+};
+
+
 typedef Hash_Map<Material *> Material_Lib;
 
-void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, const char *filepath) {
+Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filepath);
+void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, const char *mtl_filepath);
+
+struct Asset_Manager {
+    Hash_Map<Texture *> textures;
+    Hash_Map<Model *> models;
+    Hash_Map<Material_Lib *> materials;
+    Hash_Map<Font *> fonts;
+    Hash_Map<Shader_Info> shader_catalog;
+
+    Game *game;
+
+    Asset_Manager(Game *g) : game(g) {}
+
+    Texture *load_image(const char *filepath) {
+        int width, height, comp;
+        unsigned char *data = stbi_load(filepath, &width, &height, &comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
+        if (data) {
+            Texture *tex = textures[filepath];
+            if (!tex) {
+                tex = GET_MEMORY(Texture);
+                textures[filepath] = tex;
+            } else {
+                game->renderer->delete_texture(tex);
+            }
+
+            game->renderer->create_texture(tex, width, height, data);
+            stbi_image_free(data);
+            return tex;
+        }
+
+        printf("ERROR:%s\n", stbi_failure_reason());
+        return nullptr;
+    }
+
+    Model *load_model(const char *filepath) {
+        char *obj_source = slurp_file(filepath);
+        Model *mod = model_loader_parse_obj(game, obj_source, filepath);
+        for (u32 i = 0; i < mod->meshes.count; ++i) {
+            auto it = mod->meshes[i];
+            game->renderer->store_mesh_in_buffer(it);
+        }
+        if (models[filepath]) {
+            // @TODO free old model
+        }
+        models[filepath] = mod;
+        return mod;
+    }
+
+    void reload_shader(const char *path) {
+        auto &deps = shader_catalog[path].dependencies;
+        for (u32 i = 0; i < deps.count; ++i) {
+            auto it = deps[i];
+            // kind of wastefull, we can speed this up by detecting which shader it is early (extension check)
+            char *vsrc = slurp_file(it->vert_path);
+            char *fsrc = slurp_file(it->frag_path);
+            game->renderer->compile_shader_source(it, vsrc, fsrc);
+            FREE_MEMORY(vsrc);
+            FREE_MEMORY(fsrc);
+        }
+    }
+
+    // Load vert/frag pair as a new shader
+    Shader *load_shader_pair(const char *vpath, const char *fpath) {
+        char *vert = slurp_file(vpath);
+        char *frag = slurp_file(fpath);
+        Shader *sh = game->renderer->compile_shader_source(vert, frag);
+        shader_catalog[vpath].dependencies.add(sh);
+        shader_catalog[fpath].dependencies.add(sh);
+        sh->vert_path = copy_c_string(vpath);
+        sh->frag_path = copy_c_string(fpath);
+        FREE_MEMORY(vert);
+        FREE_MEMORY(frag);
+        return sh;
+    }
+};
+
+
+char *path_of(const char *filepath) {
+    const char *p = strrchr(filepath, '/');
+    char *out = GET_MEMORY_SIZED(p - filepath + 2);
+    memcpy(out, filepath, p-filepath+1);
+    out[p-filepath+1] = 0;
+    return out;
+}
+
+float ml_get_signed_float(ML_State *st, ML_Token *tok) {
+    bool neg = false;
+    if (tok->type == '-') {
+        neg = true;
+        ml_get_token(st, tok);
+    }
+
+    assert(tok->type == ML_TOKEN_FLOAT);
+    float val = (float) tok->float64;
+
+    ml_get_token(st, tok);
+    return neg ? -val : val;    
+}
+
+void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, const char *mtl_filepath) {
     ML_State st;
+    st.flags = ML_DOTS_IN_IDENTIFIERS;
     ml_init(&st, strlen(src), (char *)src);
     ML_Token tok;
 
@@ -262,6 +368,18 @@ void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, cons
                 ml_get_token(&st, &tok);
                 assert(tok.type == ML_TOKEN_INTEGER);
                 ml_get_token(&st, &tok);
+            } else if (compare_c_strings(name, "map_Kd")) {
+                ml_get_token(&st, &tok);
+                assert(tok.type == ML_TOKEN_IDENTIFIER);
+                char *filepath = ml_string_to_c_string(&tok.string);
+                char *p = path_of(mtl_filepath);
+                filepath = concatenate(p, filepath);
+
+                printf("%s\n",filepath);
+                Texture *tex = game->asset_man->load_image(filepath);
+                mat->textures[TEXTURE_DIFFUSE_INDEX] = tex;
+
+                ml_get_token(&st, &tok);
             } else {
                 assert(0);
             }
@@ -269,28 +387,6 @@ void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, cons
             assert(0);
         }
     }
-}
-
-char *path_of(const char *filepath) {
-    const char *p = strrchr(filepath, '/');
-    char *out = GET_MEMORY_SIZED(p - filepath + 2);
-    memcpy(out, filepath, p-filepath+1);
-    out[p-filepath+1] = 0;
-    return out;
-}
-
-float ml_get_signed_float(ML_State *st, ML_Token *tok) {
-    bool neg = false;
-    if (tok->type == '-') {
-        neg = true;
-        ml_get_token(st, tok);
-    }
-
-    assert(tok->type == ML_TOKEN_FLOAT);
-    float val = (float) tok->float64;
-
-    ml_get_token(st, tok);
-    return neg ? -val : val;    
 }
 
 Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filepath) {
@@ -304,6 +400,7 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
     Mesh *mesh = nullptr;
     Array<Vector3> vertices;
     Array<Vector3> normals;
+    Array<Vector2> tex_coords;
     ml_get_token(&st, &tok);
     while(tok.type != ML_TOKEN_END) {
         if (tok.type == '#') {
@@ -352,6 +449,12 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 v.y = ml_get_signed_float(&st, &tok);
                 v.z = ml_get_signed_float(&st, &tok);
                 normals.add(v);
+            } else if (compare_c_strings(name, "vt")) {
+                ml_get_token(&st, &tok);
+                Vector2 v;
+                v.x = ml_get_signed_float(&st, &tok);
+                v.y = ml_get_signed_float(&st, &tok);
+                tex_coords.add(v);
             } else if (compare_c_strings(name, "usemtl")) {
                 ml_get_token(&st, &tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
@@ -384,7 +487,7 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 ml_get_token(&st, &tok); assert(tok.type == '/');
                 ml_get_token(&st, &tok);
                 if (tok.type == ML_TOKEN_INTEGER) {
-                    // mesh->tex_coords
+                    mesh->tex_coords.add(tex_coords[tok.integer-1]);
                     ml_get_token(&st, &tok);
                 }
                 assert(tok.type == '/');
@@ -397,7 +500,7 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 ml_get_token(&st, &tok); assert(tok.type == '/');
                 ml_get_token(&st, &tok);
                 if (tok.type == ML_TOKEN_INTEGER) {
-                    // mesh->tex_coords
+                    mesh->tex_coords.add(tex_coords[tok.integer-1]);
                     ml_get_token(&st, &tok);
                 }
                 assert(tok.type == '/');
@@ -414,84 +517,6 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
     }
     return mod;
 }
-
-struct Shader_Info {
-    Array<Shader *> dependencies; // shaders linked using this one
-};
-
-struct Asset_Manager {
-    Hash_Map<Texture *> textures;
-    Hash_Map<Model *> models;
-    Hash_Map<Material_Lib *> materials;
-    Hash_Map<Font *> fonts;
-    Hash_Map<Shader_Info> shader_catalog;
-
-    Game *game;
-
-    Asset_Manager(Game *g) : game(g) {}
-
-    Texture *load_image(const char *filepath) {
-        int width, height, comp;
-        unsigned char *data = stbi_load(filepath, &width, &height, &comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
-        if (data) {
-            Texture *tex = textures[filepath];
-            if (!tex) {
-                tex = GET_MEMORY(Texture);
-                textures[filepath] = tex;
-            } else {
-                game->renderer->delete_texture(tex);
-            }
-
-            game->renderer->create_texture(tex, width, height, data);
-            stbi_image_free(data);
-            return tex;
-        }
-
-        printf("ERROR:%s\n", stbi_failure_reason());
-        return nullptr;
-    }
-
-    Model *load_model(const char *filepath) {
-        char *obj_source = slurp_file(filepath);
-        Model *mod = model_loader_parse_obj(game, obj_source, filepath);
-        for (u32 i = 0; i < mod->meshes.count; ++i) {
-            auto it = mod->meshes[i];
-            game->renderer->store_mesh_in_buffer(it);
-        }
-        if (models[filepath]) {
-            // @TODO free old model
-        }
-        models[filepath] = mod;
-        return mod;
-    }
-
-    void reload_shader(const char *path) {
-        auto &deps = shader_catalog[path].dependencies;
-        for (u32 i = 0; i < deps.count; ++i) {
-            auto it = deps[i];
-            // kind of wastefull, we can speed this up by detecting which shader it is early (extension check)
-            char *vsrc = slurp_file(it->vert_path);
-            char *fsrc = slurp_file(it->frag_path);
-            game->renderer->compile_shader_source(it, vsrc, fsrc);
-            FREE_MEMORY(vsrc);
-            FREE_MEMORY(fsrc);
-        }
-    }
-
-    // Load vert/frag pair as a new shader
-    Shader *load_shader_pair(const char *vpath, const char *fpath) {
-        char *vert = slurp_file(vpath);
-        char *frag = slurp_file(fpath);
-        Shader *sh = game->renderer->compile_shader_source(vert, frag);
-        shader_catalog[vpath].dependencies.add(sh);
-        shader_catalog[fpath].dependencies.add(sh);
-        sh->vert_path = copy_c_string(vpath);
-        sh->frag_path = copy_c_string(fpath);
-        FREE_MEMORY(vert);
-        FREE_MEMORY(frag);
-        return sh;
-    }
-};
 
 void file_update_callback(File_Notification *notif, void *userdata) {
     Game *g = (Game *)userdata;
@@ -575,7 +600,7 @@ int main(int argc, char **argv) {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    __model = asset_man.load_model("assets/monkey.obj");
+    __model = asset_man.load_model("assets/keyOGA.obj");
 
     while (true) {
         bool exit = false;

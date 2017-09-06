@@ -8,8 +8,8 @@ in vec2 tex_coords;
 in vec3 frag_pos;
 in vec3 normal;
 
-uniform sampler2D diffuse_texture;
-uniform sampler2D specular_texture;
+uniform sampler2D diffuse_map;
+uniform sampler2D specular_map;
 
 struct Material {
     vec3 diffuse;
@@ -27,7 +27,7 @@ void main() {
 
     if (use_diffuse_map) {
         // i think this is right...
-        g_albedospec.rgb = material.diffuse.rgb * texture(diffuse_texture, tex_coords).rgb;
+        g_albedospec.rgb = material.diffuse.rgb * texture(diffuse_map, tex_coords).rgb;
         g_albedospec.a = material.specular_exp; // not sure what to do here, especially if we dont have a spec map
     } else {
     	g_albedospec.rgb = material.diffuse.rgb;

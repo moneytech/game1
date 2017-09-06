@@ -441,7 +441,7 @@ void GL_Renderer::start_scene() {
     clear_screen(0, 0, 0, 1);
 
     glUseProgram(render_to_gbuffer->id);
-    view_matrix = Matrix4::translate(0, 0, -3);
+    view_matrix = Matrix4::translate(0, 0, -1);
 }
 
 void GL_Renderer::finish_scene() {
@@ -546,11 +546,17 @@ void GL_Renderer::draw_mesh(Mesh *m) {
     GLint mat_spec_exp = glGetUniformLocation(render_to_gbuffer->id, "material.specular_exp");
     GLint use_diffuse_map = glGetUniformLocation(render_to_gbuffer->id, "use_diffuse_map");
     GLint use_normal_map = glGetUniformLocation(render_to_gbuffer->id, "use_normal_map");
-
+    GLint diffuse_map = glGetUniformLocation(render_to_gbuffer->id, "diffuse_map");
 
     assert(m->material);
     Material *mat = m->material;
-    glUniform1i(use_diffuse_map, m->textures[0] ? 1 : 0);
+    Texture *diffuse_tex =  mat->textures[TEXTURE_DIFFUSE_INDEX];
+    glUniform1i(use_diffuse_map, diffuse_tex ? 1 : 0);
+    if (diffuse_tex) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuse_tex->id);
+        glUniform1i(diffuse_map, 0);
+    }
 
     Color &diffuse = mat->diffuse;
     glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
