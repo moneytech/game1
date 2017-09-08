@@ -259,6 +259,16 @@ inline float length(const Vector3 &v) {
     return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
 
+inline Vector3 normalize(const Vector3 &v) {
+    Vector3 out;
+    float len = length(v);
+    if (len == 0) return v;
+    out.x = v.x / len;
+    out.y = v.y / len;
+    out.z = v.z / len;
+    return out;
+}
+
 struct Vector2 {
     float x;
     float y;

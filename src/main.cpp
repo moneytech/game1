@@ -140,6 +140,35 @@ typedef Hash_Map<Material *> Material_Lib;
 Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filepath);
 void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, const char *mtl_filepath);
 
+void maybe_calc_tangent_normals(Mesh *m) {
+    if (!m->material->textures[TEXTURE_NORMAL_INDEX]) return;
+
+    auto &tex = m->tex_coords;
+    auto &verts = m->vertices;
+    auto &tangents = m->tangent_normals;
+    tangents.reserve(verts.count);
+    for (u32 i = 0; i < verts.count; i += 3) {
+        Vector3 e1 = verts[i+1] - verts[i];
+        Vector3 e2 = verts[i+2] - verts[i];
+
+        Vector2 dUV1 = tex[i+1] - tex[i];
+        Vector2 dUV2 = tex[i+2] - tex[i];
+
+        float f = 1.0f / (dUV1.x * dUV2.y - dUV2.x * dUV1.y);
+
+        Vector3 tangent;
+        tangent.x = f * (dUV2.y * e1.x - dUV1.y * e2.x);
+        tangent.y = f * (dUV2.y * e1.y - dUV1.y * e2.y);
+        tangent.z = f * (dUV2.y * e1.z - dUV1.y * e2.z);
+        tangent = normalize(tangent);
+
+        // we add it three times, one for each vertex
+        tangents.add(tangent);
+        tangents.add(tangent);
+        tangents.add(tangent);
+    }    
+}
+
 struct Asset_Manager {
     Hash_Map<Texture *> textures;
     Hash_Map<Model *> models;
@@ -154,6 +183,7 @@ struct Asset_Manager {
     Texture *load_image(const char *filepath) {
         int width, height, comp;
         unsigned char *data = stbi_load(filepath, &width, &height, &comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
+
         if (data) {
             Texture *tex = textures[filepath];
             if (!tex) {
@@ -177,6 +207,7 @@ struct Asset_Manager {
         Model *mod = model_loader_parse_obj(game, obj_source, filepath);
         for (u32 i = 0; i < mod->meshes.count; ++i) {
             auto it = mod->meshes[i];
+            maybe_calc_tangent_normals(it);
             game->renderer->store_mesh_in_buffer(it);
         }
         if (models[filepath]) {
@@ -375,9 +406,44 @@ void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, cons
                 char *p = path_of(mtl_filepath);
                 filepath = concatenate(p, filepath);
 
-                printf("%s\n",filepath);
                 Texture *tex = game->asset_man->load_image(filepath);
                 mat->textures[TEXTURE_DIFFUSE_INDEX] = tex;
+
+                ml_get_token(&st, &tok);
+            } else if (compare_c_strings(name, "map_Bump")) {
+                ml_get_token(&st, &tok);
+                if (tok.type == '-') {
+                    ml_get_token(&st, &tok);
+                    assert(tok.type == ML_TOKEN_IDENTIFIER);
+
+                    name = ml_string_to_c_string(&tok.string);
+                    if (compare_c_strings(name, "bm")) {
+                        ml_get_token(&st, &tok);
+                        float bump_mult = ml_get_signed_float(&st, &tok);
+
+                        // @TODO not really sure how to use the bump multiplier..
+                    } else {
+                        assert(0);
+                    }
+                }
+                assert(tok.type == ML_TOKEN_IDENTIFIER);
+                char *filepath = ml_string_to_c_string(&tok.string);
+                char *p = path_of(mtl_filepath);
+                filepath = concatenate(p, filepath);
+
+                Texture *tex = game->asset_man->load_image(filepath);
+                mat->textures[TEXTURE_NORMAL_INDEX] = tex;
+
+                ml_get_token(&st, &tok);
+            } else if (compare_c_strings(name, "map_Ks")) {
+                ml_get_token(&st, &tok);
+                assert(tok.type == ML_TOKEN_IDENTIFIER);
+                char *filepath = ml_string_to_c_string(&tok.string);
+                char *p = path_of(mtl_filepath);
+                filepath = concatenate(p, filepath);
+
+                Texture *tex = game->asset_man->load_image(filepath);
+                mat->textures[TEXTURE_SPECULAR_INDEX] = tex;
 
                 ml_get_token(&st, &tok);
             } else {
@@ -453,7 +519,7 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 ml_get_token(&st, &tok);
                 Vector2 v;
                 v.x = ml_get_signed_float(&st, &tok);
-                v.y = ml_get_signed_float(&st, &tok);
+                v.y = 1.0f - ml_get_signed_float(&st, &tok);
                 tex_coords.add(v);
             } else if (compare_c_strings(name, "usemtl")) {
                 ml_get_token(&st, &tok);
@@ -464,7 +530,7 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 ml_get_token(&st, &tok);
             } else if (compare_c_strings(name, "s")) {
                 ml_get_token(&st, &tok);
-                assert(tok.type == ML_TOKEN_IDENTIFIER);
+                assert(tok.type == ML_TOKEN_IDENTIFIER || tok.type == ML_TOKEN_INTEGER);
                 // smooth shading
                 ml_get_token(&st, &tok);
             } else if (compare_c_strings(name, "f")) {
@@ -474,7 +540,7 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
                 ml_get_token(&st, &tok); assert(tok.type == '/');
                 ml_get_token(&st, &tok);
                 if (tok.type == ML_TOKEN_INTEGER) {
-                    // mesh->tex_coords
+                    mesh->tex_coords.add(tex_coords[tok.integer-1]);
                     ml_get_token(&st, &tok);
                 }
                 assert(tok.type == '/');
@@ -600,7 +666,8 @@ int main(int argc, char **argv) {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    __model = asset_man.load_model("assets/keyOGA.obj");
+    // __model = asset_man.load_model("assets/keyOGA.obj");
+    __model = asset_man.load_model("assets/well.coveredopen.obj");
 
     while (true) {
         bool exit = false;

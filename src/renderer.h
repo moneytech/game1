@@ -35,6 +35,8 @@ struct Color {
 
 const int MAX_TEXTURES_PER_MESH = 4;
 const int TEXTURE_DIFFUSE_INDEX = 0;
+const int TEXTURE_NORMAL_INDEX  = 1;
+const int TEXTURE_SPECULAR_INDEX = 2;
 
 struct Material {
     Texture *textures[MAX_TEXTURES_PER_MESH];
@@ -51,6 +53,7 @@ struct Mesh {
     u32 buffer_id;
     Array<Vector3> vertices;
     Array<Vector3> normals;
+    Array<Vector3> tangent_normals;
     Array<Vector2> tex_coords;
 };
 

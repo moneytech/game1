@@ -441,7 +441,7 @@ void GL_Renderer::start_scene() {
     clear_screen(0, 0, 0, 1);
 
     glUseProgram(render_to_gbuffer->id);
-    view_matrix = Matrix4::translate(0, 0, -1);
+    view_matrix = Matrix4::translate(0, -2, -3);
 }
 
 void GL_Renderer::finish_scene() {
@@ -531,7 +531,7 @@ void GL_Renderer::draw_mesh(Mesh *m) {
     Quaternion q;
     q.set_angle_vector(0, 1, 0, 0);
     Quaternion b;
-    b.set_angle_vector(3.14f, 1, 0, 0);
+    b.set_angle_vector(3.14f, 0, 1, 0);
     Matrix4 t =  Matrix4::rotate(nlerp(clamp(r, 0, 1), q, b));
 
     GLint proj = glGetUniformLocation(render_to_gbuffer->id, "projection");
@@ -541,16 +541,26 @@ void GL_Renderer::draw_mesh(Mesh *m) {
     glUniformMatrix4fv(view, 1, GL_TRUE, &view_matrix[0]);
     glUniformMatrix4fv(model, 1, GL_TRUE, &t[0]);
 
+    GLint viewer_pos = glGetUniformLocation(render_to_gbuffer->id, "viewer_pos");
+    assert(viewer_pos);
+    glUniform3f(viewer_pos, 0, 0, 10); // @TODO
+
     // material
     GLint mat_diffuse = glGetUniformLocation(render_to_gbuffer->id, "material.diffuse");
     GLint mat_spec_exp = glGetUniformLocation(render_to_gbuffer->id, "material.specular_exp");
     GLint use_diffuse_map = glGetUniformLocation(render_to_gbuffer->id, "use_diffuse_map");
     GLint use_normal_map = glGetUniformLocation(render_to_gbuffer->id, "use_normal_map");
+    GLint use_specular_map = glGetUniformLocation(render_to_gbuffer->id, "use_specular_map");
     GLint diffuse_map = glGetUniformLocation(render_to_gbuffer->id, "diffuse_map");
+    GLint normal_map = glGetUniformLocation(render_to_gbuffer->id, "normal_map");
+    GLint specular_map = glGetUniformLocation(render_to_gbuffer->id, "specular_map");
 
     assert(m->material);
     Material *mat = m->material;
     Texture *diffuse_tex =  mat->textures[TEXTURE_DIFFUSE_INDEX];
+    Texture *normal_tex = mat->textures[TEXTURE_NORMAL_INDEX];
+    Texture *spec_tex = mat->textures[TEXTURE_SPECULAR_INDEX];
+
     glUniform1i(use_diffuse_map, diffuse_tex ? 1 : 0);
     if (diffuse_tex) {
         glActiveTexture(GL_TEXTURE0);
@@ -558,26 +568,53 @@ void GL_Renderer::draw_mesh(Mesh *m) {
         glUniform1i(diffuse_map, 0);
     }
 
+    glUniform1i(use_normal_map, normal_tex ? 1: 0);
+    if (normal_tex) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normal_tex->id);
+        glUniform1i(normal_map, 1);
+    }
+
+    glUniform1i(use_specular_map, spec_tex ? 1: 0);
+    if (spec_tex) {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, spec_tex->id);
+        glUniform1i(specular_map, 2);
+    }
+
+    glActiveTexture(GL_TEXTURE0);
+
     Color &diffuse = mat->diffuse;
     glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
     glUniform1f(mat_spec_exp, mat->specular_exp);
 
     glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
 
     u64 vertex_size = m->vertices.count * sizeof(Vector3);
     u64 normal_size = m->normals.count * sizeof(Vector3);
+    u64 tex_size    = m->tex_coords.count * sizeof(Vector2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)vertex_size);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size));
+
+    if (tex_size) {
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size));
+    }
+
+    if (normal_tex) {
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size+tex_size));
+    }
 
     glDrawArrays(GL_TRIANGLES, 0, m->vertices.count);
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(2);
+    
+    if (tex_size) glDisableVertexAttribArray(2);
+    if (normal_tex) glDisableVertexAttribArray(3);
 
     glDisable(GL_DEPTH_TEST);
 }
@@ -589,12 +626,14 @@ void GL_Renderer::store_mesh_in_buffer(Mesh *m) {
     u32 vertex_size = m->vertices.count * sizeof(Vector3);
     u32 normal_size = m->normals.count * sizeof(Vector3);
     u32 tex_size    = m->tex_coords.count * sizeof(Vector2);
-    u32 total_size = vertex_size + tex_size + normal_size;
+    u32 tangent_size = m->tangent_normals.count * sizeof(Vector3);
+    u32 total_size = vertex_size + tex_size + normal_size + tangent_size;
 
     glBufferData(GL_ARRAY_BUFFER, total_size, nullptr, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m->vertices.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m->normals.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m->tex_coords.data);
+    glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size, tangent_size, m->tangent_normals.data);
 }
 
 void GL_Renderer::draw_model(Model *m) {
