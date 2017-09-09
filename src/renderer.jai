@@ -60,178 +60,93 @@ Material :: struct {
 Mesh :: struct {
     material: *Material;
     buffer_id: u32;
-    Array<Vector3> vertices;
-    Array<Vector3> normals;
-    Array<Vector3> tangent_normals;
-    Array<Vector2> tex_coords;
+
+    vertices: [..] Vector3;
+    normals: [..] Vector3;
+    tangent_normals: [..] Vector3;
+    tex_coords: [..] Vector2;
 };
 
-struct Model {
-    Array<Mesh *> meshes;
+Model :: struct {
+    meshes: [..] *Mesh;
 };
 
-const u32 BITMAP_FRAME_FLIP_VERTICLE   = (1 << 0);
-const u32 BITMAP_FRAME_FLIP_HORIZONTAL = (1 << 1);
+BITMAP_FRAME_FLIP_VERTICLE   :: (1 << 0);
+BITMAP_FRAME_FLIP_HORIZONTAL :: (1 << 1);
 
-struct Bitmap_Frame {
-    Rectangle tex_coords;
-    float duration;
-    u32 flags;
+Bitmap_Frame :: struct {
+    tex_coords: Rectangle;
+    duration: float;
+    flags: u32;
 };
 
-const u32 SPRITE_ANIMATION_REPEAT = (1 << 0);
+SPRITE_ANIMATION_REPEAT :: (1 << 0);
 
-struct Sprite_Animation {
-    Array<Bitmap_Frame> frames;
-    u8 current_frame;
-    float time_elapsed;
-    u32 flags;
+Sprite_Animation :: struct {
+    frames: [..] Bitmap_Frame;
+    current_frame: u8;
+    time_elapsed: float;
+    flags: u32;
 };
 
-struct Sprite {
-    Texture *texture;
-    Bitmap_Frame *current_frame;
-    Rectangle dimensions;
-    Array<Sprite_Animation> animations;
-    u8 current_animation;
+Sprite :: struct {
+    texture: *Texture;
+    current_frame: *Bitmap_Frame;
+    dimensions: Rectangle;
+    animations: [..] Sprite_Animation;
+    current_animation: u8;
 };
 
 
-enum Light_Type {
+Light_Type :: enum {
     DIRECTIONAL,
     RADIAL
 };
 
-struct Light {
-    Light_Type type;
-    Vector3 position;
-    Color ambient;
-    Color diffuse;
-    Color specular;
+Light :: struct {
+    type: Light_Type;
+    position: Vector3;
+    ambient: Color;
+    diffuse: Color;
+    specular: Color;
 
-    float linear;
-    float quadratic;
+    linear: float;
+    quadratic: float;
 };
 
 struct Shader {
-    u32 id;
+    id: u32;
 
     // for hot reloading
-    const char *vert_path;
-    const char *frag_path;
+    vert_path: string;
+    frag_path: string;
 };
 
 struct Camera {
-    Vector3 position;
-    Quaternion rotation;
+    position: Vector3;
+    rotation: Quaternion;
 };
 
-
-#ifdef WIN32
-// for function pointer types, gl functions should never be called outside renderer_gl.cpp!
-#include <GL/gl.h>
-#include "glext.h"
-#endif
-
-struct Game;
-
 struct GL_Renderer {
-    Game *game;
+    game: *Game;
 
-    Array<Light> lights;
+    lights: [..] Light;
 
-    u32 gbuffer_framebuffer;
-    u32 gbuffer_position;
-    u32 gbuffer_normal;
-    u32 gbuffer_albedo_spec;
-    u32 gbuffer_depth;
+    gbuffer_framebuffer: u32;
+    gbuffer_position: u32;
+    gbuffer_normal: u32;
+    gbuffer_albedo_spec: u32;
+    gbuffer_depth: u32;
 
-    Shader *render_to_gbuffer;
-    Shader *render_light_using_gbuffer;
-    Shader *render_plain_texture;
+    render_to_gbuffer: *Shader;
+    render_light_using_gbuffer: *Shader;
+    render_plain_texture: *Shader;
 
-    Matrix4 projection_matrix;
-    Matrix4 view_matrix;
+    projection_matrix: Matrix4;
+    view_matrix: Matrix4;
+}
 
-    #ifdef WIN32
-    // GL API
-
-    PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers;
-    PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffers;
-    PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer;
-    PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
-    PFNGLFRAMEBUFFERRENDERBUFFERPROC glFramebufferRenderbuffer;
-
-    PFNGLDRAWBUFFERSPROC glDrawBuffers;
-
-    PFNGLGENRENDERBUFFERSPROC glGenRenderbuffers;
-    PFNGLDELETERENDERBUFFERSPROC glDeleteRenderbuffers;
-    PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer;
-    PFNGLRENDERBUFFERSTORAGEPROC glRenderbufferStorage;
-    PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatus;
-
-    PFNGLACTIVETEXTUREPROC glActiveTexture;
-
-    PFNGLCREATEPROGRAMPROC glCreateProgram;
-    PFNGLDELETEPROGRAMPROC glDeleteProgram;
-    PFNGLCREATESHADERPROC glCreateShader;
-    PFNGLDELETESHADERPROC glDeleteShader;
-    PFNGLATTACHSHADERPROC glAttachShader;
-    PFNGLDETACHSHADERPROC glDetachShader;
-    PFNGLCOMPILESHADERPROC glCompileShader;
-    PFNGLLINKPROGRAMPROC glLinkProgram;
-    PFNGLSHADERSOURCEPROC glShaderSource;
-    PFNGLUSEPROGRAMPROC glUseProgram;
-
-    PFNGLGETSHADERIVPROC glGetShaderiv;
-    PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog;
-    PFNGLGETPROGRAMIVPROC glGetProgramiv;
-    PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog;
-
-    PFNGLUNIFORM1FPROC glUniform1f;
-    PFNGLUNIFORM2FPROC glUniform2f;
-    PFNGLUNIFORM3FPROC glUniform3f;
-    PFNGLUNIFORM4FPROC glUniform4f;
-    PFNGLUNIFORM1IPROC glUniform1i;
-    PFNGLUNIFORM2IPROC glUniform2i;
-    PFNGLUNIFORM3IPROC glUniform3i;
-    PFNGLUNIFORM4IPROC glUniform4i;
-    PFNGLUNIFORM1FVPROC glUniform1fv;
-    PFNGLUNIFORM2FVPROC glUniform2fv;
-    PFNGLUNIFORM3FVPROC glUniform3fv;
-    PFNGLUNIFORM4FVPROC glUniform4fv;
-    PFNGLUNIFORM1IVPROC glUniform1iv;
-    PFNGLUNIFORM2IVPROC glUniform2iv;
-    PFNGLUNIFORM3IVPROC glUniform3iv;
-    PFNGLUNIFORM4IVPROC glUniform4iv;
-    PFNGLUNIFORMMATRIX2FVPROC glUniformMatrix2fv;
-    PFNGLUNIFORMMATRIX3FVPROC glUniformMatrix3fv;
-    PFNGLUNIFORMMATRIX4FVPROC glUniformMatrix4fv;
-
-    PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
-    PFNGLGETUNIFORMFVPROC glGetUniformfv;
-    PFNGLGETUNIFORMIVPROC glGetUniformiv;
-    PFNGLGETACTIVEUNIFORMPROC glGetActiveUniform;
-
-    PFNGLBINDBUFFERPROC glBindBuffer;
-    PFNGLDELETEBUFFERSPROC glDeleteBuffers;
-    PFNGLGENBUFFERSPROC glGenBuffers;
-    PFNGLISBUFFERPROC glIsBuffer;
-    PFNGLBUFFERDATAPROC glBufferData;
-    PFNGLBUFFERSUBDATAPROC glBufferSubData;
-    PFNGLGETBUFFERSUBDATAPROC glGetBufferSubData;
-
-    PFNGLDISABLEVERTEXATTRIBARRAYPROC glDisableVertexAttribArray;
-    PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray;
-
-    PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer;
-
-    PFNGLGENVERTEXARRAYSPROC glGenVertexArrays;
-    PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays;
-    PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
-
-    #endif
-
+/*
     void init(int width, int height);
 
     void create_texture(Texture *tex, u16 width, u16 height, void *data);
@@ -265,5 +180,84 @@ struct GL_Renderer {
     void draw_cube(float x, float y, float z, float size);
     void draw_mesh(Mesh *m);
     void draw_model(Model *m);
-};
 
+*/
+
+GL_3_0_API :: struct {
+    glGenFramebuffers: (n: GLsizei, framebuffers: *GLuint) #foreign;
+    glDeleteFramebuffers: (n: GLsizei, framebuffers: *GLuint) #foreign;
+    glBindFramebuffer: (target: GLenum, framebuffer: GLuint) #foreign;
+    glFramebufferTexture2D: (target: GLenum, attachment: GLenum, textarget: GLenum, texture: GLuint, level: GLint) #foreign;
+    glFramebufferRenderbuffer: (target: GLenum, attachment: GLenum, renderbuffertarget: GLenum, renderbuffer: GLuint) #foreign;
+
+    glDrawBuffers: (n: GLsizei, bufs: *GLenum) #foreign;
+
+    glGenRenderbuffers: (n: GLsizei, renderbuffers: *GLuint) #foreign;
+    glDeleteRenderbuffers: (n: GLsizei, renderbuffers: *GLuint) #foreign;
+    glBindRenderbuffer: (target: GLenum, renderbuffer: GLuint) #foreign;
+    glRenderbufferStorage: (target: GLenum, internalformat: GLenum, width: GLsizei, height: GLsizei) #foreign;
+    glCheckFramebufferStatus: (target: GLenum) -> GLenum #foreign;
+
+    glActiveTexture: (texture: GLenum) #foreign;
+
+    glCreateProgram: () -> GLuint #foreign;
+    glDeleteProgram: (program: GLuint) #foreign;
+    glCreateShader: (type: GLenum) -> GLuint #foreign;
+    glDeleteShader: (shader: GLuint) #foreign;
+    glAttachShader: (program: GLuint, shader: GLuint) #foreign;
+    glDetachShader: (program: GLuint, shader: GLuint) #foreign;
+    glCompileShader: (shader: GLuint) #foreign;
+    glLinkProgram: (program: GLuint) #foreign;
+    glShaderSource: (shader: GLuint, count: GLsizei, c_string: **GLchar, length: *GLint) #foreign;
+    glUseProgram: (program: GLuint) #foreign;
+
+    glGetShaderiv: (shader: GLuint, pname: GLenum, params: *GLint) #foreign;
+    glGetShaderInfoLog: (shader: GLuint, bufSize: GLsizei, length: *GLsizei, infoLog: *GLchar) #foreign;
+    glGetProgramiv: (program: GLuint, pname: GLenum, params: *GLint) #foreign;
+    glGetProgramInfoLog: (program: GLuint, bufSize: GLsizei, length: *GLsizei, infoLog: *GLchar) #foreign;
+
+    glUniform1f: (location: GLint, v0: GLfloat) #foreign;
+    glUniform2f: (location: GLint, v0: GLfloat, v1: GLfloat) #foreign;
+    glUniform3f: (location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat) #foreign;
+    glUniform4f: (location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat); #foreign
+    glUniform1i: (location: GLint, v0: GLint) #foreign;
+    glUniform2i: (location: GLint, v0: GLint, v1: GLint) #foreign;
+    glUniform3i: (location: GLint, v0: GLint, v1: GLint, v2: GLint) #foreign;
+    glUniform4i: (location: GLint, v0: GLint, v1: GLint, v2: GLint, v3: GLint); #foreign
+
+    glUniform1fv: (location: GLint, count: GLsizei, value: *GLfloat) #foreign;
+    glUniform2fv: (location: GLint, count: GLsizei, value: *GLfloat) #foreign;
+    glUniform3fv: (location: GLint, count: GLsizei, value: *GLfloat) #foreign;
+    glUniform4fv: (location: GLint, count: GLsizei, value: *GLfloat) #foreign;
+    glUniform1iv: (location: GLint, count: GLsizei, value: *GLint) #foreign;
+    glUniform2iv: (location: GLint, count: GLsizei, value: *GLint) #foreign;
+    glUniform3iv: (location: GLint, count: GLsizei, value: *GLint) #foreign;
+    glUniform4iv: (location: GLint, count: GLsizei, value: *GLint) #foreign;
+    glUniformMatrix2fv: (location: GLint, count: GLsizei, transpose: GLboolean, value: *GLfloat) #foreign;
+    glUniformMatrix3fv: (location: GLint, count: GLsizei, transpose: GLboolean, value: *GLfloat) #foreign;
+    glUniformMatrix4fv: (location: GLint, count: GLsizei, transpose: GLboolean, value: *GLfloat) #foreign;
+
+    glGetUniformLocation: (program: GLuint, name: *GLchar) -> GLint #foreign;
+    glGetUniformfv: (program: GLuint, location: GLint, params: *GLfloat) #foreign;
+    glGetUniformiv: (program: GLuint, location: GLint, params: *GLint) #foreign;
+    glGetActiveUniform: (program: GLuint, index: GLuint, bufSize: GLsizei, length: *GLsizei, size: *GLint, type: *GLenum, name: *GLchar) #foreign;
+
+    glBindBuffer: (target: GLenum, buffer: GLuint) #foreign;
+    glDeleteBuffers: (n: GLsizei, buffers: *GLuint) #foreign;
+    glGenBuffers: (n: GLsizei, buffers: *GLuint) #foreign;
+    glIsBuffer: (buffer: GLuint) -> GLboolean #foreign;
+    glBufferData: (target: GLenum, size: GLsizeiptr, data: *void, usage: GLenum) #foreign;
+    glBufferSubData: (target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *void) #foreign;
+    glGetBufferSubData: (target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *void) #foreign;
+
+    glDisableVertexAttribArray: (index: GLuint) #foreign;
+    glEnableVertexAttribArray: (index: GLuint) #foreign;
+
+    glVertexAttribPointer: (index: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, pointer: *void) #foreign;
+
+    glGenVertexArrays: (n: GLsizei, arrays: *GLuint) #foreign;
+    glDeleteVertexArrays: (n: GLsizei, arrays: *GLuint) #foreign;
+    glBindVertexArray: (array: GLuint) #foreign;
+}
+
+gl_api: GL_3_0_API;
