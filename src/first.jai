@@ -19,7 +19,7 @@ setup_build_options :: () -> Build_Options {
 };
 
 build_workspace :: (name: string) -> Workspace, Build_Options {
-    options := setup_build_options_for_demo();
+    options := setup_build_options();
     options.output_type = Build_Output_Type.EXECUTABLE;
     options.output_executable_name = name;
     
@@ -32,5 +32,22 @@ build_workspace :: (name: string) -> Workspace, Build_Options {
 build_debug :: () -> Workspace, Build_Options {
     w, options := build_workspace("renderer");
     add_build_file("main.jai", w);
+
+    #if OS_WINDOWS {
+        add_build_file("os_windows.jai", w);
+    } else {
+        add_build_file("os_linux.jai", w);
+    }
+
+    add_build_string("DEBUG :: true;", w);
     return w, options;
 }
+
+demo :: () {
+    w, options := build_debug();
+    options.output_type = Build_Output_Type.NO_OUTPUT;
+    set_build_options(options, w);
+    add_build_string("#run main();", w);
+}
+
+#run build_debug();
