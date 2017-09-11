@@ -3,6 +3,9 @@
 #import "GL";
 #import "Compiler";
 
+strtoull :: (start: *u8, endptr: **u8, base: s32) -> u64 #foreign crt "_strtoui64";
+strtod :: (start: *u8, endptr: **u8) -> float64 #foreign crt;
+
 #scope_file
 User32   :: #foreign_system_library "user32";
 Kernel32 :: #foreign_system_library "kernel32";

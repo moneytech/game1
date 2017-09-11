@@ -1,14 +1,13 @@
 #load "renderer.jai";
+#load "lexer.jai";
+#load "asset_manager.jai";
 
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
 
-file_update_callback :: (notif: *File_Notification, data: *void) {
-
-}
-
 Game :: struct {
     renderer: *GL_Renderer;
+    asset_man: *Asset_Manager;
 }
 
 #import "Compiler";
@@ -33,12 +32,13 @@ main :: () {
     rdr: GL_Renderer;
     game: Game;
     game.renderer = *rdr;
-    // Asset_Manager asset_man (&game);
-    // game.asset_man = &asset_man;
+    asset_man: Asset_Manager;
+    asset_man.game = *game;
+    game.asset_man = *asset_man;
 
     rdr.game = *game;
     init(*rdr, WINDOW_WIDTH, WINDOW_HEIGHT);
-    // renderer = &rdr;
+    renderer = *rdr;
 
     // rdr.render_to_gbuffer = asset_man.load_shader_pair("assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
     // rdr.render_light_using_gbuffer = asset_man.load_shader_pair("assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
@@ -95,29 +95,14 @@ main :: () {
 }
 
 
-#include "general.h"
-#include "os_api.h"
-#include "renderer.h"
-#include "game.h"
+x, y: float;
 
-#include "stb_image.h"
+tex: *Texture;
+renderer: *GL_Renderer;
+font: *Font;
+__model: *Model;
 
-#define MACH_LEXER_IMPLEMENTATION
-#define MACH_LEXER_ENABLE_HTML
-
-#include "lexer.h"
-#include "html_parser.h"
-
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
-
-float x = 0, y = 0;
-
-Texture *tex = nullptr;
-GL_Renderer *renderer = nullptr;
-Font *font = nullptr;
-Model *__model = nullptr;
-
+/*
 struct Html_Phase {
     float text_x = 0;
     float text_y = 0;
@@ -194,8 +179,9 @@ void render() {
     // renderer->draw_text(font, "Hello World!", 32, 32);
     // render_html_dom(dom);
 }
+*/
 
-
+/*
 unsigned char ttf_buffer[1<<20];
 unsigned char temp_bitmap[512*512];
 
@@ -206,16 +192,18 @@ void my_stbtt_initfont(Font *font)
     stbtt_BakeFontBitmap(ttf_buffer,0, 32.0, temp_bitmap,512,512, 32,96, font->cdata); // no guarantee this fits!
     fclose(f);
 }
+*/
+
 
 file_update_callback :: (notif: *File_Notification, userdata: *void) {
-    g := (Game *)userdata;
+    g := cast(*Game) userdata;
     print("CALLBACK %\n", notif.name);
     if (contains_key(*g.asset_man.textures, notif.name)) {
         print("Updating file: %\n", notif.name);
-        load_image(*g.asset_man, notif.name);
+        load_image(g.asset_man, notif.name);
     } else if (contains_key(*g.asset_man.shader_catalog, notif.name)) {
-        printf("Reloading shader: %\n", notif.name);
-        reload_shader(*g.asset_man, notif.name);
+        print("Reloading shader: %\n", notif.name);
+        // reload_shader(*g.asset_man, notif.name);
     } else {
         print("No key for %\n", notif.name);
     }
@@ -259,3 +247,69 @@ void print_token(ML_Token *tok) {
     }
 }
 */
+
+
+Hash_Map :: struct (T: Type) {
+    Hash_Entry :: struct {
+        key: string;
+        next: *Hash_Entry;
+        value: T;
+    }
+
+    table: [4096] Hash_Entry;
+}
+
+hash_key :: (str: string) -> u32 {
+    hash: u32 = 5381;
+    c: s16;
+
+    for 0..str.count-1 {
+        // double cast to ensure sign extension
+        c =  xx cast(s8) str[it];
+        hash = ((hash << 5) + hash) + xx c;
+    }
+
+    return hash;
+}
+
+contains_key :: (using map: *Hash_Map($T), str: string) -> bool {
+    slot := hash_key(str) & (4096-1);
+    e := *table[slot];
+
+    while e != null {
+        if (!e.key.count) break;
+
+        if (str == e.key) break;
+
+        e = e.next;
+    }
+
+    return e.key.count != 0;
+}
+
+get_slot :: (using map: Hash_Map($T), str: string) -> **T {
+    slot := hash_key(str) & (4096-1);
+    e := *table[slot];
+
+    while e != null {
+        if (!e.key.count) {
+            e.key = copy_string(str);
+            break;
+        }
+
+        if (str == e.key) break;
+
+        if (!e.next) {
+            e.next = alloc(Hash_Map(T).Hash_Entry);
+            e = e.next;
+            e.key = copy_string(str);
+            e.next = null;
+            break;
+        }
+
+        e = e.next;
+        assert(e != null);
+    }
+
+    return *e.value;
+}

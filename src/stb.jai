@@ -22,3 +22,5 @@ stbtt_GetBakedQuad :: (chardata: *stbtt_bakedchar, pw: s32, ph: s32,
                        	char_index: s32, xpos: *float, ypos: *float,
                        	q: *stbtt_aligned_quad, opengl_fillrule: s32) #foreign stb;
 
+stbi_load :: (filename: *u8, x: *s32, y: *s32, channels_in_file: *s32, desired_channels: s32) -> *u8 #foreign stb;
+stbi_image_free :: (retval_from_stbi_load: *void) #foreign stb;

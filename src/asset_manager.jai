@@ -1,12 +1,49 @@
 #import "Basic";
 #import "File";
 
+Asset_Manager :: struct {
+    textures: Hash_Map(#type (*Texture));
+    models: Hash_Map(#type (*Model));
+    materials: Hash_Map(#type (*Material_Lib));
+    fonts: Hash_Map(#type (*Font));
+    shader_catalog: Hash_Map(Shader_Info);
+
+    game: *Game;
+}
+
 Shader_Info :: struct {
     dependencies: [..] *Shader; // shaders linked using this one
 };
 
-typedef Hash_Map<Material *> Material_Lib;
-Material_Lib :: Hash_Map(* Material);
+Material_Lib :: struct {
+    map: Hash_Map(#type (*Material));
+}
+// Material_Lib :: Hash_Map(#type (*Material));
+
+load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
+    width, height, comp: s32;
+    // @Leak
+    data := stbi_load(to_c_string(filepath), *width, *height, *comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
+
+    if (data) {
+        tex: *Texture = textures[filepath];
+        if (!tex) {
+            tex = xx New(Texture);
+            <<textures[filepath] = tex;
+        } else {
+            delete_texture(tex);
+        }
+
+        create_texture(tex, width, height, data);
+        stbi_image_free(data);
+        return tex;
+    }
+
+    print("ERROR:%s\n", point_at_c_string(stbi_failure_reason()));
+    return null;
+}
+
+/*
 
 maybe_calc_tangent_normals :: (m: *Mesh) {
     if (!m.material.textures[TEXTURE_NORMAL_INDEX]) return;
@@ -38,37 +75,10 @@ maybe_calc_tangent_normals :: (m: *Mesh) {
 }
 
 struct Asset_Manager {
-    Hash_Map<Texture *> textures;
-    Hash_Map<Model *> models;
-    Hash_Map<Material_Lib *> materials;
-    Hash_Map<Font *> fonts;
-    Hash_Map<Shader_Info> shader_catalog;
-
-    Game *game;
+  
 
     Asset_Manager(Game *g) : game(g) {}
 
-    Texture *load_image(const char *filepath) {
-        int width, height, comp;
-        unsigned char *data = stbi_load(filepath, &width, &height, &comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
-
-        if (data) {
-            Texture *tex = textures[filepath];
-            if (!tex) {
-                tex = GET_MEMORY(Texture);
-                textures[filepath] = tex;
-            } else {
-                game->renderer->delete_texture(tex);
-            }
-
-            game->renderer->create_texture(tex, width, height, data);
-            stbi_image_free(data);
-            return tex;
-        }
-
-        printf("ERROR:%s\n", stbi_failure_reason());
-        return nullptr;
-    }
 
     Model *load_model(const char *filepath) {
         char *obj_source = slurp_file(filepath);
@@ -451,3 +461,4 @@ Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filep
     }
     return mod;
 }
+*/
