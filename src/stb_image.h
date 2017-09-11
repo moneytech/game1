@@ -402,7 +402,13 @@ extern "C" {
 #ifdef STB_IMAGE_STATIC
 #define STBIDEF static
 #else
+
+#ifdef _WIN32
+#define STBIDEF __declspec(dllexport)
+#else
 #define STBIDEF extern
+#endif
+
 #endif
 
 //////////////////////////////////////////////////////////////////////////////

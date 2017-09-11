@@ -1,4 +1,6 @@
 
+#load "stb.jai";
+#load "math.jai";
 #import "GL";
 
 Rectangle :: struct {
@@ -17,8 +19,8 @@ Texture :: struct {
 
 Font :: struct {
     id: u32;
-    bwidth: u32;
-    bheight: u16;
+    bwidth: s16;
+    bheight: s16;
     cdata: [96] stbtt_bakedchar; // ASCII 32..126 is 95 glyphs
 };
 
@@ -26,11 +28,11 @@ font_get_length :: (using font: *Font, str: string) -> float {
     x: float = 0;
     y: float = 0;
     for 0..str.count-1 {
-        c := str[it_index];
+        c := str[it];
         if (c >= 32 && c < 128) {
             q: stbtt_aligned_quad = ---;
             // just run this so we can advance x for this character
-            stbtt_GetBakedQuad(cdata, bwidth, bheight, c-32, *x, *y, *q,1);
+            stbtt_GetBakedQuad(cdata.data, bwidth, bheight, c-32, *x, *y, *q,1);
         }
     }
     return x;
@@ -114,7 +116,7 @@ Light :: struct {
     quadratic: float;
 };
 
-struct Shader {
+Shader :: struct {
     id: u32;
 
     // for hot reloading
@@ -122,12 +124,12 @@ struct Shader {
     frag_path: string;
 };
 
-struct Camera {
+Camera :: struct {
     position: Vector3;
     rotation: Quaternion;
 };
 
-struct GL_Renderer {
+GL_Renderer :: struct {
     game: *Game;
 
     lights: [..] Light;
@@ -146,39 +148,498 @@ struct GL_Renderer {
     view_matrix: Matrix4;
 }
 
-/*
-    void init(int width, int height);
 
-    void create_texture(Texture *tex, u16 width, u16 height, void *data);
-    void delete_texture(Texture *tex);
-    Shader *compile_shader_source(const char *vertex, const char* pixel);
-    void compile_shader_source(Shader *sh, const char *vertex, const char *pixel);
-    void store_mesh_in_buffer(Mesh *m);
+debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
+    printf("DEBUG:%s\n", point_at_c_string(message));
+}
 
-    void set_projection_ortho(float l, float r, float t, float b, float n, float f);
+init :: (using rdr: *GL_Renderer, screen_width: int, screen_height: int) {
+    glDebugMessageCallback(debug_callback, null);
 
-    void set_projection_frustum(float l, float r, float b, float t, float n, float f);
-    void set_projection_fov(float fov, float aspect, float n, float f);
+    // @Temporary
+    // @Temporary
+    // @Temporary
+    // @Temporary
+    // @Temporary
+    VertexArrayID: GLuint;
+    glGenVertexArrays(1, *VertexArrayID);
+    glBindVertexArray(VertexArrayID);
 
-    void clear_screen(float r, float g, float b, float a);
+    glGenFramebuffers(1, *gbuffer_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
 
-    // 2D API
+    glGenTextures(1, *gbuffer_position);
+    glGenTextures(1, *gbuffer_normal);
+    glGenTextures(1, *gbuffer_albedo_spec);
 
-    void draw_rect(Rectangle &rect);
-    void draw_rect(float x, float y, float width, float height);
-    void draw_textured_rect(Texture *tex, float x, float y, float width, float height);
-    void draw_textured_rect(Texture *tex, Rectangle &rect);
-    void draw_sprite(Sprite *sp);
-    void create_font(Font *font, u16 bmap_width, u16 bmap_height, void *data);
-    float draw_text(Font *font, const char *text, float x, float y);
+    glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, screen_width, screen_height, 0, GL_RGB, GL_FLOAT, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gbuffer_position, 0);
 
-    // 3D API
+    glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, screen_width, screen_height, 0, GL_RGB, GL_FLOAT, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gbuffer_normal, 0);
 
-    void start_scene();
-    void finish_scene();
+    glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gbuffer_albedo_spec, 0);
 
-    void draw_cube(float x, float y, float z, float size);
-    void draw_mesh(Mesh *m);
-    void draw_model(Model *m);
+    attach: [3] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attach);
 
-*/
+    glGenRenderbuffers(1, *gbuffer_depth);
+    glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_depth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) assert(false);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+create_texture :: (tex: *Texture, width: u16, height: u16, data: *void) {
+    texId: GLuint;
+    glGenTextures(1, *texId);
+    glBindTexture(GL_TEXTURE_2D, texId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Filtering
+    tex.width = width;
+    tex.height = height;
+    tex.id = texId;
+}
+
+delete_texture :: (tex: *Texture) {
+    glDeleteTextures(1, *tex.id);
+    tex.id = 0;
+}
+
+compile_shader :: (type: GLenum, source: *u8) -> u32 {
+    v := glCreateShader(type);
+    glShaderSource(v, 1, *source, 0);
+    glCompileShader(v);
+
+    GLint status;
+    glGetShaderiv(v, GL_COMPILE_STATUS, *status);
+    if (status == GL_FALSE) {
+        GLint len;
+        glGetShaderiv(v, GL_INFO_LOG_LENGTH, *len);
+        buf := cast(*u8) alloc(len);
+        glGetShaderInfoLog(v, len, *len, buf);
+        print("ERROR: %s\n", point_at_c_string(buf));
+        free(buf);
+
+        glDeleteShader(v);
+        return 0;
+    }
+
+    return v;
+}
+
+compile_shader_source :: (vertex: *u8, pixel: *u8) -> *Shader {
+    out := New(Shader);
+    compile_shader_source(out, vertex, pixel);
+    return out;
+}
+
+compile_shader_source :: (out: *Shader, vertex: *u8, pixel: *u8) {
+    vert = compile_shader(GL_VERTEX_SHADER, vertex);
+    frag = compile_shader(GL_FRAGMENT_SHADER, pixel);
+    program = glCreateProgram();
+    glAttachShader(program, vert);
+    glAttachShader(program, frag);
+    glLinkProgram(program);
+
+    status: GLint;
+    glGetProgramiv(program, GL_LINK_STATUS, *status);
+    if (status == GL_FALSE) {
+        len: GLint;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, *len);
+        buf := cast(*u8) alloc(len);
+        glGetProgramInfoLog(program, len, *len, buf);
+        print("ERROR: %s\n", point_at_c_string(buf));
+        free(buf);
+
+        glDeleteProgram(program);
+        glDeleteShader(vert);
+        glDeleteShader(frag);
+        return ;
+    }
+
+    glDetachShader(program, vert);
+    glDetachShader(program, frag);
+
+    out.id = program;
+}
+
+matrix_projection_fov :: (fov: float, aspect: float, n: float, f: float) -> Matrix4 {
+    t := tan(fov * 3.14159 / 360.0) * n;
+    b := -t;
+    l := aspect * b;
+    r := aspect * t;
+    return matrix_frustum(l, r, b, t, n, f);
+}
+
+clear_screen :: (r: float, g: float, b: float, a: float) {
+    glClearColor(r, g, b, a);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK);
+}
+
+draw_rect :: (rect: Rectangle) {
+    x := rect.x;
+    y := rect.y;
+    width := rect.width;
+    height := rect.height;
+
+    draw_rect(x, y, width, height);
+}
+
+draw_rect :: (x: float, y: float, width: float, height: float) {
+    xw := x+width;
+    yh := y+height;
+    // glBegin(GL_QUADS);
+    //     glVertex2f(x, y);
+    //     glVertex2f(x, yh);
+    //     glVertex2f(xw, yh);
+    //     glVertex2f(xw, y);
+    // glEnd();
+
+    assert(false);
+}
+
+draw_textured_rect :: (tex: Texture, x: float, y: float, width: float, height: float) {
+    if (tex) {
+        glUseProgram(render_plain_texture.id);
+        glBindTexture(GL_TEXTURE_2D, tex.id);
+    }
+
+    xw := x+width;
+    yh := y+height;
+
+    arr: [] float = {:float:
+        x, y, 0, 0,
+        xw, y, 1, 0,
+        xw, yh, 1, 1,
+
+        xw, yh, 1, 1,
+        x, yh, 0, 1,
+        x, y, 0, 0,
+    };
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, size_of(arr), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(float)*4, 0);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, size_of(float)*4, (void *)(size_of(float)*2));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(2);
+    glDeleteBuffers(1, *buf);
+}
+
+draw_textured_rect :: (tex: Texture, rect: Rectangle) {
+    draw_textured_rect(tex, rect.x, rect.y, rect.width, rect.height);
+}
+
+draw_sprite :: (sp: Sprite) {
+    glBindTexture(GL_TEXTURE_2D, sp.texture.id);
+
+    rect := *sp.dimensions;
+    x := rect.x;
+    y := rect.y;
+    width := rect.width;
+    height := rect.height;
+
+    xw := x+width;
+    yh := y+height;
+
+    frame := sp->current_frame;
+    assert(frame != null);
+
+    tex_coords = *frame.tex_coords;
+    tx := tex_coords.x;
+    ty := tex_coords.y;
+    txw := tx + tex_coords.width;
+    tyh := ty + tex_coords.height;
+ 
+    if (frame.flags & BITMAP_FRAME_FLIP_VERTICLE) {
+        temp := tx;
+        tx = txw;
+        txw = temp;
+        assert(false);
+    }
+    if (frame.flags & BITMAP_FRAME_FLIP_HORIZONTAL) {
+        temp := ty;
+        tx = tyh;
+        tyh = temp;
+        assert(false);
+    }
+
+    // glBegin(GL_QUADS);
+    //     glTexCoord2f(tx, tyh);
+    //     glVertex2f(x, y);
+    //     glTexCoord2f(tx, ty);
+    //     glVertex2f(x, yh);
+    //     glTexCoord2f(txw, ty);
+    //     glVertex2f(xw, yh);
+    //     glTexCoord2f(txw, tyh);
+    //     glVertex2f(xw, y);
+    // glEnd();
+
+    assert(false);
+}
+
+create_font :: (font: *Font, bwidth: u16, bheight: u16, data: *void) {
+    font.bwidth = bwidth;
+    font.bheight = bheight;
+    glGenTextures(1, *font.id);
+    glBindTexture(GL_TEXTURE_2D, font.id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bwidth, bheight, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+}
+
+draw_text :: (font: Font, text: string, x: float, y: float) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glBindTexture(GL_TEXTURE_2D, font.id);
+    // glBegin(GL_QUADS);
+    // while (*text) {
+    //     if (*text >= 32 && *text < 128) {
+    //         stbtt_aligned_quad q;
+    //         stbtt_GetBakedQuad(font->cdata, font->bwidth, font->bheight, *text-32, &x,&y,&q,1);//1=opengl & d3d10+,0=d3d9
+    //         glTexCoord2f(q.s0,q.t0); glVertex2f(q.x0,q.y0);
+    //         glTexCoord2f(q.s0,q.t1); glVertex2f(q.x0,q.y1);
+    //         glTexCoord2f(q.s1,q.t1); glVertex2f(q.x1,q.y1);
+    //         glTexCoord2f(q.s1,q.t0); glVertex2f(q.x1,q.y0);
+    //     }
+    //     ++text;
+    // }
+    // glEnd();
+
+    glDisable(GL_BLEND);
+    assert(false);
+
+    return x;
+}
+
+start_scene :: (using rdr: GL_Renderer) {
+    glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
+    clear_screen(0, 0, 0, 1);
+
+    glUseProgram(render_to_gbuffer.id);
+    view_matrix = matrix_translate(0, -2, -3);
+}
+
+finish_scene :: (using rdr: GL_Renderer) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    clear_screen(0, 0, 0, 1);
+
+    projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+
+    glUseProgram(render_light_using_gbuffer.id);
+    proj := glGetUniformLocation(render_light_using_gbuffer.id, "projection");
+    tex_normal := glGetUniformLocation(render_light_using_gbuffer.id, "g_normal");
+    tex_pos := glGetUniformLocation(render_light_using_gbuffer.id, "g_position");
+    tex_albedo := glGetUniformLocation(render_light_using_gbuffer.id, "g_albedospec");
+    glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
+    glUniform1i(tex_pos, 0);
+    glUniform1i(tex_normal, 1);
+    glUniform1i(tex_albedo, 2);
+    draw_textured_rect(null, 0, 0, 1, 1);
+
+    for lights {
+
+    }
+
+    glUseProgram(0);
+}
+
+draw_cube :: (x: float, y: float, z: float, size: float) {
+
+    glEnable(GL_DEPTH_TEST);
+
+    t := matrix_translate(x, y, z);
+
+    hs := size/2.0;
+    // glBegin(GL_QUADS);
+    //     glNormal3f(0, 0, 1);
+    //     glVertex3f(-hs, hs, hs);
+    //     glVertex3f(-hs,-hs, hs);
+    //     glVertex3f( hs,-hs, hs);
+    //     glVertex3f( hs, hs, hs);
+
+    //     glNormal3f(-1, 0, 0);
+    //     glVertex3f(-hs, hs,-hs);
+    //     glVertex3f(-hs,-hs,-hs);
+    //     glVertex3f(-hs,-hs, hs);
+    //     glVertex3f(-hs, hs, hs);
+
+    //     glNormal3f(0, 0, -1);
+    //     glVertex3f( hs, hs,-hs);
+    //     glVertex3f( hs,-hs,-hs);
+    //     glVertex3f(-hs,-hs,-hs);
+    //     glVertex3f(-hs, hs,-hs);
+
+    //     glNormal3f(1, 0, 0);
+    //     glVertex3f( hs, hs, hs);
+    //     glVertex3f( hs,-hs, hs);
+    //     glVertex3f( hs,-hs,-hs);
+    //     glVertex3f( hs, hs,-hs);
+
+    //     glNormal3f(0, 1, 0);
+    //     glVertex3f(-hs, hs,-hs);
+    //     glVertex3f(-hs, hs, hs);
+    //     glVertex3f( hs, hs, hs);
+    //     glVertex3f( hs, hs,-hs);
+
+    //     glNormal3f(0, -1, 0);
+    //     glVertex3f( hs,-hs,-hs);
+    //     glVertex3f( hs,-hs, hs);
+    //     glVertex3f(-hs,-hs, hs);
+    //     glVertex3f(-hs,-hs,-hs);
+
+    // glEnd();
+
+    glDisable(GL_DEPTH_TEST);
+    assert(false);
+}
+
+r: float;
+
+draw_mesh :: (m: Mesh) {
+    glEnable(GL_DEPTH_TEST);
+
+    r += 0.001;
+    q := set_angle_vector(0, 1, 0, 0);
+    b := set_angle_vector(3.14, 0, 1, 0);
+    t := matrix_rotate(nlerp(clamp(r, 0, 1), q, b));
+
+    proj := glGetUniformLocation(render_to_gbuffer.id, "projection");
+    view := glGetUniformLocation(render_to_gbuffer.id, "view");
+    model := glGetUniformLocation(render_to_gbuffer.id, "model");
+    glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
+    glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
+    glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
+
+    viewer_pos := glGetUniformLocation(render_to_gbuffer.id, "viewer_pos");
+    glUniform3f(viewer_pos, 0, 0, 10); // @TODO
+
+    // material
+    mat_diffuse := glGetUniformLocation(render_to_gbuffer.id, "material.diffuse");
+    mat_spec_exp := glGetUniformLocation(render_to_gbuffer.id, "material.specular_exp");
+    use_diffuse_map := glGetUniformLocation(render_to_gbuffer.id, "use_diffuse_map");
+    use_normal_map := glGetUniformLocation(render_to_gbuffer.id, "use_normal_map");
+    use_specular_map := glGetUniformLocation(render_to_gbuffer.id, "use_specular_map");
+    diffuse_map := glGetUniformLocation(render_to_gbuffer.id, "diffuse_map");
+    normal_map := glGetUniformLocation(render_to_gbuffer.id, "normal_map");
+    specular_map := glGetUniformLocation(render_to_gbuffer.id, "specular_map");
+
+    assert(m.material);
+    Material *mat = m->material;
+    Texture *diffuse_tex =  mat->textures[TEXTURE_DIFFUSE_INDEX];
+    Texture *normal_tex = mat->textures[TEXTURE_NORMAL_INDEX];
+    Texture *spec_tex = mat->textures[TEXTURE_SPECULAR_INDEX];
+
+    glUniform1i(use_diffuse_map, diffuse_tex ? 1 : 0);
+    if (diffuse_tex) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuse_tex->id);
+        glUniform1i(diffuse_map, 0);
+    }
+
+    glUniform1i(use_normal_map, normal_tex ? 1: 0);
+    if (normal_tex) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normal_tex->id);
+        glUniform1i(normal_map, 1);
+    }
+
+    glUniform1i(use_specular_map, spec_tex ? 1: 0);
+    if (spec_tex) {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, spec_tex->id);
+        glUniform1i(specular_map, 2);
+    }
+
+    glActiveTexture(GL_TEXTURE0);
+
+    Color &diffuse = mat->diffuse;
+    glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
+    glUniform1f(mat_spec_exp, mat->specular_exp);
+
+    glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
+
+    u64 vertex_size = m->vertices.count * sizeof(Vector3);
+    u64 normal_size = m->normals.count * sizeof(Vector3);
+    u64 tex_size    = m->tex_coords.count * sizeof(Vector2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)vertex_size);
+
+    if (tex_size) {
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size));
+    }
+
+    if (normal_tex) {
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size+tex_size));
+    }
+
+    glDrawArrays(GL_TRIANGLES, 0, m->vertices.count);
+
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    
+    if (tex_size) glDisableVertexAttribArray(2);
+    if (normal_tex) glDisableVertexAttribArray(3);
+
+    glDisable(GL_DEPTH_TEST);
+}
+
+store_mesh_in_buffer :: (m: *Mesh) {
+    glGenBuffers(1, *m.buffer_id);
+    glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
+
+    vertex_size := m.vertices.count * size_of(Vector3);
+    normal_size := m.normals.count * size_of(Vector3);
+    tex_size    := m.tex_coords.count * size_of(Vector2);
+    tangent_size := m.tangent_normals.count * size_of(Vector3);
+    total_size := vertex_size + tex_size + normal_size + tangent_size;
+
+    glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m.vertices.data);
+    glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m.normals.data);
+    glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m.tex_coords.data);
+    glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size, tangent_size, m.tangent_normals.data);
+}
+
+draw_model :: (using m: Model) {
+    for meshes {
+        draw_mesh(<< it);
+    }
+}

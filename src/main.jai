@@ -1,3 +1,4 @@
+#load "renderer.jai";
 
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
@@ -7,13 +8,20 @@ file_update_callback :: (notif: *File_Notification, data: *void) {
 }
 
 Game :: struct {
-
+    renderer: GL_Renderer;
 }
+
+#import "Compiler";
 
 main :: () {
     os_init_platform();
-    path := os_get_executable_path();
-    setcwd(path);
+    #if running_at_compile_time() {
+        opts := get_build_options();
+        setcwd(opts.output_path);
+    } else {
+        path := os_get_executable_path();
+        setcwd(path);
+    }
     os_watch_dir("assets");
     // os_watch_dir("assets/shaders");
 
@@ -22,14 +30,14 @@ main :: () {
     os_make_current(win, ctx);
     os_set_vsync(true);
 
-    // GL_Renderer rdr;
+    rdr: GL_Renderer;
     game: Game;
-    // game.renderer = &rdr;
+    game.renderer = *rdr;
     // Asset_Manager asset_man (&game);
     // game.asset_man = &asset_man;
 
-    // rdr.game = &game;
-    // rdr.init(WINDOW_WIDTH, WINDOW_HEIGHT);
+    rdr.game = *game;
+    init(*rdr, WINDOW_WIDTH, WINDOW_HEIGHT);
     // renderer = &rdr;
 
     // rdr.render_to_gbuffer = asset_man.load_shader_pair("assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");

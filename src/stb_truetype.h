@@ -469,7 +469,13 @@ int main(int arg, char **argv)
 #ifdef STBTT_STATIC
 #define STBTT_DEF static
 #else
+
+#ifdef _WIN32
+#define STBTT_DEF __declspec(dllexport)
+#else
 #define STBTT_DEF extern
+#endif
+
 #endif
 
 #ifdef __cplusplus

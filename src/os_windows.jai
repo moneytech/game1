@@ -205,8 +205,10 @@ GL_3_0_API :: struct {
     glDeleteVertexArrays: (n: GLsizei, arrays: *GLuint) #foreign;
     glBindVertexArray: (array: GLuint) #foreign;
 
-
+    glDebugMessageCallback :: (callback: GLDEBUGPROC, userParam: *void) #foreign;
 }
+
+GLDEBUGPROC :: #type (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback;
 
 gl_api: GL_3_0_API;
 
@@ -392,7 +394,7 @@ wglSwapIntervalStub :: (interval: s16) -> s16 #c_callback {
 
 os_set_vsync :: (on: bool) {
     // @Cleanup we should query these at startup
-    wglSwapIntervalEXT := wglSwapIntervalStub;
+    wglSwapIntervalEXT : (interval: s16) -> s16 #foreign = xx wglSwapIntervalStub;
     wglGetExtensionsStringEXT: () -> *u8 #foreign = xx os_load_gl_func("wglGetExtensionsStringEXT");
 
     if (strstr(wglGetExtensionsStringEXT(), to_c_string("EXT_swap_control"))) {
@@ -410,7 +412,7 @@ os_set_vsync :: (on: bool) {
     array_reset(*joysticks);
     for 0..XUSER_MAX_COUNT-1 {
         st: XINPUT_STATE;
-        if (__XInputGetState(xx it, *st) == ERROR_SUCCESS) {
+        if (XInputGetStateStub(xx it, *st) == ERROR_SUCCESS) {
             joy: Joystick;
             pad := *st.Gamepad;
 
