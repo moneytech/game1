@@ -3,6 +3,10 @@
 #load "math.jai";
 #import "GL";
 
+#scope_file
+using gl_30_api;
+#scope_export
+
 Rectangle :: struct {
     x: float;
     y: float;
@@ -150,10 +154,10 @@ GL_Renderer :: struct {
 
 
 debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
-    printf("DEBUG:%s\n", point_at_c_string(message));
+    print("DEBUG:%\n", point_at_c_string(message));
 }
 
-init :: (using rdr: *GL_Renderer, screen_width: int, screen_height: int) {
+init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
     glDebugMessageCallback(debug_callback, null);
 
     // @Temporary
@@ -173,25 +177,25 @@ init :: (using rdr: *GL_Renderer, screen_width: int, screen_height: int) {
     glGenTextures(1, *gbuffer_albedo_spec);
 
     glBindTexture(GL_TEXTURE_2D, gbuffer_position);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, screen_width, screen_height, 0, GL_RGB, GL_FLOAT, null);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx screen_width, xx screen_height, 0, GL_RGB, GL_FLOAT, null);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gbuffer_position, 0);
 
     glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, screen_width, screen_height, 0, GL_RGB, GL_FLOAT, null);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx screen_width, xx screen_height, 0, GL_RGB, GL_FLOAT, null);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gbuffer_normal, 0);
 
     glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, xx screen_width, xx screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gbuffer_albedo_spec, 0);
 
     attach: [3] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attach);
+    glDrawBuffers(3, attach.data);
 
     glGenRenderbuffers(1, *gbuffer_depth);
     glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_depth);
@@ -222,17 +226,17 @@ delete_texture :: (tex: *Texture) {
 
 compile_shader :: (type: GLenum, source: *u8) -> u32 {
     v := glCreateShader(type);
-    glShaderSource(v, 1, *source, 0);
+    glShaderSource(v, 1, *source, null);
     glCompileShader(v);
 
-    GLint status;
+    status: GLint;
     glGetShaderiv(v, GL_COMPILE_STATUS, *status);
     if (status == GL_FALSE) {
-        GLint len;
+        len: GLint;
         glGetShaderiv(v, GL_INFO_LOG_LENGTH, *len);
         buf := cast(*u8) alloc(len);
-        glGetShaderInfoLog(v, len, *len, buf);
-        print("ERROR: %s\n", point_at_c_string(buf));
+        glGetShaderInfoLog(v, xx len, xx *len, buf);
+        print("ERROR: %\n", point_at_c_string(buf));
         free(buf);
 
         glDeleteShader(v);
@@ -249,9 +253,9 @@ compile_shader_source :: (vertex: *u8, pixel: *u8) -> *Shader {
 }
 
 compile_shader_source :: (out: *Shader, vertex: *u8, pixel: *u8) {
-    vert = compile_shader(GL_VERTEX_SHADER, vertex);
-    frag = compile_shader(GL_FRAGMENT_SHADER, pixel);
-    program = glCreateProgram();
+    vert := compile_shader(GL_VERTEX_SHADER, vertex);
+    frag := compile_shader(GL_FRAGMENT_SHADER, pixel);
+    program := glCreateProgram();
     glAttachShader(program, vert);
     glAttachShader(program, frag);
     glLinkProgram(program);
@@ -262,8 +266,8 @@ compile_shader_source :: (out: *Shader, vertex: *u8, pixel: *u8) {
         len: GLint;
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, *len);
         buf := cast(*u8) alloc(len);
-        glGetProgramInfoLog(program, len, *len, buf);
-        print("ERROR: %s\n", point_at_c_string(buf));
+        glGetProgramInfoLog(program, xx len, xx *len, buf);
+        print("ERROR: %\n", point_at_c_string(buf));
         free(buf);
 
         glDeleteProgram(program);
@@ -316,7 +320,7 @@ draw_rect :: (x: float, y: float, width: float, height: float) {
     assert(false);
 }
 
-draw_textured_rect :: (tex: Texture, x: float, y: float, width: float, height: float) {
+draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float) {
     if (tex) {
         glUseProgram(render_plain_texture.id);
         glBindTexture(GL_TEXTURE_2D, tex.id);
@@ -325,26 +329,38 @@ draw_textured_rect :: (tex: Texture, x: float, y: float, width: float, height: f
     xw := x+width;
     yh := y+height;
 
-    arr: [] float = {:float:
-        x, y, 0, 0,
-        xw, y, 1, 0,
-        xw, yh, 1, 1,
+    arr: [24] float = {:float:
+        -1, -1, 0, 0,
+        -1, -1, 1, 0,
+        -1, -1, 1, 1,
 
-        xw, yh, 1, 1,
-        x, yh, 0, 1,
-        x, y, 0, 0,
+        -1, -1, 1, 1,
+        -1, -1, 0, 1,
+        -1, -1, 0, 0,
     };
+    arr[0] = x;
+    arr[1] = y;
+    arr[4] = xw;
+    arr[5] = y;
+    arr[8] = xw;
+    arr[9] = yh;
+    arr[12] = xw;
+    arr[13] = yh;
+    arr[16] = x;
+    arr[17] = yh;
+    arr[20] = x;
+    arr[21] = y;
 
     buf: u32;
     glGenBuffers(1, *buf);
     glBindBuffer(GL_ARRAY_BUFFER, buf);
-    glBufferData(GL_ARRAY_BUFFER, size_of(arr), arr.data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(float), arr.data, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(2);
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(float)*4, 0);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, size_of(float)*4, (void *)(size_of(float)*2));
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(float)*4, null);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, size_of(float)*4, cast(*void)(size_of(float)*2));
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
@@ -353,8 +369,8 @@ draw_textured_rect :: (tex: Texture, x: float, y: float, width: float, height: f
     glDeleteBuffers(1, *buf);
 }
 
-draw_textured_rect :: (tex: Texture, rect: Rectangle) {
-    draw_textured_rect(tex, rect.x, rect.y, rect.width, rect.height);
+draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, rect: Rectangle) {
+    draw_textured_rect(rdr, tex, rect.x, rect.y, rect.width, rect.height);
 }
 
 draw_sprite :: (sp: Sprite) {
@@ -369,10 +385,10 @@ draw_sprite :: (sp: Sprite) {
     xw := x+width;
     yh := y+height;
 
-    frame := sp->current_frame;
+    frame := sp.current_frame;
     assert(frame != null);
 
-    tex_coords = *frame.tex_coords;
+    tex_coords := *frame.tex_coords;
     tx := tex_coords.x;
     ty := tex_coords.y;
     txw := tx + tex_coords.width;
@@ -405,7 +421,7 @@ draw_sprite :: (sp: Sprite) {
     assert(false);
 }
 
-create_font :: (font: *Font, bwidth: u16, bheight: u16, data: *void) {
+create_font :: (font: *Font, bwidth: s16, bheight: s16, data: *void) {
     font.bwidth = bwidth;
     font.bheight = bheight;
     glGenTextures(1, *font.id);
@@ -414,7 +430,7 @@ create_font :: (font: *Font, bwidth: u16, bheight: u16, data: *void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
-draw_text :: (font: Font, text: string, x: float, y: float) {
+draw_text :: (font: Font, text: string, x: float, y: float) -> x {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -468,7 +484,7 @@ finish_scene :: (using rdr: GL_Renderer) {
     glUniform1i(tex_pos, 0);
     glUniform1i(tex_normal, 1);
     glUniform1i(tex_albedo, 2);
-    draw_textured_rect(null, 0, 0, 1, 1);
+    draw_textured_rect(rdr, null, 0, 0, 1, 1);
 
     for lights {
 
@@ -529,7 +545,7 @@ draw_cube :: (x: float, y: float, z: float, size: float) {
 
 r: float;
 
-draw_mesh :: (m: Mesh) {
+draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glEnable(GL_DEPTH_TEST);
 
     r += 0.001;
@@ -557,60 +573,60 @@ draw_mesh :: (m: Mesh) {
     normal_map := glGetUniformLocation(render_to_gbuffer.id, "normal_map");
     specular_map := glGetUniformLocation(render_to_gbuffer.id, "specular_map");
 
-    assert(m.material);
-    Material *mat = m->material;
-    Texture *diffuse_tex =  mat->textures[TEXTURE_DIFFUSE_INDEX];
-    Texture *normal_tex = mat->textures[TEXTURE_NORMAL_INDEX];
-    Texture *spec_tex = mat->textures[TEXTURE_SPECULAR_INDEX];
+    assert(m.material != null);
+    mat := m.material;
+    diffuse_tex :=  mat.textures[TEXTURE_DIFFUSE_INDEX];
+    normal_tex := mat.textures[TEXTURE_NORMAL_INDEX];
+    spec_tex := mat.textures[TEXTURE_SPECULAR_INDEX];
 
-    glUniform1i(use_diffuse_map, diffuse_tex ? 1 : 0);
+    glUniform1i(use_diffuse_map, xx (diffuse_tex != null));
     if (diffuse_tex) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuse_tex->id);
+        glBindTexture(GL_TEXTURE_2D, diffuse_tex.id);
         glUniform1i(diffuse_map, 0);
     }
 
-    glUniform1i(use_normal_map, normal_tex ? 1: 0);
+    glUniform1i(use_normal_map, xx (normal_tex != null));
     if (normal_tex) {
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normal_tex->id);
+        glBindTexture(GL_TEXTURE_2D, normal_tex.id);
         glUniform1i(normal_map, 1);
     }
 
-    glUniform1i(use_specular_map, spec_tex ? 1: 0);
+    glUniform1i(use_specular_map, xx (spec_tex != null));
     if (spec_tex) {
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, spec_tex->id);
+        glBindTexture(GL_TEXTURE_2D, spec_tex.id);
         glUniform1i(specular_map, 2);
     }
 
     glActiveTexture(GL_TEXTURE0);
 
-    Color &diffuse = mat->diffuse;
+    diffuse := *mat.diffuse;
     glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
-    glUniform1f(mat_spec_exp, mat->specular_exp);
+    glUniform1f(mat_spec_exp, mat.specular_exp);
 
-    glBindBuffer(GL_ARRAY_BUFFER, m->buffer_id);
+    glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
 
-    u64 vertex_size = m->vertices.count * sizeof(Vector3);
-    u64 normal_size = m->normals.count * sizeof(Vector3);
-    u64 tex_size    = m->tex_coords.count * sizeof(Vector2);
+    vertex_size := m.vertices.count * size_of(Vector3);
+    normal_size := m.normals.count * size_of(Vector3);
+    tex_size    := m.tex_coords.count * size_of(Vector2);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)vertex_size);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) vertex_size);
 
     if (tex_size) {
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size));
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size));
     }
 
     if (normal_tex) {
         glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, (void*)(vertex_size+normal_size+tex_size));
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size));
     }
 
-    glDrawArrays(GL_TRIANGLES, 0, m->vertices.count);
+    glDrawArrays(GL_TRIANGLES, 0, xx m.vertices.count);
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
@@ -638,8 +654,8 @@ store_mesh_in_buffer :: (m: *Mesh) {
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size, tangent_size, m.tangent_normals.data);
 }
 
-draw_model :: (using m: Model) {
-    for meshes {
-        draw_mesh(<< it);
+draw_model :: (rdr: GL_Renderer, m: Model) {
+    for m.meshes {
+        draw_mesh(rdr, << it);
     }
 }
