@@ -15,6 +15,9 @@ Game :: struct {
 main :: () {
     os_init_platform();
     #if running_at_compile_time() {
+        orig_wd: string;
+        orig_wd.data = alloc(512);
+        orig_wd.count = get_current_directory(orig_wd.data, 512);
         opts := get_build_options();
         setcwd(opts.output_path);
     } else {
@@ -92,6 +95,10 @@ main :: () {
     }
 
     os_close_window(win);
+
+    #if running_at_compile_time() {
+        setcwd(orig_wd);
+    }
 }
 
 
@@ -249,11 +256,11 @@ void print_token(ML_Token *tok) {
 */
 
 
-Hash_Map :: struct (T: Type) {
+Hash_Map :: struct (Value_Type: Type) {
     Hash_Entry :: struct {
         key: string;
         next: *Hash_Entry;
-        value: T;
+        value: Value_Type;
     }
 
     table: [4096] Hash_Entry;
@@ -287,7 +294,7 @@ contains_key :: (using map: *Hash_Map($T), str: string) -> bool {
     return e.key.count != 0;
 }
 
-get_slot :: (using map: Hash_Map($T), str: string) -> **T {
+get_slot :: (using map: *Hash_Map($T), str: string) -> T {
     slot := hash_key(str) & (4096-1);
     e := *table[slot];
 
@@ -300,7 +307,7 @@ get_slot :: (using map: Hash_Map($T), str: string) -> **T {
         if (str == e.key) break;
 
         if (!e.next) {
-            e.next = alloc(Hash_Map(T).Hash_Entry);
+            e.next = New(#type Hash_Map(T).Hash_Entry);
             e = e.next;
             e.key = copy_string(str);
             e.next = null;
@@ -311,5 +318,32 @@ get_slot :: (using map: Hash_Map($T), str: string) -> **T {
         assert(e != null);
     }
 
-    return *e.value;
+    return e.value;
+}
+
+set_slot :: (using map: *Hash_Map($T), str: string, val: T) {
+    slot := hash_key(str) & (4096-1);
+    e := *table[slot];
+
+    while e != null {
+        if (!e.key.count) {
+            e.key = copy_string(str);
+            break;
+        }
+
+        if (str == e.key) break;
+
+        if (!e.next) {
+            e.next = New(#type Hash_Map(T).Hash_Entry);
+            e = e.next;
+            e.key = copy_string(str);
+            e.next = null;
+            break;
+        }
+
+        e = e.next;
+        assert(e != null);
+    }
+
+    e.value = val;
 }

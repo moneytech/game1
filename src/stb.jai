@@ -24,3 +24,4 @@ stbtt_GetBakedQuad :: (chardata: *stbtt_bakedchar, pw: s32, ph: s32,
 
 stbi_load :: (filename: *u8, x: *s32, y: *s32, channels_in_file: *s32, desired_channels: s32) -> *u8 #foreign stb;
 stbi_image_free :: (retval_from_stbi_load: *void) #foreign stb;
+stbi_failure_reason :: () -> *u8 #foreign stb;

@@ -2,11 +2,11 @@
 #import "File";
 
 Asset_Manager :: struct {
-    textures: Hash_Map(#type (*Texture));
-    models: Hash_Map(#type (*Model));
-    materials: Hash_Map(#type (*Material_Lib));
-    fonts: Hash_Map(#type (*Font));
-    shader_catalog: Hash_Map(Shader_Info);
+    textures: Hash_Map(#type *Texture);
+    models: Hash_Map(#type *Model);
+    materials: Hash_Map(#type *Material_Lib);
+    fonts: Hash_Map(#type *Font);
+    shader_catalog: Hash_Map(#type Shader_Info);
 
     game: *Game;
 }
@@ -26,15 +26,16 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
     data := stbi_load(to_c_string(filepath), *width, *height, *comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
 
     if (data) {
-        tex: *Texture = textures[filepath];
+        tex: *Texture = get_slot(*textures, filepath);
+
         if (!tex) {
             tex = xx New(Texture);
-            <<textures[filepath] = tex;
+            set_slot(*textures, filepath, tex);
         } else {
             delete_texture(tex);
         }
 
-        create_texture(tex, width, height, data);
+        create_texture(tex, xx width, xx height, data);
         stbi_image_free(data);
         return tex;
     }
@@ -43,41 +44,36 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
     return null;
 }
 
-/*
+maybe_calc_tangent_normals :: (using m: *Mesh) {
+    if (!material.textures[TEXTURE_NORMAL_INDEX]) return;
 
-maybe_calc_tangent_normals :: (m: *Mesh) {
-    if (!m.material.textures[TEXTURE_NORMAL_INDEX]) return;
+    array_reserve(*tangent_normals, vertices.count);
+    for 0..vertices.count-1 {
+        e1 := vertices[it+1] - vertices[it];
+        e2 := vertices[it+2] - vertices[it];
 
-    tex := *m.tex_coords;
-    verts = *m.vertices;
-    tangents = *m.tangent_normals;
-    array_reserve(tangents, verts.count);
-    for (u32 i = 0; i < verts.count; i += 3) {
-        Vector3 e1 = verts[i+1] - verts[i];
-        Vector3 e2 = verts[i+2] - verts[i];
+        dUV1 := tex_coords[it+1] - tex_coords[it];
+        dUV2 := tex_coords[it+2] - tex_coords[it];
 
-        Vector2 dUV1 = tex[i+1] - tex[i];
-        Vector2 dUV2 = tex[i+2] - tex[i];
+        f := 1.0 / (dUV1.x * dUV2.y - dUV2.x * dUV1.y);
 
-        float f = 1.0f / (dUV1.x * dUV2.y - dUV2.x * dUV1.y);
-
-        Vector3 tangent;
+        tangent: Vector3;
         tangent.x = f * (dUV2.y * e1.x - dUV1.y * e2.x);
         tangent.y = f * (dUV2.y * e1.y - dUV1.y * e2.y);
         tangent.z = f * (dUV2.y * e1.z - dUV1.y * e2.z);
         tangent = normalize(tangent);
 
         // we add it three times, one for each vertex
-        tangents.add(tangent);
-        tangents.add(tangent);
-        tangents.add(tangent);
+        array_add(*tangent_normals, tangent);
+        array_add(*tangent_normals, tangent);
+        array_add(*tangent_normals, tangent);
+
+        it += 2;
     }    
 }
 
-struct Asset_Manager {
-  
+/*
 
-    Asset_Manager(Game *g) : game(g) {}
 
 
     Model *load_model(const char *filepath) {
@@ -121,7 +117,7 @@ struct Asset_Manager {
         FREE_MEMORY(frag);
         return sh;
     }
-};
+
 
 
 char *path_of(const char *filepath) {
