@@ -16,7 +16,7 @@ Shader_Info :: struct {
 };
 
 Material_Lib :: struct {
-    map: Hash_Map(#type (*Material));
+    using map: Hash_Map(#type *Material);
 }
 // Material_Lib :: Hash_Map(#type (*Material));
 
@@ -43,6 +43,47 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
     print("ERROR:%s\n", point_at_c_string(stbi_failure_reason()));
     return null;
 }
+
+load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
+    obj_source := read_entire_file(filepath);
+    mod := model_loader_parse_obj(game, obj_source, filepath);
+    for mod.meshes {
+        maybe_calc_tangent_normals(it);
+        store_mesh_in_buffer(it);
+    }
+    if (get_slot(*models, filepath)) {
+        // @TODO free old model
+    }
+    set_slot(*models, filepath, mod);
+    return mod;
+}
+
+reload_shader :: (using asset_man: *Asset_Manager, path: string) {
+    deps := get_slot(*shader_catalog, path).dependencies;
+    for deps {
+        // kind of wastefull, we can speed this up by detecting which shader it is early (extension check)
+        vsrc := read_entire_file(it.vert_path);
+        fsrc := read_entire_file(it.frag_path);
+        compile_shader_source(it, vsrc, fsrc);
+        free(vsrc);
+        free(fsrc);
+    }
+}
+
+// Load vert/frag pair as a new shader
+load_shader_pair :: (using asset_man: *Asset_Manager, vpath: string, fpath: string) -> *Shader {
+    vert := read_entire_file(vpath);
+    frag := read_entire_file(fpath);
+    sh := compile_shader_source(vert, frag);
+    array_add(*get_slot(*shader_catalog, vpath).dependencies, sh);
+    array_add(*get_slot(*shader_catalog, fpath).dependencies, sh);
+    sh.vert_path = copy_string(vpath);
+    sh.frag_path = copy_string(fpath);
+    free(vert);
+    free(frag);
+    return sh;
+}
+
 
 maybe_calc_tangent_normals :: (using m: *Mesh) {
     if (!material.textures[TEXTURE_NORMAL_INDEX]) return;
@@ -72,228 +113,182 @@ maybe_calc_tangent_normals :: (using m: *Mesh) {
     }    
 }
 
-/*
-
-
-
-    Model *load_model(const char *filepath) {
-        char *obj_source = slurp_file(filepath);
-        Model *mod = model_loader_parse_obj(game, obj_source, filepath);
-        for (u32 i = 0; i < mod->meshes.count; ++i) {
-            auto it = mod->meshes[i];
-            maybe_calc_tangent_normals(it);
-            game->renderer->store_mesh_in_buffer(it);
-        }
-        if (models[filepath]) {
-            // @TODO free old model
-        }
-        models[filepath] = mod;
-        return mod;
-    }
-
-    void reload_shader(const char *path) {
-        auto &deps = shader_catalog[path].dependencies;
-        for (u32 i = 0; i < deps.count; ++i) {
-            auto it = deps[i];
-            // kind of wastefull, we can speed this up by detecting which shader it is early (extension check)
-            char *vsrc = slurp_file(it->vert_path);
-            char *fsrc = slurp_file(it->frag_path);
-            game->renderer->compile_shader_source(it, vsrc, fsrc);
-            FREE_MEMORY(vsrc);
-            FREE_MEMORY(fsrc);
-        }
-    }
-
-    // Load vert/frag pair as a new shader
-    Shader *load_shader_pair(const char *vpath, const char *fpath) {
-        char *vert = slurp_file(vpath);
-        char *frag = slurp_file(fpath);
-        Shader *sh = game->renderer->compile_shader_source(vert, frag);
-        shader_catalog[vpath].dependencies.add(sh);
-        shader_catalog[fpath].dependencies.add(sh);
-        sh->vert_path = copy_c_string(vpath);
-        sh->frag_path = copy_c_string(fpath);
-        FREE_MEMORY(vert);
-        FREE_MEMORY(frag);
-        return sh;
-    }
-
-
-
-char *path_of(const char *filepath) {
-    const char *p = strrchr(filepath, '/');
-    char *out = GET_MEMORY_SIZED(p - filepath + 2);
-    memcpy(out, filepath, p-filepath+1);
-    out[p-filepath+1] = 0;
-    return out;
+path_of :: (filepath: string) -> string {
+    p := find_and_truncate_character_from_right(filepath, #char "/");
+    return p;
 }
 
-float ml_get_signed_float(ML_State *st, ML_Token *tok) {
-    bool neg = false;
-    if (tok->type == '-') {
+#scope_file
+using ML_Token_Type;
+#scope_export
+
+ml_get_signed_float :: (st: *ML_State, tok: *ML_Token) -> float {
+    neg := false;
+    if (tok.type == xx #char "-") {
         neg = true;
         ml_get_token(st, tok);
     }
 
-    assert(tok->type == ML_TOKEN_FLOAT);
-    float val = (float) tok->float64;
+    assert(tok.type == ML_TOKEN_FLOAT);
+    val := cast(float) tok._float;
 
     ml_get_token(st, tok);
-    return neg ? -val : val;    
+    if (neg) val = -val;
+    return val;
 }
 
-void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, const char *mtl_filepath) {
-    ML_State st;
+model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_filepath: string) {
+    st: ML_State;
     st.flags = ML_DOTS_IN_IDENTIFIERS;
-    ml_init(*st, strlen(src), (char *)src);
-    ML_Token tok;
+    init(*st, src);
+    tok: ML_Token;
 
-    Material *mat = nullptr;
+    mat: *Material;
     ml_get_token(*st, *tok);
     while(tok.type != ML_TOKEN_END) {
-        if (tok.type == '#') {
-            int current_line = tok.line_number;
+        if (tok.type == xx #char "#") {
+            current_line := tok.line_number;
             while (tok.line_number == current_line && tok.type != ML_TOKEN_END)
                 ml_get_token(*st, *tok); // eat comment line
             continue;
         }
 
         if (tok.type == ML_TOKEN_IDENTIFIER) {
-            char *ml_string_to_c_string(ML_String *str);
-            char *name = ml_string_to_c_string(*tok.string);
-            if (compare_c_strings(name, "newmtl")) {
+            name := tok._string;
+            if (name == "newmtl") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                lib[ml_string_to_c_string(*tok.string)] = mat = GET_MEMORY_ZERO_INIT(Material);
+                mat = New(Material);
+                set_slot(lib, tok._string, mat);
 
                 ml_get_token(*st, *tok);
             } else if (!mat) {
-                assert(0 && "setting property before declaring material");
-            } else if (compare_c_strings(name, "Ns")) {
+                assert(false && "setting property before declaring material");
+            } else if (name == "Ns") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT || tok.type == ML_TOKEN_INTEGER);
                 if (tok.type == ML_TOKEN_FLOAT)
-                    mat->specular_exp = (float)tok.float64;
+                    mat.specular_exp = cast(float) tok._float;
                 else if (tok.type == ML_TOKEN_INTEGER)
-                    mat->specular_exp = (float)tok.integer;
+                    mat.specular_exp = cast(float) tok.integer;
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "Ka")) {
+            } else if (name == "Ka") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float r = (float)tok.float64;
+                r := cast(float) tok._float;
                 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float g = (float)tok.float64;
+                g := cast(float) tok._float;
 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float b = (float)tok.float64;
+                b := cast(float) tok._float;
 
-                Color c;
+                c: Color;
                 c.r = r;
                 c.g = g;
                 c.b = b;
-                mat->ambient = c;
+                mat.ambient = c;
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "Kd")) {
+            } else if (name == "Kd") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float r = (float)tok.float64;
+                r := cast(float) tok._float;
                 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float g = (float)tok.float64;
+                g := cast(float) tok._float;
 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float b = (float)tok.float64;
+                b := cast(float) tok._float;
 
-                Color c;
+                c: Color;
                 c.r = r;
                 c.g = g;
                 c.b = b;
-                mat->diffuse = c;
+                mat.diffuse = c;
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "Ks")) {
+            } else if (name == "Ks") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float r = (float)tok.float64;
+                r := cast(float) tok._float;
                 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float g = (float)tok.float64;
+                g := cast(float) tok._float;
 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float b = (float)tok.float64;
+                b := cast(float) tok._float;
 
-                Color c;
+                c: Color;
                 c.r = r;
                 c.g = g;
                 c.b = b;
-                mat->specular = c;
+                mat.specular = c;
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "Ke")) {
+            } else if (name == "Ke") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float r = (float)tok.float64;
+                r := cast(float) tok._float;
                 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float g = (float)tok.float64;
+                g := cast(float) tok._float;
 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
-                float b = (float)tok.float64;
+                b := cast(float) tok._float;
 
-                Color c;
+                c: Color;
                 c.r = r;
                 c.g = g;
                 c.b = b;
-                mat->emissive = c;
+                mat.emissive = c;
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "Ni")) {
+            } else if (name == "Ni") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT);
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "d")) {
+            } else if (name == "d") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT || tok.type == ML_TOKEN_INTEGER);
                 if (tok.type == ML_TOKEN_FLOAT)
-                    mat->transparency = (float)tok.float64;
+                    mat.transparency = cast(float) tok._float;
                 else if (tok.type == ML_TOKEN_INTEGER)
-                    mat->transparency = (float)tok.integer;
+                    mat.transparency = cast(float) tok.integer;
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "illum")) {
+            } else if (name == "illum") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_INTEGER);
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "map_Kd")) {
+            } else if (name == "map_Kd") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                char *filepath = ml_string_to_c_string(*tok.string);
-                char *p = path_of(mtl_filepath);
+                filepath := tok._string;
+                p := path_of(mtl_filepath);
                 filepath = concatenate(p, filepath);
 
-                Texture *tex = game->asset_man->load_image(filepath);
-                mat->textures[TEXTURE_DIFFUSE_INDEX] = tex;
+                tex := load_image(game.asset_man, filepath);
+                mat.textures[TEXTURE_DIFFUSE_INDEX] = tex;
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "map_Bump")) {
+            } else if (name == "map_Bump") {
                 ml_get_token(*st, *tok);
-                if (tok.type == '-') {
+                if (tok.type == xx #char "-") {
                     ml_get_token(*st, *tok);
                     assert(tok.type == ML_TOKEN_IDENTIFIER);
 
-                    name = ml_string_to_c_string(*tok.string);
-                    if (compare_c_strings(name, "bm")) {
+                    name = tok._string;
+                    if (name == "bm") {
                         ml_get_token(*st, *tok);
-                        float bump_mult = ml_get_signed_float(*st, *tok);
+                        bump_mult := ml_get_signed_float(*st, *tok);
 
                         // @TODO not really sure how to use the bump multiplier..
                     } else {
@@ -301,23 +296,23 @@ void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, cons
                     }
                 }
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                char *filepath = ml_string_to_c_string(*tok.string);
-                char *p = path_of(mtl_filepath);
+                filepath := tok._string;
+                p := path_of(mtl_filepath);
                 filepath = concatenate(p, filepath);
 
-                Texture *tex = game->asset_man->load_image(filepath);
-                mat->textures[TEXTURE_NORMAL_INDEX] = tex;
+                tex := load_image(game.asset_man, filepath);
+                mat.textures[TEXTURE_NORMAL_INDEX] = tex;
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "map_Ks")) {
+            } else if (name == "map_Ks") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                char *filepath = ml_string_to_c_string(*tok.string);
-                char *p = path_of(mtl_filepath);
+                filepath := tok._string;
+                p := path_of(mtl_filepath);
                 filepath = concatenate(p, filepath);
 
-                Texture *tex = game->asset_man->load_image(filepath);
-                mat->textures[TEXTURE_SPECULAR_INDEX] = tex;
+                tex := load_image(game.asset_man, filepath);
+                mat.textures[TEXTURE_SPECULAR_INDEX] = tex;
 
                 ml_get_token(*st, *tok);
             } else {
@@ -329,132 +324,131 @@ void model_loader_parse_mtl(Game *game, const char *src, Material_Lib &lib, cons
     }
 }
 
-Model *model_loader_parse_obj(Game *game, const char *src, const char *obj_filepath) {
-    Material_Lib lib;
-    ML_State st;
+model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *Model {
+    lib := New(Material_Lib);
+    st: ML_State;
     st.flags = ML_DOTS_IN_IDENTIFIERS;
-    ml_init(*st, strlen(src), (char *)src);
-    ML_Token tok;
+    init(*st, src);
+    tok: ML_Token;
 
-    Model *mod = GET_MEMORY_ZERO_INIT(Model);
-    Mesh *mesh = nullptr;
-    Array<Vector3> vertices;
-    Array<Vector3> normals;
-    Array<Vector2> tex_coords;
+    mod := New(Model);
+    mesh: *Mesh = null;
+    vertices: [..] Vector3;
+    normals: [..] Vector3;
+    tex_coords: [..] Vector2;
     ml_get_token(*st, *tok);
     while(tok.type != ML_TOKEN_END) {
-        if (tok.type == '#') {
-            int current_line = tok.line_number;
+        if (tok.type == xx #char "#") {
+            current_line := tok.line_number;
             while (tok.line_number == current_line && tok.type != ML_TOKEN_END)
                 ml_get_token(*st, *tok); // eat comment line
             continue;
         }
 
         if (tok.type == ML_TOKEN_IDENTIFIER) {
-            char *ml_string_to_c_string(ML_String *str);
-            char *name = ml_string_to_c_string(*tok.string);
-            if (compare_c_strings(name, "mtllib")) {
+            name := tok._string;
+            if (name == "mtllib") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                char *filepath = ml_string_to_c_string(*tok.string);
-                char *p = path_of(obj_filepath);
+                filepath := tok._string;
+                p := path_of(obj_filepath);
                 filepath = concatenate(p, filepath);
-                char *lib_src = slurp_file(filepath);
+                lib_src := read_entire_file(filepath);
 
                 // @TODO this should hook into asset_man
                 model_loader_parse_mtl(game, lib_src, lib, filepath);
 
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "o")) {
+            } else if (name == "o") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                mesh = GET_MEMORY_ZERO_INIT(Mesh);
-                mod->meshes.add(mesh);
-                vertices.clear();
+                mesh = New(Mesh);
+                array_add(*mod.meshes, mesh);
+                array_reset(*vertices);
 
                 ml_get_token(*st, *tok);
             } else if (!mesh) {
                 assert(0 && "setting property before declaring object");
-            } else if (compare_c_strings(name, "v")) {
+            } else if (name == "v") {
                 ml_get_token(*st, *tok);
-                Vector3 v;
+                v: Vector3;
                 v.x = ml_get_signed_float(*st, *tok);
                 v.y = ml_get_signed_float(*st, *tok);
                 v.z = ml_get_signed_float(*st, *tok);
-                vertices.add(v);
-            } else if (compare_c_strings(name, "vn")) {
+                array_add(*vertices, v);
+            } else if (name == "vn") {
                 ml_get_token(*st, *tok);
-                Vector3 v;
+                v: Vector3;
                 v.x = ml_get_signed_float(*st, *tok);
                 v.y = ml_get_signed_float(*st, *tok);
                 v.z = ml_get_signed_float(*st, *tok);
-                normals.add(v);
-            } else if (compare_c_strings(name, "vt")) {
+                array_add(*normals, v);
+            } else if (name == "vt") {
                 ml_get_token(*st, *tok);
-                Vector2 v;
+                v: Vector2;
                 v.x = ml_get_signed_float(*st, *tok);
-                v.y = 1.0f - ml_get_signed_float(*st, *tok);
-                tex_coords.add(v);
-            } else if (compare_c_strings(name, "usemtl")) {
+                v.y = 1.0 - ml_get_signed_float(*st, *tok);
+                array_add(*tex_coords, v);
+            } else if (name == "usemtl") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                char *mtl_name = ml_string_to_c_string(*tok.string);
-                mesh->material = lib[mtl_name];
-                assert(mesh->material);
+                mtl_name := tok._string;
+                mesh.material = get_slot(lib, mtl_name);
+                assert(mesh.material != null);
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "s")) {
+            } else if (name == "s") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER || tok.type == ML_TOKEN_INTEGER);
                 // smooth shading
                 ml_get_token(*st, *tok);
-            } else if (compare_c_strings(name, "f")) {
+            } else if (name == "f") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_INTEGER);
-                mesh->vertices.add(vertices[tok.integer-1]);
-                ml_get_token(*st, *tok); assert(tok.type == '/');
+                array_add(*mesh.vertices, vertices[tok.integer-1]);
+                ml_get_token(*st, *tok); assert(tok.type == xx #char "/");
                 ml_get_token(*st, *tok);
                 if (tok.type == ML_TOKEN_INTEGER) {
-                    mesh->tex_coords.add(tex_coords[tok.integer-1]);
+                    array_add(*mesh.tex_coords, tex_coords[tok.integer-1]);
                     ml_get_token(*st, *tok);
                 }
-                assert(tok.type == '/');
+                assert(tok.type == xx #char "/");
                 ml_get_token(*st, *tok); assert(tok.type == ML_TOKEN_INTEGER);
-                mesh->normals.add(normals[tok.integer-1]);
+                array_add(*mesh.normals, normals[tok.integer-1]);
 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_INTEGER);
-                mesh->vertices.add(vertices[tok.integer-1]);
-                ml_get_token(*st, *tok); assert(tok.type == '/');
+                array_add(*mesh.vertices, vertices[tok.integer-1]);
+                ml_get_token(*st, *tok); assert(tok.type == xx #char "/");
                 ml_get_token(*st, *tok);
                 if (tok.type == ML_TOKEN_INTEGER) {
-                    mesh->tex_coords.add(tex_coords[tok.integer-1]);
+                    array_add(*mesh.tex_coords, tex_coords[tok.integer-1]);
                     ml_get_token(*st, *tok);
                 }
-                assert(tok.type == '/');
+                assert(tok.type == xx #char "/");
                 ml_get_token(*st, *tok); assert(tok.type == ML_TOKEN_INTEGER);
-                mesh->normals.add(normals[tok.integer-1]);
+                array_add(*mesh.normals, normals[tok.integer-1]);
 
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_INTEGER);
-                mesh->vertices.add(vertices[tok.integer-1]);
-                ml_get_token(*st, *tok); assert(tok.type == '/');
+                array_add(*mesh.vertices, vertices[tok.integer-1]);
+                ml_get_token(*st, *tok); assert(tok.type == xx #char "/");
                 ml_get_token(*st, *tok);
                 if (tok.type == ML_TOKEN_INTEGER) {
-                    mesh->tex_coords.add(tex_coords[tok.integer-1]);
+                    array_add(*mesh.tex_coords, tex_coords[tok.integer-1]);
                     ml_get_token(*st, *tok);
                 }
-                assert(tok.type == '/');
+                assert(tok.type == xx #char "/");
                 ml_get_token(*st, *tok); assert(tok.type == ML_TOKEN_INTEGER);
-                mesh->normals.add(normals[tok.integer-1]);
+                array_add(*mesh.normals, normals[tok.integer-1]);
 
                 ml_get_token(*st, *tok);
             } else {
                 assert(false);
             }
         } else {
+            print("token: %\n", tok.type);
             assert(false);
         }
     }
     return mod;
 }
-*/

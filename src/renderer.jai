@@ -224,9 +224,10 @@ delete_texture :: (tex: *Texture) {
     tex.id = 0;
 }
 
-compile_shader :: (type: GLenum, source: *u8) -> u32 {
+compile_shader :: (type: GLenum, source: string) -> u32 {
     v := glCreateShader(type);
-    glShaderSource(v, 1, *source, null);
+    length: GLint = xx source.count;
+    glShaderSource(v, 1, *source.data, *length);
     glCompileShader(v);
 
     status: GLint;
@@ -246,13 +247,13 @@ compile_shader :: (type: GLenum, source: *u8) -> u32 {
     return v;
 }
 
-compile_shader_source :: (vertex: *u8, pixel: *u8) -> *Shader {
+compile_shader_source :: (vertex: string, pixel: string) -> *Shader {
     out := New(Shader);
     compile_shader_source(out, vertex, pixel);
     return out;
 }
 
-compile_shader_source :: (out: *Shader, vertex: *u8, pixel: *u8) {
+compile_shader_source :: (out: *Shader, vertex: string, pixel: string) {
     vert := compile_shader(GL_VERTEX_SHADER, vertex);
     frag := compile_shader(GL_FRAGMENT_SHADER, pixel);
     program := glCreateProgram();

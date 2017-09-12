@@ -28,7 +28,7 @@ ML_Token_Type :: enum s32 {
 }
 
 ML_Token :: struct {
-	type: ML_Token_Type.loose;
+	type: ML_Token_Type;
 
 	// values
 	integer: u64;
@@ -97,7 +97,7 @@ ml__eat_whitespace :: (st: *ML_State) {
 }
 
 ml__token :: (st: *ML_State, tok: *ML_Token, type: ML_Token_Type) {
-	tok.type = cast(s32) type;
+	tok.type = type;
 	tok.line_number = st.line_number;
 	tok.character_number = st.character_number;
 }
@@ -119,7 +119,7 @@ ml__ident_dots :: (st: *ML_State, c: s32) -> bool {
 
 ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 	ml__eat_whitespace(st);
-	tok.type = xx ML_TOKEN_UNINITIALIZED;
+	tok.type = ML_TOKEN_UNINITIALIZED;
 
 	current := st.current;
 	end := st.end;
@@ -277,7 +277,7 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 				if (<<current == #char ".") {
 					if (base != -1) {
 						base = -1;
-						tok.type = xx ML_TOKEN_FLOAT;
+						tok.type = ML_TOKEN_FLOAT;
 					}
 					else break; // extra dot in float
 				}

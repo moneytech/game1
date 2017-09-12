@@ -43,9 +43,9 @@ main :: () {
     init(*rdr, WINDOW_WIDTH, WINDOW_HEIGHT);
     renderer = *rdr;
 
-    // rdr.render_to_gbuffer = asset_man.load_shader_pair("assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
-    // rdr.render_light_using_gbuffer = asset_man.load_shader_pair("assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
-    // rdr.render_plain_texture = asset_man.load_shader_pair("assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
+    rdr.render_to_gbuffer = load_shader_pair(*asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
+    rdr.render_light_using_gbuffer = load_shader_pair(*asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
+    rdr.render_plain_texture = load_shader_pair(*asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
     
 
     // Font fnt;
@@ -54,7 +54,7 @@ main :: () {
     // font = &fnt;
 
     // __model = asset_man.load_model("assets/keyOGA.obj");
-    // __model = asset_man.load_model("assets/well.coveredopen.obj");
+    __model = load_model(*asset_man, "assets/well.coveredopen.obj");
 
     while (true) {
         exit := false;
@@ -83,7 +83,7 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
-        // render();
+        render();
 
         os_swap_buffers(win);
         os_pump_input();
@@ -157,17 +157,18 @@ void render_html_dom(Html_Dom *dom) {
         render_html_node(&phs, c);
     }
 }
+*/
 
-void render() {
-    renderer->set_projection_fov(90.0f, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1f, 100.0f);
-    renderer->start_scene();
-    renderer->clear_screen(0.0, 0.0, 0.0, 1.0);
+render :: () {
+    renderer.projection_matrix = matrix_projection_fov(90.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 0.1, 100.0);
+    start_scene(<<renderer);
+    clear_screen(0.0, 0.0, 0.0, 1.0);
     // renderer->draw_cube(0, 0, -2, 1);
-    renderer->draw_model(__model);
-    renderer->finish_scene();
+    draw_model(<<renderer, <<__model);
+    finish_scene(<<renderer);
 
 
-    renderer->set_projection_ortho(0, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT, 0, -1, 1);
+    renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
     /*
     Bitmap_Frame frame = {0};
     frame.tex_coords.width = 14.0f / (float)tex->width;
@@ -186,7 +187,7 @@ void render() {
     // renderer->draw_text(font, "Hello World!", 32, 32);
     // render_html_dom(dom);
 }
-*/
+
 
 /*
 unsigned char ttf_buffer[1<<20];
@@ -311,7 +312,7 @@ get_slot :: (using map: *Hash_Map($T), str: string) -> T {
             e = e.next;
             e.key = copy_string(str);
             e.next = null;
-            break;
+            // break;
         }
 
         e = e.next;
@@ -338,7 +339,7 @@ set_slot :: (using map: *Hash_Map($T), str: string, val: T) {
             e = e.next;
             e.key = copy_string(str);
             e.next = null;
-            break;
+            // break;
         }
 
         e = e.next;
