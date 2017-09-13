@@ -312,7 +312,7 @@ get_slot :: (using map: *Hash_Map($T), str: string) -> T {
             e = e.next;
             e.key = copy_string(str);
             e.next = null;
-            // break;
+            break;
         }
 
         e = e.next;
@@ -339,7 +339,7 @@ set_slot :: (using map: *Hash_Map($T), str: string, val: T) {
             e = e.next;
             e.key = copy_string(str);
             e.next = null;
-            // break;
+            break;
         }
 
         e = e.next;

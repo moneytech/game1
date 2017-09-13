@@ -143,6 +143,8 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
     init(*st, src);
     tok: ML_Token;
 
+    print("");
+
     mat: *Material;
     ml_get_token(*st, *tok);
     while(tok.type != ML_TOKEN_END) {
@@ -273,7 +275,7 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
                 filepath := tok._string;
                 p := path_of(mtl_filepath);
-                filepath = concatenate(p, filepath);
+                filepath = concatenate(p, "/", filepath);
 
                 tex := load_image(game.asset_man, filepath);
                 mat.textures[TEXTURE_DIFFUSE_INDEX] = tex;
@@ -298,7 +300,7 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
                 filepath := tok._string;
                 p := path_of(mtl_filepath);
-                filepath = concatenate(p, filepath);
+                filepath = concatenate(p, "/", filepath);
 
                 tex := load_image(game.asset_man, filepath);
                 mat.textures[TEXTURE_NORMAL_INDEX] = tex;
@@ -309,7 +311,7 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
                 filepath := tok._string;
                 p := path_of(mtl_filepath);
-                filepath = concatenate(p, filepath);
+                filepath = concatenate(p, "/", filepath);
 
                 tex := load_image(game.asset_man, filepath);
                 mat.textures[TEXTURE_SPECULAR_INDEX] = tex;
@@ -351,8 +353,10 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
                 filepath := tok._string;
+                print("%\n", filepath);
                 p := path_of(obj_filepath);
-                filepath = concatenate(p, filepath);
+                filepath = concatenate(p, "/", filepath);
+                print("path: %\n", filepath);
                 lib_src := read_entire_file(filepath);
 
                 // @TODO this should hook into asset_man
