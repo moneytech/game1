@@ -349,6 +349,9 @@ GL_3_0_API :: struct {
     glDeleteTextures: (n: GLsizei, textures: *GLuint) #foreign;
 }
 
+GL :: #foreign_system_library "opengl32";
+glCullFace:: (mode: GLenum) #foreign GL;
+
 glGetUniformLocation :: (program: GLuint, name: string) -> GLint {
     using gl_30_api;
     c_name := to_c_string(name);

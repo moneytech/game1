@@ -53,8 +53,19 @@ main :: () {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    // __model = asset_man.load_model("assets/keyOGA.obj");
-    __model = load_model(*asset_man, "assets/well.coveredopen.obj");
+    key := load_model(*asset_man, "assets/keyOGA.obj");
+    // __model = load_model(*asset_man, "assets/well.coveredopen.obj");
+    // __model = load_model(*asset_man, "assets/sphere.obj");
+    __model = create_sphere(1.0, 32, 32);
+    __model.meshes[0].material = key.meshes[0].material;
+    key.meshes[0].material.textures[0] = null;
+
+    fwd := false;
+    back := false;
+    left := false;
+    right := false;
+
+    renderer.camera.position.z = 5;
 
     while (true) {
         exit := false;
@@ -63,9 +74,30 @@ main :: () {
             if (it.type == Event_Type.QUIT) {
                 exit = true;
             } else if (it.type == Event_Type.KEYBOARD) {
-                
+                if it.key_code == xx #char "W" {
+                    fwd = it.key_pressed != 0;
+                }
+
+                if it.key_code == xx #char "S" {
+                    back = it.key_pressed != 0;
+                }
+
+                if it.key_code == xx #char "D" {
+                    right = it.key_pressed != 0;
+                }
+
+                if it.key_code == xx #char "A" {
+                    left = it.key_pressed != 0;
+                }
+
             }
         }
+
+        if fwd game.renderer.camera.position.z   -= 0.1;
+        if back game.renderer.camera.position.z  += 0.1;
+        if left game.renderer.camera.position.x  -= 0.1;
+        if right game.renderer.camera.position.x += 0.1;
+
 
         if (joysticks.count) {
             joy := joysticks[0];
@@ -160,7 +192,8 @@ void render_html_dom(Html_Dom *dom) {
 */
 
 render :: () {
-    renderer.projection_matrix = matrix_projection_fov(90.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 0.1, 100.0);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 100.0);
     start_scene(<<renderer);
     clear_screen(0.0, 0.0, 0.0, 1.0);
     // renderer->draw_cube(0, 0, -2, 1);

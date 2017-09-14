@@ -441,7 +441,7 @@ matrix_scale :: (x: float, y: float, z: float) -> Matrix4 {
 }
 
 matrix_perspective :: (fov: float, aspect: float, _near: float, _far: float) -> Matrix4 {
-    t := cast(float) tan(fov * 3.14159 / 360.0) * _near;
+    t := cast(float) tan(fov * 3.14159 / 720.0) * _near;
     b := -t;
     l := aspect * b;
     r := aspect * t;

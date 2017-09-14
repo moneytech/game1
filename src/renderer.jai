@@ -148,6 +148,7 @@ GL_Renderer :: struct {
     render_light_using_gbuffer: *Shader;
     render_plain_texture: *Shader;
 
+    camera: Camera;
     projection_matrix: Matrix4;
     view_matrix: Matrix4;
 }
@@ -283,20 +284,12 @@ compile_shader_source :: (out: *Shader, vertex: string, pixel: string) {
     out.id = program;
 }
 
-matrix_projection_fov :: (fov: float, aspect: float, n: float, f: float) -> Matrix4 {
-    t := tan(fov * 3.14159 / 360.0) * n;
-    b := -t;
-    l := aspect * b;
-    r := aspect * t;
-    return matrix_frustum(l, r, b, t, n, f);
-}
-
 clear_screen :: (r: float, g: float, b: float, a: float) {
     glClearColor(r, g, b, a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 }
 
 draw_rect :: (rect: Rectangle) {
@@ -461,7 +454,9 @@ start_scene :: (using rdr: GL_Renderer) {
     clear_screen(0, 0, 0, 1);
 
     glUseProgram(render_to_gbuffer.id);
-    view_matrix = matrix_translate(0, -2, -3);
+
+    pos := camera.position;
+    view_matrix = matrix_translate(-pos.x, -pos.y, -pos.z);
 }
 
 finish_scene :: (using rdr: GL_Renderer) {
@@ -549,10 +544,11 @@ r: float;
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glEnable(GL_DEPTH_TEST);
 
-    r += 0.001;
+    r += 0.01;
     q := set_angle_vector(0, 1, 0, 0);
     b := set_angle_vector(3.14, 0, 1, 0);
-    t := matrix_rotate(nlerp(clamp(r, 0, 1), q, b));
+    // t := matrix_rotate(slerp(clamp(r, 0, 1), q, b));
+    t := matrix_identity();
 
     proj := glGetUniformLocation(render_to_gbuffer.id, "projection");
     view := glGetUniformLocation(render_to_gbuffer.id, "view");
@@ -561,8 +557,8 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
     glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
 
-    viewer_pos := glGetUniformLocation(render_to_gbuffer.id, "viewer_pos");
-    glUniform3f(viewer_pos, 0, 0, 10); // @TODO
+    viewer_pos := glGetUniformLocation(render_to_gbuffer.id, "camera_position");
+    glUniform3f(viewer_pos, camera.position.x, camera.position.y, camera.position.z);
 
     // material
     mat_diffuse := glGetUniformLocation(render_to_gbuffer.id, "material.diffuse");
@@ -659,4 +655,78 @@ draw_model :: (rdr: GL_Renderer, m: Model) {
     for m.meshes {
         draw_mesh(rdr, << it);
     }
+}
+
+PI :: 3.14159;
+
+get_sphere_vertex :: (theta: float, phi: float) -> Vector3 {
+    v: Vector3 = ---;
+    v.x = sin(theta * PI * 2) * cos(phi * PI * 2);
+    v.y = cos(theta * PI * 2);
+    v.z = sin(theta * PI * 2) * sin(phi * PI * 2);
+    return v;
+}
+
+create_sphere :: (radius: float, latitude_slices: int, longitude_slices: int) -> *Model {
+    mod := New(Model);
+    m := New(Mesh);
+    array_add(*mod.meshes, m);
+
+    xstep: float = 1.0 / cast(float) longitude_slices;
+    ystep := (1.0 / cast(float) latitude_slices) / 2;
+
+    for xa: 0..(longitude_slices/2)-1 {
+        theta: float = cast(float) xa * xstep;
+
+        for ya: 0..latitude_slices-1 {
+            phi: float = cast(float) ya * ystep;
+            v0 := get_sphere_vertex(theta,         phi);
+            v1 := get_sphere_vertex(theta + xstep, phi);
+            v2 := get_sphere_vertex(theta + xstep, phi + ystep);
+            v3 := get_sphere_vertex(theta,         phi + ystep);
+
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, normalize(v0));
+            array_add(*m.vertices, v1);
+            array_add(*m.normals, normalize(v1));
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, normalize(v2));
+
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, normalize(v0));
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, normalize(v2));
+            array_add(*m.vertices, v3);
+            array_add(*m.normals, normalize(v3));
+        }
+    }
+
+    for xa: (longitude_slices/2)..longitude_slices-1 {
+        theta: float = cast(float) xa * xstep;
+
+        for ya: 0..latitude_slices-1 {
+            phi: float = cast(float) ya * ystep;
+            v0 := get_sphere_vertex(theta,         phi);
+            v1 := get_sphere_vertex(theta + xstep, phi);
+            v2 := get_sphere_vertex(theta + xstep, phi + ystep);
+            v3 := get_sphere_vertex(theta,         phi + ystep);
+
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, normalize(v2));
+            array_add(*m.vertices, v1);
+            array_add(*m.normals, normalize(v1));
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, normalize(v0));
+
+            array_add(*m.vertices, v3);
+            array_add(*m.normals, normalize(v3));
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, normalize(v2));
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, normalize(v0));
+        }
+    }
+
+    store_mesh_in_buffer(m);
+    return mod;
 }
