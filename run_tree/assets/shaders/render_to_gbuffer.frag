@@ -32,7 +32,7 @@ void main() {
         out_normal = normalize(TBN * out_normal);
         g_normal = out_normal;
     } else {
-        g_normal = normalize(normal * 0.5 + 0.5);
+        g_normal = normalize(normal);
     }
 
     if (use_diffuse_map) {
