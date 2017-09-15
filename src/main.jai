@@ -56,18 +56,20 @@ main :: () {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    // key := load_model(*asset_man, "assets/keyOGA.obj");
-    __model = load_model(*asset_man, "assets/well.coveredopen.obj");
+    key := load_model(*asset_man, "assets/monkey.obj");
+    // __model = load_model(*asset_man, "assets/well.coveredopen.obj");
+    __model = load_model(*asset_man, "assets/treasure_chest.fbx");
+    // __model = key;
     // __model = create_sphere(1.0, 32, 32);
-    // __model.meshes[0].material = key.meshes[0].material;
-    // key.meshes[0].material.textures[0] = null;
+    __model.meshes[0].material = key.meshes[0].material;
+    key.meshes[0].material.textures[0] = null;
 
     fwd := false;
     back := false;
     left := false;
     right := false;
 
-    renderer.camera.position.z = 5;
+    renderer.camera.position.z = 10;
 
     while (true) {
         exit := false;
@@ -95,10 +97,10 @@ main :: () {
             }
         }
 
-        if fwd game.renderer.camera.position.z   -= 0.1;
-        if back game.renderer.camera.position.z  += 0.1;
-        if left game.renderer.camera.position.x  -= 0.1;
-        if right game.renderer.camera.position.x += 0.1;
+        if fwd game.renderer.camera.position.z   -= 1;
+        if back game.renderer.camera.position.z  += 1;
+        if left game.renderer.camera.position.x  -= 1;
+        if right game.renderer.camera.position.x += 1;
 
 
         if (joysticks.count) {

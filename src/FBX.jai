@@ -51,7 +51,13 @@ FBX_Node :: struct {
     nodes: [..] *FBX_Node;
 };
 
+operator[] :: (using node: FBX_Node, name: string) -> *FBX_Node {
+    for node.nodes {
+        if it.node_type == name return it;
+    }
 
+    return null;
+}
 
 FBX :: struct  {
     Header :: struct {
@@ -201,24 +207,22 @@ FBX_read_property :: (file: File) -> FBX_Node_Property {
 }
 
 FBX_read_node :: (file: File) -> *FBX_Node {
-    end_offset: u32;
+    node := New(FBX_Node);
+    end_offset: s64;
     num_properties: u32;
     property_list_len: u32;
     name_len: u8;
-    node := New(FBX_Node);
 
-    success := file_read(file, *end_offset, 4);
-    success = file_read(file, *num_properties, 4);
-    success = file_read(file, *property_list_len, 4);
-    success = file_read(file, *name_len, 1);
+    file_read(file, *end_offset, 4);
+    file_read(file, *num_properties, 4);
+    file_read(file, *property_list_len, 4);
+    file_read(file, *name_len, 1);
 
     temp_name: string;
-    temp_name.data = alloc(name_len + 1);
+    temp_name.data = alloc(name_len);
     temp_name.count = name_len;
-    success = file_read(file, temp_name.data, name_len);
+    file_read(file, temp_name.data, name_len);
     node.node_type = temp_name;
-
-    if !success return null;
 
     if num_properties for 0..num_properties-1 {
         prop := FBX_read_property(file);
@@ -230,8 +234,7 @@ FBX_read_node :: (file: File) -> *FBX_Node {
         end_record_buf: [14] u8;
         while pos < end_offset {
             pos = file_current_position(file);
-            b := file_read(file, end_record_buf.data, 13);
-            if !b return null;
+            file_read(file, end_record_buf.data, 13);
 
             at_end := true;
             for end_record_buf {
@@ -244,7 +247,6 @@ FBX_read_node :: (file: File) -> *FBX_Node {
             if !at_end {
                 file_set_position(file, pos);
                 n := FBX_read_node(file);
-                if !n return null;
 
                 array_add(*node.nodes, n);
             } else {
@@ -262,7 +264,7 @@ KAYDARA_MAGIC_STRING :: "Kaydara FBX Binary  ";
 
 FBX_check_header :: (fbx: *FBX) -> bool {
     return (fbx.header.magic == KAYDARA_MAGIC_STRING) &&
-    (fbx.header.reserved[0] == 0x1A && fbx.header.reserved[1] == 0x00);
+            (fbx.header.reserved[0] == 0x1A && fbx.header.reserved[1] == 0x00);
 }
 
 
@@ -277,8 +279,8 @@ FBX_load_file :: (path: string) -> *FBX {
     fbx := New(FBX);
     magic: string;
     magic.data = alloc(21);
-    magic.count = 21;
-    file_read(file, magic.data, magic.count);
+    magic.count = 20;
+    file_read(file, magic.data, magic.count+1);
     fbx.header.magic = magic;
 
     file_read(file, fbx.header.reserved.data, 2);
@@ -295,6 +297,7 @@ FBX_load_file :: (path: string) -> *FBX {
         if ((total_file_size - file_current_position(file)) <= 200) break; // skip footer
         node := FBX_read_node(file);
         if !node break;
+
         array_add(*fbx.root_node.nodes, node);
     }
 

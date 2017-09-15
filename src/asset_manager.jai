@@ -45,8 +45,18 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
 }
 
 load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
-    obj_source := read_entire_file(filepath);
-    mod := model_loader_parse_obj(game, obj_source, filepath);
+    ext := find_character_from_right(filepath, #char ".");
+
+    mod: *Model;
+    if ext == ".obj" {
+        obj_source := read_entire_file(filepath);
+        mod = model_loader_parse_obj(game, obj_source, filepath);
+    } else if ext == ".fbx" {
+        mod = Model_load_fbx(filepath);
+    }
+
+    if mod == null return null;
+
     for mod.meshes {
         maybe_calc_tangent_normals(it);
         store_mesh_in_buffer(it);
@@ -353,10 +363,8 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
                 filepath := tok._string;
-                print("%\n", filepath);
                 p := path_of(obj_filepath);
                 filepath = concatenate(p, "/", filepath);
-                print("path: %\n", filepath);
                 lib_src := read_entire_file(filepath);
 
                 // @TODO this should hook into asset_man
@@ -455,4 +463,117 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
         }
     }
     return mod;
+}
+
+print_property :: (p: FBX_Node_Property) {
+    using FBX_Node_Property.FBX_Primitive_Type;
+
+    if p.type == {
+        case TYPE_STRING;
+            print("'%'", p.string_data);
+        case TYPE_DOUBLE; 
+            print("%", p.primitive.f64);
+        case TYPE_FLOAT;
+            print("%", p.primitive.f32);
+    } 
+}
+
+print_node :: (n: *FBX_Node, depth: int) {
+    for 0..depth print("    ");
+    print("%: ", n.node_type);
+    for n.properties {
+        print_property(it);
+        print(", ");
+    }
+    print("{\n");
+    for n.nodes {
+        print_node(it, depth+1);
+    }
+    for 0..depth print("    ");
+    print("}\n");
+}
+
+Model_load_fbx :: (path: string) -> *Model {
+    model := New(Model);
+    mesh := New(Mesh);
+    array_add(*model.meshes, mesh);
+
+    fbx := FBX_load_file(path);
+    if !fbx {
+        print("error: couldn't load FBX file: %\n", path);
+        return null;
+    }
+    // print_node(*fbx.root_node, 0);
+
+    objs := fbx.root_node["Objects"];
+    if !objs {
+        print("coulnt get objs\n");
+        return null;
+    }
+    geom := (<<objs)["Geometry"];
+    if (!geom) {
+        print("Couldnt get geom\n");
+        return null;
+    }
+
+    global_settings := fbx.root_node["GlobalSettings"];
+    if !global_settings {
+        print("Couldnt get GlobalSettings\n");
+        return null;
+    }
+    properties70 := (<<global_settings)["Properties70"];
+    assert(properties70 != null);
+
+    scale_factor: float = 1.0;
+    for properties70.nodes {
+        if it.properties.count {
+            if it.properties[0].string_data == "UnitScaleFactor" {
+                // @TODO
+            }
+        }
+    }
+
+
+    indices: [..] u32;
+    normals: [..] Vector3;
+
+    vdata := (<<geom)["Vertices"].properties[0].data;
+    idata := (<<geom)["PolygonVertexIndex"].properties[0].data;
+    layer_normal := (<<geom)["LayerElementNormal"];
+    ndata := (<<layer_normal)["Normals"].properties[0].data;
+
+    array_reserve(*mesh.vertices, vdata.count / 3);
+    array_reserve(*mesh.normals, ndata.count / 3);
+    array_reserve(*indices, idata.count);
+
+    for idata {
+        in := it.int32;
+        if in < 0 {
+            in = (in * -1) -1;
+            // assert(it_index % 2 == 0);
+            // print("mod: %\n", (it_index+1) % 3);
+        }
+        array_add(*indices, cast(u32) in);
+    }
+
+    CENTIMETERS_TO_METERS :: 1.0 / 100.0;
+
+    for indices {
+        vec := make_Vector3(cast(float) vdata[it * 3].f64, cast(float) vdata[it * 3 + 1].f64, cast(float) vdata[it * 3 + 2].f64);
+        array_add(*mesh.vertices, vec * CENTIMETERS_TO_METERS);
+    }
+
+    for 0..(ndata.count/3)-1 {
+        norm := make_Vector3(cast(float) ndata[it * 3].f64, cast(float) ndata[it * 3 + 1].f64, cast(float) ndata[it * 3 + 2].f64);
+        array_add(*mesh.normals, norm);
+    }
+
+    // @TODO tex coords
+
+    // @Temporary material
+    mat := New(Material);
+    mesh.material = mat;
+    mat.diffuse.r = 1.0;
+
+    return model;
 }

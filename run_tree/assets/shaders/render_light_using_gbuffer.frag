@@ -25,7 +25,7 @@ uniform vec3 camera_position;
 
 
 vec3 schlick(float F0, vec3 l, vec3 h) {
-    return F0 + (1 - F0) * pow(cos(max(dot(l, h), 0.0)), 5.0);
+    return vec3(F0, F0, F0) + (1 - F0) * pow(cos(max(dot(l, h), 0.0)), 5.0);
 }
 
 void main() {
@@ -36,7 +36,7 @@ void main() {
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
     
     // @Temporary
-    vec3 light_pos = vec3(5, 5, 0);
+    vec3 light_pos = vec3(0, 3, 5);
 
     vec3 light_dir = normalize(light_pos-frag_pos);
     vec3 view_dir = normalize(camera_position-frag_pos);

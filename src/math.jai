@@ -21,6 +21,14 @@ Vector3 :: struct {
     z: float;
 }
 
+make_Vector3 :: (x: float, y: float, z: float) -> Vector3 {
+    v: Vector3 = ---;
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    return v;
+}
+
 operator+ :: (a: Vector3, b: Vector3) -> Vector3 {
     out: Vector3 = ---;
     out.x = a.x + b.x;
