@@ -28,7 +28,7 @@ void main() {
     	vec3 T = normalize(vec3(model * vec4(in_tangent_normal, 0.0)));
         vec3 N = normalize(vec3(model * vec4(in_normal, 0.0)));
     	vec3 B = cross(T, N);
-    	TBN = transpose(mat3(T, B, N));
+    	TBN = inverse(transpose(mat3(T, B, N)));
 	}
 
     gl_Position = projection * view * model * vec4(in_pos, 1);

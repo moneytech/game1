@@ -26,6 +26,9 @@ setup_build :: () -> Build_Options {
     stb_lib := C_compiler_make_dynamic_lib("run_tree/stb.dll", C_compiler_make_source_file("src/stb.cpp"));
     C_compiler_build_target(<< stb_lib);
 
+    miniz_lib := C_compiler_make_dynamic_lib("run_tree/miniz.dll", C_compiler_make_source_file("src/miniz.c"));
+    C_compiler_build_target(<< miniz_lib);
+
     #if OS_WINDOWS {
         SetDllDirectoryA(to_c_string(options.output_path));
     }

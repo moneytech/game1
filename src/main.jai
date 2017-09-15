@@ -1,6 +1,9 @@
 #load "renderer.jai";
 #load "lexer.jai";
 #load "asset_manager.jai";
+#load "FBX.jai";
+miniz :: #foreign_system_library "miniz";
+uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
 
 WINDOW_WIDTH :: 1280;
 WINDOW_HEIGHT :: 720;
@@ -53,12 +56,11 @@ main :: () {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    key := load_model(*asset_man, "assets/keyOGA.obj");
-    // __model = load_model(*asset_man, "assets/well.coveredopen.obj");
-    // __model = load_model(*asset_man, "assets/sphere.obj");
-    __model = create_sphere(1.0, 32, 32);
-    __model.meshes[0].material = key.meshes[0].material;
-    key.meshes[0].material.textures[0] = null;
+    // key := load_model(*asset_man, "assets/keyOGA.obj");
+    __model = load_model(*asset_man, "assets/well.coveredopen.obj");
+    // __model = create_sphere(1.0, 32, 32);
+    // __model.meshes[0].material = key.meshes[0].material;
+    // key.meshes[0].material.textures[0] = null;
 
     fwd := false;
     back := false;

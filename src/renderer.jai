@@ -547,8 +547,8 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     r += 0.01;
     q := set_angle_vector(0, 1, 0, 0);
     b := set_angle_vector(3.14, 0, 1, 0);
-    // t := matrix_rotate(slerp(clamp(r, 0, 1), q, b));
-    t := matrix_identity();
+    t := matrix_rotate(slerp(clamp(r, 0, 1), q, b));
+    // t := matrix_identity();
 
     proj := glGetUniformLocation(render_to_gbuffer.id, "projection");
     view := glGetUniformLocation(render_to_gbuffer.id, "view");
