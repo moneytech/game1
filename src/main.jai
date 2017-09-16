@@ -49,7 +49,12 @@ main :: () {
     rdr.render_to_gbuffer = load_shader_pair(*asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
     rdr.render_light_using_gbuffer = load_shader_pair(*asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
     rdr.render_plain_texture = load_shader_pair(*asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
-    
+    rdr.picking_shader = load_shader_pair(*asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
+
+    #if DEVELOPER {
+        picking_buf.count = WINDOW_WIDTH * WINDOW_HEIGHT;
+        picking_buf.data = alloc(picking_buf.count*size_of(u32) * 4); // this is wasteful maybe we can store 8bits of the index in each channel in GL ?
+    }
 
     // Font fnt;
     // my_stbtt_initfont(&fnt);
@@ -58,7 +63,7 @@ main :: () {
 
     // key := load_model(*asset_man, "assets/keyOGA.obj");
     // __model = load_model(*asset_man, "assets/well.coveredopen.obj");
-    __model = load_model(*asset_man, "assets/treasure_chest.fbx");
+    // __model = load_model(*asset_man, "assets/treasure_chest.fbx");
     // __model = key;
     // __model = create_sphere(1.0, 32, 32);
     // __model.meshes[0].material = key.meshes[0].material;
@@ -108,8 +113,7 @@ main :: () {
 
         if (joysticks.count) {
             joy := joysticks[0];
-            // x += joy.left_thumb.x;
-            // y -= joy.left_thumb.y;
+
             game.renderer.camera.position.x += joy.left_thumb.x;
             game.renderer.camera.position.z -= joy.left_thumb.y;
             if joy.buttons & JOYSTICK_BUTTON_RBUMPER {
@@ -130,7 +134,12 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
-        render();
+        if mode == Game_Mode.EDITOR {
+            editor_update();
+            editor_render();
+        } else {
+            render();
+        }
 
         os_swap_buffers(win);
         os_pump_input();
@@ -156,6 +165,9 @@ renderer: *GL_Renderer;
 font: *Font;
 __model: *Model;
 __terrain: *Mesh;
+#if DEVELOPER {
+    picking_buf: [] u8;
+}
 
 /*
 struct Html_Phase {
@@ -210,13 +222,21 @@ void render_html_dom(Html_Dom *dom) {
 render :: () {
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
-    start_scene(<<renderer);
+    start_scene(renderer);
     clear_screen(0.0, 0.0, 0.0, 1.0);
     // renderer->draw_cube(0, 0, -2, 1);
-    draw_model(<<renderer, <<__model);
+    // draw_model(<<renderer, <<__model);
     draw_mesh(<<renderer, <<__terrain);
     finish_scene(<<renderer);
 
+    #if DEVELOPER {
+        renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
+        start_picking(renderer);
+        draw_picking_mesh(<<renderer, <<__terrain, renderer.picking_shader);
+        finish_picking(<<renderer);
+
+        get_picking_data(<<renderer, picking_buf.data, xx picking_buf.count * size_of(u32));
+    }
 
     renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
     /*

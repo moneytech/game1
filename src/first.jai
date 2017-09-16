@@ -58,6 +58,7 @@ build_debug :: () -> Workspace, Build_Options {
     }
 
     add_build_string("DEBUG :: true;", w);
+    add_build_string("DEVELOPER :: true;", w);
     return w, options;
 }
 

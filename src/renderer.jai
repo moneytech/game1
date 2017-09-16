@@ -79,6 +79,10 @@ Mesh :: struct {
     normals: [..] Vector3;
     tangent_normals: [..] Vector3;
     tex_coords: [..] Vector2;
+
+    #if DEVELOPER {
+        picking_indices: [..] u32;
+    }
 };
 
 Model :: struct {
@@ -156,6 +160,13 @@ GL_Renderer :: struct {
     render_light_using_gbuffer: *Shader;
     render_plain_texture: *Shader;
 
+    #if DEVELOPER {
+        picking_framebuffer: u32;
+        picking_texture: u32;
+        picking_depth: u32;
+        picking_shader: *Shader;
+    }
+
     camera: Camera;
     projection_matrix: Matrix4;
     view_matrix: Matrix4;
@@ -211,7 +222,29 @@ init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) assert(false);
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    #if DEVELOPER {
+        glGenFramebuffers(1, *picking_framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
+
+        glGenTextures(1, *picking_texture);
+        glBindTexture(GL_TEXTURE_2D, picking_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, xx screen_width, xx screen_height, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, null);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, picking_texture, 0);
+
+        attach: [1] u32 = {:u32: GL_COLOR_ATTACHMENT0};
+        glDrawBuffers(1, attach.data);
+
+        glGenRenderbuffers(1, *picking_depth);
+        glBindRenderbuffer(GL_RENDERBUFFER, picking_depth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, picking_depth);
+
+        assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -457,7 +490,7 @@ draw_text :: (font: Font, text: string, x: float, y: float) -> x {
     return x;
 }
 
-start_scene :: (using rdr: GL_Renderer) {
+start_scene :: (using rdr: *GL_Renderer) {
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
     clear_screen(0, 0, 0, 1);
 
@@ -637,6 +670,67 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glDisable(GL_DEPTH_TEST);
 }
 
+#if DEVELOPER {
+    draw_picking_mesh :: (using rdr: GL_Renderer, m:Mesh, sh: *Shader) {
+        glEnable(GL_DEPTH_TEST);
+
+        // @TODO model matrix
+        t := matrix_identity();
+
+        proj := glGetUniformLocation(sh.id, "projection");
+        view := glGetUniformLocation(sh.id, "view");
+        model := glGetUniformLocation(sh.id, "model");
+        glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
+        glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
+        glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
+
+        glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
+
+        vertex_size := m.vertices.count * size_of(Vector3);
+        normal_size := m.normals.count * size_of(Vector3);
+        tex_size    := m.tex_coords.count * size_of(Vector2);
+        tangent_size := m.tangent_normals.count * size_of(Vector3);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
+        glVertexAttribPointer(1, 1, GL_UNSIGNED_INT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
+
+        glDrawArrays(GL_TRIANGLES, 0, xx m.vertices.count);
+
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
+
+        glDisable(GL_DEPTH_TEST);
+    }
+
+    start_picking :: (using rdr: *GL_Renderer) {
+        glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        pos := camera.position;
+        view_matrix = matrix_translate(-pos.x, -pos.y, -pos.z);
+        glUseProgram(picking_shader.id);
+    }
+
+    finish_picking :: (using rdr: GL_Renderer) {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glUseProgram(0);
+    }
+
+    get_picking_data :: (using rdr: GL_Renderer, data: *u8, bytes: u32) {
+        glBindTexture(GL_TEXTURE_2D, picking_texture);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data);
+    }
+}
+
+draw_mesh_wireframe :: (rdr: GL_Renderer, m: Mesh) {
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // @TODO we should probably use a temporary material heres
+    // and disable lighting to get consistent results
+    draw_mesh(rdr, m);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
 store_mesh_in_buffer :: (m: *Mesh) {
     glGenBuffers(1, *m.buffer_id);
     glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
@@ -647,11 +741,19 @@ store_mesh_in_buffer :: (m: *Mesh) {
     tangent_size := m.tangent_normals.count * size_of(Vector3);
     total_size := vertex_size + tex_size + normal_size + tangent_size;
 
+    #if DEVELOPER {
+        picking_size := m.picking_indices.count * size_of(u32);
+        total_size += picking_size;
+    }
+
     glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m.vertices.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m.normals.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m.tex_coords.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size, tangent_size, m.tangent_normals.data);
+    #if DEVELOPER {
+        glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size+tangent_size, picking_size, m.picking_indices.data);
+    }
 }
 
 draw_model :: (rdr: GL_Renderer, m: Model) {
@@ -754,6 +856,10 @@ generate_terrain_mesh :: (map: Height_Map) -> Mesh {
     array_reserve(*m.vertices, width*height*6);
     array_reserve(*m.normals, width*height*6);
 
+    #if DEVELOPER {
+        array_reserve(*m.picking_indices, width*height*6);
+    }
+
     for y: 0..height-2 {
         for x: 0..width-2 {
             v0 := make_Vector3(xx x, height_lookup(map, x, y), xx y);
@@ -774,6 +880,16 @@ generate_terrain_mesh :: (map: Height_Map) -> Mesh {
             array_add(*m.normals, make_Vector3(0, 1, 0));
             array_add(*m.vertices, v0);
             array_add(*m.normals, make_Vector3(0, 1, 0));
+
+            #if DEVELOPER {
+                in: u32 = xx (y * width + x);
+                array_add(*m.picking_indices, in);
+                array_add(*m.picking_indices, in);
+                array_add(*m.picking_indices, in);
+                array_add(*m.picking_indices, in);
+                array_add(*m.picking_indices, in);
+                array_add(*m.picking_indices, in);
+            }
         }
     }
 

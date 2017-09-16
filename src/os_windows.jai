@@ -267,6 +267,8 @@ GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER :: 0x8CDB;
 GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER :: 0x8CDC;
 GL_FRAMEBUFFER_UNSUPPORTED        :: 0x8CDD;
 
+GL_R32UI                         :: 0x8236;
+GL_RED_INTEGER                   :: 0x8D94;
 
 GL_3_0_API :: struct {
     glGenFramebuffers: (n: GLsizei, framebuffers: *GLuint) #foreign;
@@ -347,10 +349,13 @@ GL_3_0_API :: struct {
     glDebugMessageCallback: (callback: GLDEBUGPROC, userParam: *void) #foreign;
 
     glDeleteTextures: (n: GLsizei, textures: *GLuint) #foreign;
+
+    // glGetnTexImage: (target: GLenum, level: GLint, format: GLenum, type: GLenum, bufSize: GLsizei, pixels: *void) #foreign;
 }
 
 GL :: #foreign_system_library "opengl32";
-glCullFace:: (mode: GLenum) #foreign GL;
+glCullFace :: (mode: GLenum) #foreign GL;
+glGetTexImage :: (target: GLenum, level: GLint, format: GLenum, type: GLenum, pixels: *void) #foreign GL;
 
 glGetUniformLocation :: (program: GLuint, name: string) -> GLint {
     using gl_30_api;
