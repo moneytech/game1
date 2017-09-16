@@ -93,6 +93,13 @@ Vector2 :: struct {
     y: float;
 }
 
+make_Vector2 :: (x: float, y: float) -> Vector2 {
+    v: Vector2 = ---;
+    v.x = x;
+    v.y = y;
+    return v;
+}
+
 operator+ :: (a: Vector2, b: Vector2) -> Vector2 {
     out: Vector2 = ---;
     out.x = a.x + b.x;

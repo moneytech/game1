@@ -503,7 +503,7 @@ Model_load_fbx :: (path: string) -> *Model {
         print("error: couldn't load FBX file: %\n", path);
         return null;
     }
-    // print_node(*fbx.root_node, 0);
+    print_node(*fbx.root_node, 0);
 
     objs := fbx.root_node["Objects"];
     if !objs {
@@ -540,7 +540,9 @@ Model_load_fbx :: (path: string) -> *Model {
     vdata := (<<geom)["Vertices"].properties[0].data;
     idata := (<<geom)["PolygonVertexIndex"].properties[0].data;
     layer_normal := (<<geom)["LayerElementNormal"];
+    layer_uv := (<<geom)["LayerElementUV"];
     ndata := (<<layer_normal)["Normals"].properties[0].data;
+    uvdata := (<<layer_uv)["UV"].properties[0].data;
 
     array_reserve(*mesh.vertices, vdata.count / 3);
     array_reserve(*mesh.normals, ndata.count / 3);
@@ -558,6 +560,8 @@ Model_load_fbx :: (path: string) -> *Model {
 
     CENTIMETERS_TO_METERS :: 1.0 / 100.0;
 
+    assert(indices.count % 3 == 0);
+
     for indices {
         vec := make_Vector3(cast(float) vdata[it * 3].f64, cast(float) vdata[it * 3 + 1].f64, cast(float) vdata[it * 3 + 2].f64);
         array_add(*mesh.vertices, vec * CENTIMETERS_TO_METERS);
@@ -568,12 +572,15 @@ Model_load_fbx :: (path: string) -> *Model {
         array_add(*mesh.normals, norm);
     }
 
-    // @TODO tex coords
+    for 0..(uvdata.count/2)-1 {
+        uv := make_Vector2(cast(float) uvdata[it * 2].f64, cast(float) uvdata[it * 2 + 1].f64);
+        array_add(*mesh.tex_coords, uv);
+    }
 
     // @Temporary material
     mat := New(Material);
     mesh.material = mat;
-    mat.diffuse.r = 1.0;
+    mat.diffuse = make_Color(0.8, 0.8, 0.8);
 
     return model;
 }

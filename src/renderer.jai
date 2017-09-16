@@ -48,6 +48,14 @@ Color :: struct {
     b: float;
 };
 
+make_Color :: (r: float, g: float, b: float) -> Color {
+    c: Color = ---;
+    c.r = r;
+    c.g = g;
+    c.b = b;
+    return c;
+}
+
 MAX_TEXTURES_PER_MESH  :: 4;
 TEXTURE_DIFFUSE_INDEX  :: 0;
 TEXTURE_NORMAL_INDEX   :: 1;
@@ -547,8 +555,8 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     r += 0.01;
     q := set_angle_vector(0, 1, 0, 0);
     b := set_angle_vector(3.14, 0, 1, 0);
-    // t := matrix_rotate(slerp(clamp(r, 0, 1), q, b));
-    t := matrix_identity();
+    t := matrix_rotate(slerp(clamp(r, 0, 1), q, b));
+    // t := matrix_identity();
 
     proj := glGetUniformLocation(render_to_gbuffer.id, "projection");
     view := glGetUniformLocation(render_to_gbuffer.id, "view");

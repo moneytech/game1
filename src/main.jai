@@ -56,13 +56,13 @@ main :: () {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    key := load_model(*asset_man, "assets/monkey.obj");
+    // key := load_model(*asset_man, "assets/keyOGA.obj");
     // __model = load_model(*asset_man, "assets/well.coveredopen.obj");
     __model = load_model(*asset_man, "assets/treasure_chest.fbx");
     // __model = key;
     // __model = create_sphere(1.0, 32, 32);
-    __model.meshes[0].material = key.meshes[0].material;
-    key.meshes[0].material.textures[0] = null;
+    // __model.meshes[0].material = key.meshes[0].material;
+    // key.meshes[0].material.textures[0] = null;
 
     fwd := false;
     back := false;
