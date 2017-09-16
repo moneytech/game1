@@ -36,7 +36,7 @@ void main() {
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
     
     // @Temporary
-    vec3 light_pos = vec3(0, 3, 5);
+    vec3 light_pos = vec3(64, 1000, -64);
 
     vec3 light_dir = normalize(light_pos-frag_pos);
     vec3 view_dir = normalize(camera_position-frag_pos);

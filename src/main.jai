@@ -30,7 +30,7 @@ main :: () {
     os_watch_dir("assets");
     // os_watch_dir("assets/shaders");
 
-    win := os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "test");
+    win := os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "game1");
     ctx := os_create_gl_context(win);
     os_make_current(win, ctx);
     os_set_vsync(true);
@@ -69,7 +69,10 @@ main :: () {
     left := false;
     right := false;
 
-    renderer.camera.position.z = 10;
+    renderer.camera.position.z = 30;
+    renderer.camera.position.y = 5;
+
+    __terrain = load_heightmap(*asset_man, "assets/heightmap.png");
 
     while (true) {
         exit := false;
@@ -107,6 +110,14 @@ main :: () {
             joy := joysticks[0];
             // x += joy.left_thumb.x;
             // y -= joy.left_thumb.y;
+            game.renderer.camera.position.x += joy.left_thumb.x;
+            game.renderer.camera.position.z -= joy.left_thumb.y;
+            if joy.buttons & JOYSTICK_BUTTON_RBUMPER {
+                game.renderer.camera.position.y += 1;
+            }
+            if joy.buttons & JOYSTICK_BUTTON_LBUMPER {
+                game.renderer.camera.position.y -= 1;
+            }
 
             if (joy.buttons & JOYSTICK_BUTTON_BACK) exit = true;
         }
@@ -144,6 +155,7 @@ tex: *Texture;
 renderer: *GL_Renderer;
 font: *Font;
 __model: *Model;
+__terrain: *Mesh;
 
 /*
 struct Html_Phase {
@@ -197,11 +209,12 @@ void render_html_dom(Html_Dom *dom) {
 
 render :: () {
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 100.0);
+    renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
     start_scene(<<renderer);
     clear_screen(0.0, 0.0, 0.0, 1.0);
     // renderer->draw_cube(0, 0, -2, 1);
     draw_model(<<renderer, <<__model);
+    draw_mesh(<<renderer, <<__terrain);
     finish_scene(<<renderer);
 
 

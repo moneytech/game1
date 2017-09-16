@@ -564,7 +564,7 @@ os_set_vsync :: (on: bool) {
     array_reset(*joysticks);
     for 0..XUSER_MAX_COUNT-1 {
         st: XINPUT_STATE;
-        if (XInputGetStateStub(xx it, *st) == ERROR_SUCCESS) {
+        if (__XInputGetState(xx it, *st) == ERROR_SUCCESS) {
             joy: Joystick;
             pad := *st.Gamepad;
 

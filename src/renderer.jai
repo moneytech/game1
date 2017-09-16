@@ -547,16 +547,11 @@ draw_cube :: (x: float, y: float, z: float, size: float) {
     assert(false);
 }
 
-r: float;
-
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glEnable(GL_DEPTH_TEST);
 
-    r += 0.01;
-    q := set_angle_vector(0, 1, 0, 0);
-    b := set_angle_vector(3.14, 0, 1, 0);
-    t := matrix_rotate(slerp(clamp(r, 0, 1), q, b));
-    // t := matrix_identity();
+    // @TODO model matrix
+    t := matrix_identity();
 
     proj := glGetUniformLocation(render_to_gbuffer.id, "projection");
     view := glGetUniformLocation(render_to_gbuffer.id, "view");
@@ -737,4 +732,55 @@ create_sphere :: (radius: float, latitude_slices: int, longitude_slices: int) ->
 
     store_mesh_in_buffer(m);
     return mod;
+}
+
+Height_Map :: struct {
+    map: [..] float;
+    width: int;
+    height: int;
+}
+
+height_lookup :: inline (map: Height_Map, x: int, y: int) -> float {
+    assert(x >= 0 && x < map.width);
+    assert(y >= 0 && y < map.height);
+    return map.map[y * map.width + x];
+}
+
+generate_terrain_mesh :: (map: Height_Map) -> Mesh {
+    width := map.width;
+    height := map.height;
+    m: Mesh;
+
+    array_reserve(*m.vertices, width*height*6);
+    array_reserve(*m.normals, width*height*6);
+
+    for y: 0..height-2 {
+        for x: 0..width-2 {
+            v0 := make_Vector3(xx x, height_lookup(map, x, y), xx y);
+            v1 := make_Vector3(xx (x+1), height_lookup(map, x+1, y), xx y);
+            v2 := make_Vector3(xx (x+1), height_lookup(map, x+1, y+1), xx (y+1));
+            v3 := make_Vector3(xx x, height_lookup(map, x, y+1), xx (y+1));
+
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, make_Vector3(0, 1, 0));
+            array_add(*m.vertices, v1);
+            array_add(*m.normals, make_Vector3(0, 1, 0));
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, make_Vector3(0, 1, 0));
+
+            array_add(*m.vertices, v3);
+            array_add(*m.normals, make_Vector3(0, 1, 0));
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, make_Vector3(0, 1, 0));
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, make_Vector3(0, 1, 0));
+        }
+    }
+
+    mat := New(Material);
+    mat.diffuse = make_Color(1, 1, 1);
+    m.material = mat;
+
+    store_mesh_in_buffer(*m);
+    return m;
 }

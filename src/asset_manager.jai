@@ -7,6 +7,7 @@ Asset_Manager :: struct {
     materials: Hash_Map(#type *Material_Lib);
     fonts: Hash_Map(#type *Font);
     shader_catalog: Hash_Map(#type Shader_Info);
+    heightmaps: Hash_Map(#type *Mesh);
 
     game: *Game;
 }
@@ -41,6 +42,51 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
     }
 
     print("ERROR:%s\n", point_at_c_string(stbi_failure_reason()));
+    return null;
+}
+
+load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> *Mesh {
+    width, height, comp: s32;
+    // @Leak
+    data := stbi_load(to_c_string(filepath), *width, *height, *comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
+
+    if (data) {
+        m := get_slot(*heightmaps, filepath);
+        if !m {
+            m = New(Mesh);
+        }
+        map: Height_Map;
+        map.width = width;
+        map.height = height;
+        array_reserve(*map.map, width*height);
+
+        for y: 0..height-1 {
+            for x: 0..width-1 {
+                val: float = cast(float) data[(y * width + x) * 4];
+                array_add(*map.map, val / 10.0);
+            }
+        }
+
+        <<m = generate_terrain_mesh(map);
+        stbi_image_free(data);
+        return m;
+    }
+
+    return null;
+}
+
+load_image_from_memory :: (filepath: string, data: [] u8) -> *Texture {
+    width, height, comp: s32;
+    out := stbi_load_from_memory(data.data, xx data.count, *width, *height, *comp, 4);
+
+    if out {
+        tex: *Texture = New(Texture);
+        create_texture(tex, xx width, xx height, out);
+        stbi_image_free(out);
+        return tex;
+    }
+
+    // @TODO asset_man
     return null;
 }
 
@@ -475,6 +521,26 @@ print_property :: (p: FBX_Node_Property) {
             print("%", p.primitive.f64);
         case TYPE_FLOAT;
             print("%", p.primitive.f32);
+        case TYPE_INT16;
+            print("%", p.primitive.int16);
+        case TYPE_BOOL;
+            print("%", cast(bool) p.primitive.bool8);
+        case TYPE_INT32;
+            print("%", p.primitive.int32);
+        case TYPE_INT64;
+            print("%", p.primitive.int64);
+        case TYPE_FLOAT_ARRAY;
+            print("[%] float", p.data.count);
+        case TYPE_DOUBLE_ARRAY;
+            print("[%] float64", p.data.count);
+        case TYPE_INT64_ARRAY;
+            print("[%] int64", p.data.count);
+        case TYPE_INT32_ARRAY;
+            print("[%] int32", p.data.count);
+        case TYPE_BOOL_ARRAY;
+            print("[%] bool", p.data.count);
+        case TYPE_RAW_DATA;
+            print("[] <raw_data>", p.raw_data.count);
     } 
 }
 
@@ -498,12 +564,17 @@ Model_load_fbx :: (path: string) -> *Model {
     mesh := New(Mesh);
     array_add(*model.meshes, mesh);
 
+    // @TODO this is one giant hack
+    // really we want to build a scene graph and then
+    // build the graph based on the UIDs and connections
+    // of each node
+
     fbx := FBX_load_file(path);
     if !fbx {
         print("error: couldn't load FBX file: %\n", path);
         return null;
     }
-    print_node(*fbx.root_node, 0);
+    // print_node(*fbx.root_node, 0);
 
     objs := fbx.root_node["Objects"];
     if !objs {
@@ -543,6 +614,7 @@ Model_load_fbx :: (path: string) -> *Model {
     layer_uv := (<<geom)["LayerElementUV"];
     ndata := (<<layer_normal)["Normals"].properties[0].data;
     uvdata := (<<layer_uv)["UV"].properties[0].data;
+    uvindex := (<<layer_uv)["UVIndex"].properties[0].data
 
     array_reserve(*mesh.vertices, vdata.count / 3);
     array_reserve(*mesh.normals, ndata.count / 3);
@@ -550,11 +622,7 @@ Model_load_fbx :: (path: string) -> *Model {
 
     for idata {
         in := it.int32;
-        if in < 0 {
-            in = (in * -1) -1;
-            // assert(it_index % 2 == 0);
-            // print("mod: %\n", (it_index+1) % 3);
-        }
+        if in < 0 in = (in * -1) -1;
         array_add(*indices, cast(u32) in);
     }
 
@@ -572,8 +640,14 @@ Model_load_fbx :: (path: string) -> *Model {
         array_add(*mesh.normals, norm);
     }
 
-    for 0..(uvdata.count/2)-1 {
-        uv := make_Vector2(cast(float) uvdata[it * 2].f64, cast(float) uvdata[it * 2 + 1].f64);
+    // for 0..(uvdata.count/2)-1 {
+    //     uv := make_Vector2(cast(float) uvdata[it * 2].f64, cast(float) uvdata[it * 2 + 1].f64);
+    //     array_add(*mesh.tex_coords, uv);
+    // }
+
+    for uvindex {
+        // @Note UVs are indexed as 3 dimensional vectors though we only support 2
+        uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
         array_add(*mesh.tex_coords, uv);
     }
 
@@ -581,6 +655,12 @@ Model_load_fbx :: (path: string) -> *Model {
     mat := New(Material);
     mesh.material = mat;
     mat.diffuse = make_Color(0.8, 0.8, 0.8);
+
+    vid := (<<objs)["Video"];
+    if vid != null {
+        data := (<<vid)["Content"].properties[0].raw_data;
+        mat.textures[TEXTURE_DIFFUSE_INDEX] = load_image_from_memory("", data);
+    }
 
     return model;
 }
