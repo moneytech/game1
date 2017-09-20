@@ -174,11 +174,21 @@ GL_Renderer :: struct {
 
 
 debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
+    print("source: %\n", source);
+    print("type: %\n", type);
+    print("id: %\n", id);
+    print("severity: %\n", severity);
+    print("length: %\n", length);
+    print("message: %\n", message);
+    print("userParam: %\n", userParam);
     print("DEBUG:%\n", point_at_c_string(message));
 }
 
 init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
-    glDebugMessageCallback(debug_callback, null);
+    print("rdr: %\n", rdr);
+    glDebugMessageCallback(debug_callback, rdr);
+    glBegin(GL_TRIANGLES);
+    glEnd();
 
     // @Temporary
     // @Temporary

@@ -12,7 +12,7 @@
 setup_build :: () -> Build_Options {
     options := get_build_options();
     set_optimization_level(*options, 0, 0);
-    options.backend = Backend.LLVM;
+    options.backend = Backend.X64;
     options.llvm_options.enable_split_modules = false;
 
     options.output_type = Build_Output_Type.NO_OUTPUT;
@@ -29,9 +29,7 @@ setup_build :: () -> Build_Options {
     miniz_lib := C_compiler_make_dynamic_lib("run_tree/miniz.dll", C_compiler_make_source_file("src/miniz.c"));
     C_compiler_build_target(<< miniz_lib);
 
-    #if OS_WINDOWS {
-        SetDllDirectoryA(to_c_string(options.output_path));
-    }
+    compiler_add_library_search_directory(options.output_path);
 
     return options;
 };

@@ -1,8 +1,9 @@
 #load "renderer.jai";
 #load "lexer.jai";
 #load "asset_manager.jai";
+#load "editor.jai";
 #load "FBX.jai";
-miniz :: #foreign_system_library "miniz";
+miniz :: #foreign_library "miniz";
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
 
 WINDOW_WIDTH :: 1280;
@@ -17,8 +18,9 @@ Game :: struct {
 
 main :: () {
     os_init_platform();
-    #if running_at_compile_time() {
-        orig_wd: string;
+
+    orig_wd: string;
+    if running_at_compile_time() {
         orig_wd.data = alloc(512);
         orig_wd.count = get_current_directory(orig_wd.data, 512);
         opts := get_build_options();
@@ -38,18 +40,18 @@ main :: () {
     rdr: GL_Renderer;
     game: Game;
     game.renderer = *rdr;
-    asset_man: Asset_Manager;
+    asset_man := New(Asset_Manager);
     asset_man.game = *game;
-    game.asset_man = *asset_man;
+    game.asset_man = asset_man;
 
     rdr.game = *game;
     init(*rdr, WINDOW_WIDTH, WINDOW_HEIGHT);
     renderer = *rdr;
 
-    rdr.render_to_gbuffer = load_shader_pair(*asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
-    rdr.render_light_using_gbuffer = load_shader_pair(*asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
-    rdr.render_plain_texture = load_shader_pair(*asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
-    rdr.picking_shader = load_shader_pair(*asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
+    rdr.render_to_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
+    rdr.render_light_using_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
+    rdr.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
+    rdr.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
 
     #if DEVELOPER {
         picking_buf.count = WINDOW_WIDTH * WINDOW_HEIGHT;
@@ -61,23 +63,18 @@ main :: () {
     // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
     // font = &fnt;
 
-    // key := load_model(*asset_man, "assets/keyOGA.obj");
-    // __model = load_model(*asset_man, "assets/well.coveredopen.obj");
-    // __model = load_model(*asset_man, "assets/treasure_chest.fbx");
+    // key := load_model(asset_man, "assets/keyOGA.obj");
+    // __model = load_model(asset_man, "assets/well.coveredopen.obj");
+    // __model = load_model(asset_man, "assets/treasure_chest.fbx");
     // __model = key;
     // __model = create_sphere(1.0, 32, 32);
     // __model.meshes[0].material = key.meshes[0].material;
     // key.meshes[0].material.textures[0] = null;
 
-    fwd := false;
-    back := false;
-    left := false;
-    right := false;
-
     renderer.camera.position.z = 30;
     renderer.camera.position.y = 5;
 
-    __terrain = load_heightmap(*asset_man, "assets/heightmap.png");
+    __terrain = load_heightmap(asset_man, "assets/heightmap.png");
 
     while (true) {
         exit := false;
@@ -86,29 +83,9 @@ main :: () {
             if (it.type == Event_Type.QUIT) {
                 exit = true;
             } else if (it.type == Event_Type.KEYBOARD) {
-                if it.key_code == xx #char "W" {
-                    fwd = it.key_pressed != 0;
-                }
-
-                if it.key_code == xx #char "S" {
-                    back = it.key_pressed != 0;
-                }
-
-                if it.key_code == xx #char "D" {
-                    right = it.key_pressed != 0;
-                }
-
-                if it.key_code == xx #char "A" {
-                    left = it.key_pressed != 0;
-                }
 
             }
         }
-
-        if fwd game.renderer.camera.position.z   -= 1;
-        if back game.renderer.camera.position.z  += 1;
-        if left game.renderer.camera.position.x  -= 1;
-        if right game.renderer.camera.position.x += 1;
 
 
         if (joysticks.count) {
@@ -134,12 +111,8 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
-        if mode == Game_Mode.EDITOR {
-            editor_update();
-            editor_render();
-        } else {
-            render();
-        }
+        update_editor(*game, 1.0);
+        render();
 
         os_swap_buffers(win);
         os_pump_input();
@@ -152,7 +125,7 @@ main :: () {
 
     os_close_window(win);
 
-    #if running_at_compile_time() {
+    if running_at_compile_time() {
         setcwd(orig_wd);
     }
 }

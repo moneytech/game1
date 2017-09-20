@@ -62,6 +62,14 @@ operator* :: (a: Vector3, f64: float64) -> Vector3 #symmetric {
     return out;
 }
 
+mul :: (a: Vector3, b: Vector3) -> Vector3 {
+    out: Vector3 = ---;
+    out.x = a.x * b.x;
+    out.y = a.y * b.y;
+    out.z = a.z * b.z;
+    return out;
+}
+
 dot :: (a: Vector3, b: Vector3) -> float {
     return a.x*b.x + a.y*b.y + a.z*b.z;
 }
@@ -160,6 +168,17 @@ operator* :: (q0: Quaternion, q1: Quaternion) -> Quaternion {
     o.y = q0.w*q1.y + q1.w*q0.y + (q0.z*q1.x - q0.x*q1.z);
     o.z = q0.w*q1.z + q1.w*q0.z + (q0.x*q1.y - q0.y*q1.x);
     return o;
+}
+
+operator* :: (q: Quaternion, v: Vector3) -> Vector3 {
+    qvec := make_Vector3(q.x, q.y, q.z);
+
+    uv := cross(qvec, v);
+    uuv := cross(qvec, uv);
+    uv = uv * (2.0 * q.w);
+    uuv = uuv * 2;
+
+    return v + uv + uuv;
 }
 
 operator* :: (q: Quaternion, s: float) -> Quaternion #symmetric {
