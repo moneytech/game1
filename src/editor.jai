@@ -38,6 +38,18 @@ add_point :: (m: *Mesh, p: Vector3) {
     store_mesh_in_buffer(m);
 }
 
+update_point_mesh :: (m: *Mesh, map: Height_Map, indices: [] u32) {
+	array_reset(*m.vertices);
+	array_reset(*m.normals);
+
+	for indices {
+		array_add(*m.vertices, map.vertices[it]);
+		array_add(*m.normals, make_Vector3(0, 0, 0));
+	}
+
+	store_mesh_in_buffer(m);
+}
+
 init_editor :: (game: *Game) {
     m := New(Mesh);
     m.material = New(Material);
@@ -70,6 +82,8 @@ update_editor :: (game: *Game, dt: float) {
 
             // print("x, y: %, %; index: %; %\n", x, game.window.height - y, index, terrain_map.vertices[index]);
             print("i: %, ix: %, iy: %\n", index, index % xx terrain_map.width, index / xx terrain_map.width);
+
+            // @TODO check if point is already in array
             add_point(selected_points_mesh, terrain_map.vertices[index]);
             array_add(*selected_points_indices, index);
         }
@@ -89,6 +103,7 @@ update_editor :: (game: *Game, dt: float) {
     		terrain_map.vertices[it] = out;
     	}
 
+    	update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
     	generate_terrain_mesh(terrain_map, __terrain);
     }
 }
