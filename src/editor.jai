@@ -5,7 +5,7 @@
 update_camera :: (game: *Game, dt: float) {
     using Key_Current_State;
 
-    if input_button_states[Key_Code.MOUSE_BUTTON_RIGHT] & DOWN {
+    if input_button_states[Key_Code.MOUSE_BUTTON_MIDDLE] & DOWN {
         delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
         q := game.renderer.camera.rotation;
 
