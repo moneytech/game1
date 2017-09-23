@@ -28,6 +28,7 @@ update_camera :: (game: *Game, dt: float) {
 }
 
 selected_points_mesh: *Mesh;
+selected_points_indices: [..] u32;
 
 #scope_export
 
@@ -42,8 +43,6 @@ init_editor :: (game: *Game) {
     m.material = New(Material);
     m.material.diffuse = make_Color(1, 0, 0);
     m.primitive_type = Primitive_Type.POINTS;
-
-    add_point(m, make_Vector3(0, 0, 0));
 
     selected_points_mesh = m;
 }
@@ -72,7 +71,25 @@ update_editor :: (game: *Game, dt: float) {
             // print("x, y: %, %; index: %; %\n", x, game.window.height - y, index, terrain_map.vertices[index]);
             print("i: %, ix: %, iy: %\n", index, index % xx terrain_map.width, index / xx terrain_map.width);
             add_point(selected_points_mesh, terrain_map.vertices[index]);
+            array_add(*selected_points_indices, index);
         }
+    }
+
+    if input_button_states[#char "Z"] & DOWN {
+    	delta := make_Vector3(xx mouse_delta_x, xx -mouse_delta_y, 0);
+        q := game.renderer.camera.rotation;
+
+        delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+        sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+        delta = mul(delta, make_Vector3(sx, sy, 1)) * 20;
+
+    	for selected_points_indices {
+    		vert_current := terrain_map.vertices[it];
+    		out := vert_current + delta;
+    		terrain_map.vertices[it] = out;
+    	}
+
+    	generate_terrain_mesh(terrain_map, __terrain);
     }
 }
 

@@ -903,16 +903,19 @@ generate_heightmap_vertex_data :: (map: *Height_Map) {
     }
 }
 
-generate_terrain_mesh :: (map: Height_Map) -> Mesh {
+generate_terrain_mesh :: (map: Height_Map, m: *Mesh) {
     width := map.width;
     height := map.height;
-    m: Mesh;
 
     array_reserve(*m.vertices, width*height*6);
     array_reserve(*m.normals, width*height*6);
 
+    array_reset(*m.vertices);
+    array_reset(*m.normals);
+
     #if DEVELOPER {
         array_reserve(*m.picking_indices, width*height*6);
+        array_reset(*m.picking_indices);
     }
 
     add_quad_index :: (arr: *[..] u32, i: u32) {
@@ -968,10 +971,15 @@ generate_terrain_mesh :: (map: Height_Map) -> Mesh {
         }
     }
 
+    store_mesh_in_buffer(m);
+}
+
+generate_terrain_mesh :: (map: Height_Map) -> Mesh {
+    m: Mesh;
+    generate_terrain_mesh(map, *m);
+
     mat := New(Material);
     mat.diffuse = make_Color(1, 1, 1);
     m.material = mat;
-
-    store_mesh_in_buffer(*m);
     return m;
 }
