@@ -45,8 +45,9 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
     return null;
 }
 
-load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> *Mesh {
+load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> Height_Map, *Mesh {
     width, height, comp: s32;
+    map: Height_Map;
     // @Leak
     data := stbi_load(to_c_string(filepath), *width, *height, *comp, 4); // 4 forces RGBA components / 4 bytes-per-pixel
 
@@ -55,7 +56,6 @@ load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> *Mesh {
         if !m {
             m = New(Mesh);
         }
-        map: Height_Map;
         map.width = width;
         map.height = height;
         array_reserve(*map.map, width*height);
@@ -67,12 +67,14 @@ load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> *Mesh {
             }
         }
 
+        generate_heightmap_vertex_data(*map);
         <<m = generate_terrain_mesh(map);
         stbi_image_free(data);
-        return m;
+        return map, m;
     }
 
-    return null;
+    print("ERROR:%s\n", point_at_c_string(stbi_failure_reason()));
+    return map, null;
 }
 
 load_image_from_memory :: (filepath: string, data: [] u8) -> *Texture {

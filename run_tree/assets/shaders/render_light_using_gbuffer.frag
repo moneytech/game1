@@ -34,6 +34,10 @@ void main() {
     vec3 frag_pos = texture(g_position, tex_coords).rgb;
     vec3 normal = normalize(texture(g_normal, tex_coords).rgb);
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
+    if (length(normal) == 0) {
+        normal = vec3(0, 1, 0);
+        // frag_color = vec4(in_diffuse, 1);
+    }
     
     // @Temporary
     vec3 light_pos = vec3(64, 1000, -64);

@@ -67,8 +67,8 @@ demo :: () {
     add_build_string("#run main();", w);
 }
 
-// #run build_debug();
-#run demo();
+#run build_debug();
+// #run demo();
 
 
 // C compilation code

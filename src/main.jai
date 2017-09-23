@@ -12,9 +12,21 @@ WINDOW_HEIGHT :: 720;
 Game :: struct {
     renderer: *GL_Renderer;
     asset_man: *Asset_Manager;
+    window: *Window;
+
+    fov: float = 60;
+}
+
+Window :: struct {
+    width: s32;
+    height: s32;
+
+    handle: OS_Window;
+    glc: OS_GL_Context;
 }
 
 #import "Compiler";
+terrain_map: Height_Map;
 
 main :: () {
     os_init_platform();
@@ -39,6 +51,13 @@ main :: () {
 
     rdr: GL_Renderer;
     game: Game;
+    window: Window;
+    window.width = WINDOW_WIDTH;
+    window.height = WINDOW_HEIGHT;
+    window.handle = win;
+    window.glc = ctx;
+
+    game.window = *window;
     game.renderer = *rdr;
     asset_man := New(Asset_Manager);
     asset_man.game = *game;
@@ -55,8 +74,10 @@ main :: () {
 
     #if DEVELOPER {
         picking_buf.count = WINDOW_WIDTH * WINDOW_HEIGHT;
-        picking_buf.data = alloc(picking_buf.count*size_of(u32) * 4); // this is wasteful maybe we can store 8bits of the index in each channel in GL ?
+        picking_buf.data = alloc(picking_buf.count*size_of(u32)); // this is wasteful maybe we can store 8bits of the index in each channel in GL ?
     }
+
+    init_editor(*game);
 
     // Font fnt;
     // my_stbtt_initfont(&fnt);
@@ -74,7 +95,7 @@ main :: () {
     renderer.camera.position.z = 30;
     renderer.camera.position.y = 5;
 
-    __terrain = load_heightmap(asset_man, "assets/heightmap.png");
+    terrain_map, __terrain = load_heightmap(asset_man, "assets/heightmap.png");
 
     while (true) {
         exit := false;
@@ -111,8 +132,9 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
+        renderer.projection_matrix = matrix_perspective(game.fov, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
         update_editor(*game, 1.0);
-        render();
+        render(*game);
 
         os_swap_buffers(win);
         os_pump_input();
@@ -139,7 +161,7 @@ font: *Font;
 __model: *Model;
 __terrain: *Mesh;
 #if DEVELOPER {
-    picking_buf: [] u8;
+    picking_buf: [] u32;
 }
 
 /*
@@ -192,26 +214,20 @@ void render_html_dom(Html_Dom *dom) {
 }
 */
 
-render :: () {
+render :: (game: *Game) {
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
-    start_scene(renderer);
-    clear_screen(0.0, 0.0, 0.0, 1.0);
-    // renderer->draw_cube(0, 0, -2, 1);
-    // draw_model(<<renderer, <<__model);
-    draw_mesh(<<renderer, <<__terrain);
-    finish_scene(<<renderer);
+    // start_scene(renderer);
+    // clear_screen(0.0, 0.0, 0.0, 1.0);
+    // // renderer->draw_cube(0, 0, -2, 1);
+    // // draw_model(<<renderer, <<__model);
+    // draw_mesh(<<renderer, <<__terrain);
+    // finish_scene(<<renderer);
 
     #if DEVELOPER {
-        renderer.projection_matrix = matrix_perspective(60.0, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
-        start_picking(renderer);
-        draw_picking_mesh(<<renderer, <<__terrain, renderer.picking_shader);
-        finish_picking(<<renderer);
-
-        get_picking_data(<<renderer, picking_buf.data, xx picking_buf.count * size_of(u32));
+        render_editor(game);    
     }
 
-    renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
+    // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
     /*
     Bitmap_Frame frame = {0};
     frame.tex_coords.width = 14.0f / (float)tex->width;

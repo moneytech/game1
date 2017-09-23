@@ -71,9 +71,15 @@ Material :: struct {
     transparency: float;
 };
 
+Primitive_Type :: enum u32 {
+    TRIANGLES,
+    POINTS
+}
+
 Mesh :: struct {
     material: *Material;
     buffer_id: u32;
+    primitive_type: Primitive_Type = Primitive_Type.TRIANGLES;
 
     vertices: [..] Vector3;
     normals: [..] Vector3;
@@ -150,6 +156,7 @@ GL_Renderer :: struct {
 
     lights: [..] Light;
 
+    VertexArrayID: u32;
     gbuffer_framebuffer: u32;
     gbuffer_position: u32;
     gbuffer_normal: u32;
@@ -174,13 +181,13 @@ GL_Renderer :: struct {
 
 
 debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
-    print("source: %\n", source);
-    print("type: %\n", type);
-    print("id: %\n", id);
-    print("severity: %\n", severity);
-    print("length: %\n", length);
-    print("message: %\n", message);
-    print("userParam: %\n", userParam);
+    // print("source: %\n", source);
+    // print("type: %\n", type);
+    // print("id: %\n", id);
+    // print("severity: %\n", severity);
+    // print("length: %\n", length);
+    // print("message: %\n", message);
+    // print("userParam: %\n", userParam);
     print("DEBUG:%\n", point_at_c_string(message));
 }
 
@@ -195,9 +202,8 @@ init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
     // @Temporary
     // @Temporary
     // @Temporary
-    VertexArrayID: GLuint;
-    glGenVertexArrays(1, *VertexArrayID);
-    glBindVertexArray(VertexArrayID);
+    glGenVertexArrays(1, *rdr.VertexArrayID);
+    glBindVertexArray(rdr.VertexArrayID);
 
     glGenFramebuffers(1, *gbuffer_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
@@ -514,6 +520,7 @@ finish_scene :: (using rdr: GL_Renderer) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     clear_screen(0, 0, 0, 1);
 
+    old_proj := projection_matrix;
     projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
@@ -538,6 +545,8 @@ finish_scene :: (using rdr: GL_Renderer) {
     }
 
     glUseProgram(0);
+
+    projection_matrix = old_proj;
 }
 
 draw_cube :: (x: float, y: float, z: float, size: float) {
@@ -591,7 +600,8 @@ draw_cube :: (x: float, y: float, z: float, size: float) {
 }
 
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
-    glEnable(GL_DEPTH_TEST);
+    if m.primitive_type != Primitive_Type.POINTS
+        glEnable(GL_DEPTH_TEST);
 
     // @TODO model matrix
     t := matrix_identity();
@@ -669,7 +679,13 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size));
     }
 
-    glDrawArrays(GL_TRIANGLES, 0, xx m.vertices.count);
+    prim_type: GLenum;
+    if (m.primitive_type == Primitive_Type.TRIANGLES) {
+        prim_type = GL_TRIANGLES;
+    } else if (m.primitive_type == Primitive_Type.POINTS) {
+        prim_type = GL_POINTS;
+    }
+    glDrawArrays(prim_type, 0, xx m.vertices.count);
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
@@ -703,7 +719,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
-        glVertexAttribPointer(1, 1, GL_UNSIGNED_INT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
+        glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
 
         glDrawArrays(GL_TRIANGLES, 0, xx m.vertices.count);
 
@@ -715,6 +731,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
 
     start_picking :: (using rdr: *GL_Renderer) {
         glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
+        glClearColor(1, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         pos := camera.position;
@@ -727,7 +744,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glUseProgram(0);
     }
 
-    get_picking_data :: (using rdr: GL_Renderer, data: *u8, bytes: u32) {
+    get_picking_data :: (using rdr: GL_Renderer, data: *u32, bytes: u32) {
         glBindTexture(GL_TEXTURE_2D, picking_texture);
         glGetTexImage(GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data);
     }
@@ -741,10 +758,7 @@ draw_mesh_wireframe :: (rdr: GL_Renderer, m: Mesh) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-store_mesh_in_buffer :: (m: *Mesh) {
-    glGenBuffers(1, *m.buffer_id);
-    glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
-
+store_mesh_in_buffer :: (m: *Mesh, dynamic := false) {
     vertex_size := m.vertices.count * size_of(Vector3);
     normal_size := m.normals.count * size_of(Vector3);
     tex_size    := m.tex_coords.count * size_of(Vector2);
@@ -756,7 +770,14 @@ store_mesh_in_buffer :: (m: *Mesh) {
         total_size += picking_size;
     }
 
-    glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_STATIC_DRAW);
+    if !m.buffer_id {
+        glGenBuffers(1, *m.buffer_id);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
+    if dynamic glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_DYNAMIC_DRAW);
+    else glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_STATIC_DRAW);
+
     glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m.vertices.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m.normals.data);
     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m.tex_coords.data);
@@ -846,8 +867,13 @@ create_sphere :: (radius: float, latitude_slices: int, longitude_slices: int) ->
     return mod;
 }
 
+set_point_size :: (using rdr: GL_Renderer, size: float) {
+    glPointSize(size);
+}
+
 Height_Map :: struct {
     map: [..] float;
+    vertices: [..] Vector3;
     width: int;
     height: int;
 }
@@ -856,6 +882,25 @@ height_lookup :: inline (map: Height_Map, x: int, y: int) -> float {
     assert(x >= 0 && x < map.width);
     assert(y >= 0 && y < map.height);
     return map.map[y * map.width + x];
+}
+
+add_quad :: (arr: *[..] Vector3, v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3) {
+    array_add(arr, v2);
+    array_add(arr, v1);
+    array_add(arr, v0);
+
+    array_add(arr, v3);
+    array_add(arr, v2);
+    array_add(arr, v0);
+}
+
+generate_heightmap_vertex_data :: (map: *Height_Map) {
+    for y: 0..map.height-1 {
+        for x: 0..map.width-1 {
+            v0 := make_Vector3(xx x, height_lookup(<<map, x, y), xx y);
+            array_add(*map.vertices, v0);
+        }
+    }
 }
 
 generate_terrain_mesh :: (map: Height_Map) -> Mesh {
@@ -870,35 +915,55 @@ generate_terrain_mesh :: (map: Height_Map) -> Mesh {
         array_reserve(*m.picking_indices, width*height*6);
     }
 
+    add_quad_index :: (arr: *[..] u32, i: u32) {
+        array_add(arr, i);
+        array_add(arr, i);
+        array_add(arr, i);
+
+        array_add(arr, i);
+        array_add(arr, i);
+        array_add(arr, i);
+    }
+
+    normal := make_Vector3(0, 1, 0);
     for y: 0..height-2 {
         for x: 0..width-2 {
-            v0 := make_Vector3(xx x, height_lookup(map, x, y), xx y);
-            v1 := make_Vector3(xx (x+1), height_lookup(map, x+1, y), xx y);
-            v2 := make_Vector3(xx (x+1), height_lookup(map, x+1, y+1), xx (y+1));
-            v3 := make_Vector3(xx x, height_lookup(map, x, y+1), xx (y+1));
+            in0: u32 = xx (y * width + x);
+            in1: u32 = xx (y * width + (x + 1));
+            in2: u32 = xx ((y + 1) * width + (x + 1));
+            in3: u32 = xx ((y + 1) * width + x);
+            v0 := map.vertices[in0];
+            v1 := map.vertices[in1];
+            v2 := map.vertices[in2];
+            v3 := map.vertices[in3];
 
-            array_add(*m.vertices, v2);
-            array_add(*m.normals, make_Vector3(0, 1, 0));
-            array_add(*m.vertices, v1);
-            array_add(*m.normals, make_Vector3(0, 1, 0));
-            array_add(*m.vertices, v0);
-            array_add(*m.normals, make_Vector3(0, 1, 0));
+            // we subdivide the surface here so
+            // when we need to pick the vertex in
+            // the mesh, we automatically pick the
+            // nearest vertex
+            v01 := (v0 + v1) * 0.5;
+            v02 := (v0 + v2) * 0.5;
+            v03 := (v0 + v3) * 0.5;
+            v23 := (v2 + v3) * 0.5;
+            v12 := (v1 + v2) * 0.5;
 
-            array_add(*m.vertices, v3);
-            array_add(*m.normals, make_Vector3(0, 1, 0));
-            array_add(*m.vertices, v2);
-            array_add(*m.normals, make_Vector3(0, 1, 0));
-            array_add(*m.vertices, v0);
-            array_add(*m.normals, make_Vector3(0, 1, 0));
+            // add_quad(*m.vertices, v0, v1, v2, v3);
+            add_quad(*m.vertices, v0, v01, v02, v03);
+            add_quad(*m.vertices, v01, v1, v12, v02);
+            add_quad(*m.vertices, v02, v12, v2, v23);
+            add_quad(*m.vertices, v03, v02, v23, v3);
+
+            add_quad(*m.normals, normal, normal, normal, normal);
+            add_quad(*m.normals, normal, normal, normal, normal);
+            add_quad(*m.normals, normal, normal, normal, normal);
+            add_quad(*m.normals, normal, normal, normal, normal);
+
 
             #if DEVELOPER {
-                in: u32 = xx (y * width + x);
-                array_add(*m.picking_indices, in);
-                array_add(*m.picking_indices, in);
-                array_add(*m.picking_indices, in);
-                array_add(*m.picking_indices, in);
-                array_add(*m.picking_indices, in);
-                array_add(*m.picking_indices, in);
+                add_quad_index(*m.picking_indices, in0);
+                add_quad_index(*m.picking_indices, in1);
+                add_quad_index(*m.picking_indices, in2);
+                add_quad_index(*m.picking_indices, in3);
             }
         }
     }

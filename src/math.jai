@@ -15,6 +15,15 @@ Vector4 :: struct {
     w: float;
 }
 
+make_Vector4 :: (v: Vector3, w: float) -> Vector4 {
+    o: Vector4 = ---;
+    o.x = v.x;
+    o.y = v.y;
+    o.z = v.z;
+    o.w = w;
+    return o;
+}
+
 Vector3 :: struct {
     x: float;
     y: float;
@@ -26,6 +35,14 @@ make_Vector3 :: (x: float, y: float, z: float) -> Vector3 {
     v.x = x;
     v.y = y;
     v.z = z;
+    return v;
+}
+
+make_Vector3 :: (i: Vector4) -> Vector3 {
+    v: Vector3 = ---;
+    v.x = i.x;
+    v.y = i.y;
+    v.z = i.z;
     return v;
 }
 
@@ -480,6 +497,12 @@ matrix_perspective :: (fov: float, aspect: float, _near: float, _far: float) -> 
     l := aspect * b;
     r := aspect * t;
     return matrix_frustum(l, r, b, t, _near, _far);
+}
+
+viewport_scale :: (fov: float, aspect: float, _near: float) -> float, float {
+    t := cast(float) tan(fov * 3.14159 / 720.0) * _near;
+    r := aspect * t;
+    return t*2, r*2; 
 }
 
 matrix_frustum :: (left: float, right: float, bottom: float, top: float, _near: float, _far: float) -> Matrix4 {

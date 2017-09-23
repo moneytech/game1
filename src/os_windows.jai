@@ -267,8 +267,14 @@ GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER :: 0x8CDB;
 GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER :: 0x8CDC;
 GL_FRAMEBUFFER_UNSUPPORTED        :: 0x8CDD;
 
+GL_RED                           :: 0x1903;
 GL_R32UI                         :: 0x8236;
 GL_RED_INTEGER                   :: 0x8D94;
+GL_RGBA32UI                      :: 0x8D70;
+GL_RGBA_INTEGER                  :: 0x8D99;
+GL_UNSIGNED_INT_8_8_8_8          :: 0x8035;
+
+GL_POINTS                        :: 0x0000;
 
 GL_3_0_API :: struct {
     glGenFramebuffers: (n: GLsizei, framebuffers: *GLuint) #foreign;
@@ -341,6 +347,7 @@ GL_3_0_API :: struct {
     glEnableVertexAttribArray: (index: GLuint) #foreign;
 
     glVertexAttribPointer: (index: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, pointer: *void) #foreign;
+    glVertexAttribIPointer: (index: GLuint, size: GLint, type: GLenum, stride: GLsizei, pointer: *void) #foreign;
 
     glGenVertexArrays: (n: GLsizei, arrays: *GLuint) #foreign;
     glDeleteVertexArrays: (n: GLsizei, arrays: *GLuint) #foreign;
@@ -350,12 +357,16 @@ GL_3_0_API :: struct {
 
     glDeleteTextures: (n: GLsizei, textures: *GLuint) #foreign;
 
+    glVertexAttrib3f: (index: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) #foreign;
     // glGetnTexImage: (target: GLenum, level: GLint, format: GLenum, type: GLenum, bufSize: GLsizei, pixels: *void) #foreign;
 }
 
 GL :: #foreign_system_library "opengl32";
 glCullFace :: (mode: GLenum) #foreign GL;
 glGetTexImage :: (target: GLenum, level: GLint, format: GLenum, type: GLenum, pixels: *void) #foreign GL;
+glPointSize :: (size: GLfloat) #foreign GL;
+glReadBuffer: (mode: GLenum) #foreign GL;
+glReadPixels: (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, data: *GLvoid) #foreign GL;
 
 glGetUniformLocation :: (program: GLuint, name: string) -> GLint {
     using gl_30_api;
