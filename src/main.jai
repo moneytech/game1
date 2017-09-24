@@ -6,9 +6,6 @@
 miniz :: #foreign_library "miniz";
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
 
-WINDOW_WIDTH :: 1280;
-WINDOW_HEIGHT :: 720;
-
 Game :: struct {
     renderer: *GL_Renderer;
     asset_man: *Asset_Manager;
@@ -18,8 +15,8 @@ Game :: struct {
 }
 
 Window :: struct {
-    width: s32;
-    height: s32;
+    width: u32;
+    height: u32;
 
     handle: OS_Window;
     glc: OS_GL_Context;
@@ -44,6 +41,8 @@ main :: () {
     os_watch_dir("assets");
     // os_watch_dir("assets/shaders");
 
+    WINDOW_WIDTH :: 1280;
+    WINDOW_HEIGHT :: 720;
     win := os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "game1");
     ctx := os_create_gl_context(win);
     os_make_current(win, ctx);
@@ -64,7 +63,7 @@ main :: () {
     game.asset_man = asset_man;
 
     rdr.game = *game;
-    init(*rdr, WINDOW_WIDTH, WINDOW_HEIGHT);
+    init(*rdr, game.window.width, game.window.height);
     renderer = *rdr;
 
     rdr.render_to_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
@@ -73,7 +72,7 @@ main :: () {
     rdr.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
 
     #if DEVELOPER {
-        picking_buf.count = WINDOW_WIDTH * WINDOW_HEIGHT;
+        picking_buf.count = game.window.width * game.window.height;
         picking_buf.data = alloc(picking_buf.count*size_of(u32)); // this is wasteful maybe we can store 8bits of the index in each channel in GL ?
     }
 
@@ -96,6 +95,8 @@ main :: () {
     renderer.camera.position.y = 5;
 
     terrain_map, __terrain = load_heightmap(asset_man, "assets/heightmap.png");
+    __terrain_line_mesh = New(Mesh);
+    <<__terrain_line_mesh = generate_terrain_line_mesh(terrain_map);
 
     while (true) {
         exit := false;
@@ -132,7 +133,7 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
-        renderer.projection_matrix = matrix_perspective(game.fov, cast(float) WINDOW_WIDTH/cast(float) WINDOW_HEIGHT, 1.0, 1000.0);
+        renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         update_editor(*game, 1.0);
         render(*game);
 
@@ -215,7 +216,7 @@ void render_html_dom(Html_Dom *dom) {
 */
 
 render :: (game: *Game) {
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glViewport(0, 0, xx game.window.width, xx game.window.height);
     // start_scene(renderer);
     // clear_screen(0.0, 0.0, 0.0, 1.0);
     // // renderer->draw_cube(0, 0, -2, 1);

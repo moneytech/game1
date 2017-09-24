@@ -275,6 +275,7 @@ GL_RGBA_INTEGER                  :: 0x8D99;
 GL_UNSIGNED_INT_8_8_8_8          :: 0x8035;
 
 GL_POINTS                        :: 0x0000;
+GL_LINES                         :: 0x0001;
 
 GL_3_0_API :: struct {
     glGenFramebuffers: (n: GLsizei, framebuffers: *GLuint) #foreign;

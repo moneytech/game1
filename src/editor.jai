@@ -32,6 +32,8 @@ selected_points_indices: [..] u32;
 
 #scope_export
 
+__terrain_line_mesh: *Mesh;
+
 add_point :: (m: *Mesh, p: Vector3) {
     array_add(*m.vertices, p);
     array_add(*m.normals, make_Vector3(0, 0, 0));
@@ -53,7 +55,7 @@ update_point_mesh :: (m: *Mesh, map: Height_Map, indices: [] u32) {
 init_editor :: (game: *Game) {
     m := New(Mesh);
     m.material = New(Material);
-    m.material.diffuse = make_Color(1, 0, 0);
+    m.material.diffuse = make_Color(1.0, 0.5, 0.0);
     m.primitive_type = Primitive_Type.POINTS;
 
     selected_points_mesh = m;
@@ -105,15 +107,19 @@ update_editor :: (game: *Game, dt: float) {
 
     	update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
     	generate_terrain_mesh(terrain_map, __terrain);
+        generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
     }
 }
 
 render_editor :: (game: *Game) {
     start_scene(renderer);
-    clear_screen(0.0, 0.0, 0.0, 1.0);
+    clear_screen(0.5, 0.5, 0.5, 1.0);
     // renderer->draw_cube(0, 0, -2, 1);
     // draw_model(<<renderer, <<__model);
-    draw_mesh_wireframe(<<renderer, <<__terrain);
+    __terrain.material.diffuse = make_Color(0.8, 0.8, 0.8);
+    __terrain_line_mesh.material.diffuse = make_Color(0.0, 0.0, 0.0);
+    draw_mesh(<<renderer, <<__terrain);
+    draw_mesh(<<renderer, <<__terrain_line_mesh);
     set_point_size(<<renderer, 5.0);
     draw_mesh(<<renderer, <<selected_points_mesh);
     finish_scene(<<renderer);

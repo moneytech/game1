@@ -35,7 +35,7 @@ void main() {
     vec3 normal = normalize(texture(g_normal, tex_coords).rgb);
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
     if (length(normal) < 0.5) {
-        frag_color = vec4(1, 0, 0, 1);
+        frag_color = vec4(in_diffuse, 1);
         return;
     }
     

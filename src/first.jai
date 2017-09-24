@@ -90,7 +90,7 @@ C_Target :: struct {
 
 #if OS_WINDOWS {
 
-get_file_timestamp :: (path: string) -> s64 {
+get_file_timestamp :: (path: string) -> u64 {
     ft: FILETIME;
     file, success := file_open(path);
     if (!success) {
@@ -98,7 +98,7 @@ get_file_timestamp :: (path: string) -> s64 {
     }
     GetFileTime(file.handle, null, null, *ft);
     file_close(*file);
-    return (ft.dwLowDateTime) | (ft.dwHighDateTime << 32); 
+    return (cast(u64) ft.dwLowDateTime) | ((cast(u64) ft.dwHighDateTime) << 32); 
 }
 
 }

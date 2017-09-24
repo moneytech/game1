@@ -71,9 +71,10 @@ Material :: struct {
     transparency: float;
 };
 
-Primitive_Type :: enum u32 {
+Primitive_Type :: enum u32 #complete {
     TRIANGLES,
-    POINTS
+    POINTS,
+    LINES
 }
 
 Mesh :: struct {
@@ -347,6 +348,8 @@ clear_screen :: (r: float, g: float, b: float, a: float) {
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
+
+    // glDepthFunc(GL_LEQUAL);
 }
 
 draw_rect :: (rect: Rectangle) {
@@ -600,8 +603,7 @@ draw_cube :: (x: float, y: float, z: float, size: float) {
 }
 
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
-    if m.primitive_type != Primitive_Type.POINTS
-        glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
 
     // @TODO model matrix
     t := matrix_identity();
@@ -680,12 +682,24 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     }
 
     prim_type: GLenum;
-    if (m.primitive_type == Primitive_Type.TRIANGLES) {
-        prim_type = GL_TRIANGLES;
-    } else if (m.primitive_type == Primitive_Type.POINTS) {
-        prim_type = GL_POINTS;
+
+    if m.primitive_type == {
+        case Primitive_Type.TRIANGLES;
+            prim_type = GL_TRIANGLES;
+        case Primitive_Type.POINTS;
+            prim_type = GL_POINTS;
+        case Primitive_Type.LINES;
+            prim_type = GL_LINES;
+    }
+
+    if prim_type == GL_TRIANGLES {
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1, -1);
     }
     glDrawArrays(prim_type, 0, xx m.vertices.count);
+    if prim_type == GL_LINES {
+        glDisable(GL_POLYGON_OFFSET_FILL);
+    }
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
@@ -977,6 +991,55 @@ generate_terrain_mesh :: (map: Height_Map, m: *Mesh) {
 generate_terrain_mesh :: (map: Height_Map) -> Mesh {
     m: Mesh;
     generate_terrain_mesh(map, *m);
+
+    mat := New(Material);
+    mat.diffuse = make_Color(1, 1, 1);
+    m.material = mat;
+    return m;
+}
+
+generate_terrain_line_mesh :: (map: Height_Map, m: *Mesh) {
+    width := map.width;
+    height := map.height;
+
+    array_reserve(*m.vertices, width*height*6);
+    array_reserve(*m.normals, width*height*6);
+
+    array_reset(*m.vertices);
+    array_reset(*m.normals);
+
+    normal := make_Vector3(0, 0, 0);
+    for y: 0..height-2 {
+        for x: 0..width-2 {
+            in0: u32 = xx (y * width + x);
+            in1: u32 = xx (y * width + (x + 1));
+            in2: u32 = xx ((y + 1) * width + (x + 1));
+            in3: u32 = xx ((y + 1) * width + x);
+            v0 := map.vertices[in0];
+            v1 := map.vertices[in1];
+            v2 := map.vertices[in2];
+            v3 := map.vertices[in3];
+
+            array_add(*m.vertices, v0);
+            array_add(*m.vertices, v1);
+
+            array_add(*m.vertices, v3);
+            array_add(*m.vertices, v0);
+
+            array_add(*m.normals, normal);
+            array_add(*m.normals, normal);
+            array_add(*m.normals, normal);
+            array_add(*m.normals, normal);
+        }
+    }
+
+    store_mesh_in_buffer(m);
+}
+
+generate_terrain_line_mesh :: (map: Height_Map) -> Mesh {
+    m: Mesh;
+    m.primitive_type = Primitive_Type.LINES;
+    generate_terrain_line_mesh(map, *m);
 
     mat := New(Material);
     mat.diffuse = make_Color(1, 1, 1);
