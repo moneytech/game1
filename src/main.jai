@@ -9,12 +9,12 @@ uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreig
 Game :: struct {
     renderer: *GL_Renderer;
     asset_man: *Asset_Manager;
-    window: *Window;
+    window: *Game_Window;
 
     fov: float = 60;
 }
 
-Window :: struct {
+Game_Window :: struct {
     width: u32;
     height: u32;
 
@@ -35,10 +35,10 @@ main :: () {
         opts := get_build_options();
         setcwd(opts.output_path);
     } else {
-        path := os_get_executable_path();
+        path := get_path_of_running_executable();
         setcwd(path);
     }
-    os_watch_dir("assets");
+    // os_watch_dir("assets");
     // os_watch_dir("assets/shaders");
 
     WINDOW_WIDTH :: 1280;

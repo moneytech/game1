@@ -4,11 +4,6 @@
 #import "File";
 #import "File_Utilities";
 
-#if OS_WINDOWS {
-    Kernel32 :: #foreign_system_library "kernel32";
-    SetDllDirectoryA :: (path: *u8) -> s32 #foreign Kernel32;
-}
-
 setup_build :: () -> Build_Options {
     options := get_build_options();
     set_optimization_level(*options, 0, 0);
@@ -22,11 +17,21 @@ setup_build :: () -> Build_Options {
     
     set_build_options(options);
 
+    stb_src := C_compiler_make_source_file("src/stb.cpp");
+    miniz_src := C_compiler_make_source_file("src/miniz.c");
     // compile stb lib
-    stb_lib := C_compiler_make_dynamic_lib("run_tree/stb.dll", C_compiler_make_source_file("src/stb.cpp"));
-    C_compiler_build_target(<< stb_lib);
+     #if OS_WINDOWS {
+        stb_lib := C_compiler_make_dynamic_lib("run_tree/stb.dll", stb_src);
+        miniz_lib := C_compiler_make_dynamic_lib("run_tree/miniz.dll", miniz_src);
+    } else {
+        stb_lib := C_compiler_make_dynamic_lib("run_tree/libstb.so", stb_src);
+        miniz_lib := C_compiler_make_dynamic_lib("run_tree/libminiz.so", miniz_src);
+    }
 
-    miniz_lib := C_compiler_make_dynamic_lib("run_tree/miniz.dll", C_compiler_make_source_file("src/miniz.c"));
+    
+
+    C_compiler_add_lib(stb_lib, C_LIB_MATH);
+    C_compiler_build_target(<< stb_lib);
     C_compiler_build_target(<< miniz_lib);
 
     compiler_add_library_search_directory(options.output_path);
@@ -69,7 +74,10 @@ demo :: () {
 
 #run build_debug();
 // #run demo();
-
+// #run {
+//     setup_build();
+//     return;
+// };
 
 // C compilation code
 
@@ -86,9 +94,17 @@ C_Target :: struct {
     output_type: C_Output_Type;
     output_path: string; // output file path
     dependencies: [..] *C_Target;
+
+    // for executable/dynamic libs
+    libs: [..] string;
 }
 
 #if OS_WINDOWS {
+
+C_LIB_MATH :: ""; // cl seems to link in the math lib by default
+
+COMPILER_STRING_OBJ :: "cl /nologo /INCREMENTAL:NO /c /Fo:";
+COMPILER_STRING_DLL :: "cl /nologo /INCREMENTAL:NO /LD /Fe:";
 
 get_file_timestamp :: (path: string) -> u64 {
     ft: FILETIME;
@@ -99,6 +115,23 @@ get_file_timestamp :: (path: string) -> u64 {
     GetFileTime(file.handle, null, null, *ft);
     file_close(*file);
     return (cast(u64) ft.dwLowDateTime) | ((cast(u64) ft.dwHighDateTime) << 32); 
+}
+
+}
+
+#if OS_LINUX {
+
+C_LIB_MATH :: "m";
+
+COMPILER_STRING_OBJ :: "gcc -fno-exceptions -fno-rtti -fPIC -c -o";
+COMPILER_STRING_DLL :: "gcc -fPIC -shared -o";
+
+get_file_timestamp :: (path: string) -> u64 {
+    p := to_c_string(path);
+    defer free(p);
+    st: stat_t;
+    status := stat(p, *st);
+    return xx st.st_mtime.tv_sec;
 }
 
 }
@@ -131,10 +164,15 @@ C_compiler_make_object :: (output: string, inputs: .. string) -> *C_Target {
     return target;
 }
 
+C_compiler_add_lib :: (target: *C_Target, libname: string) {
+    // @Robustness, check if lib exists, check if lib is already in list
+    array_add(*target.libs, copy_string(libname));
+}
+
 C_compiler_make_dynamic_lib :: (output: string, inputs: .. *C_Target) -> *C_Target {
     target := New(C_Target);
     target.output_type = C_Output_Type.DYNAMIC_LIBRARY;
-    target.output_path = output;
+    target.output_path = copy_string(output);
 
     for inputs {
         array_add(*target.dependencies, it);
@@ -168,9 +206,9 @@ C_compiler_build_target :: (target: C_Target) -> string {
     if target.output_type == {
         case C_Output_Type.NO_OUTPUT; // for hand written files (read: source files)
         case C_Output_Type.OBJECT;
-            cmd_string = concatenate("cl /nologo /INCREMENTAL:NO /c /Fo:", target.output_path, " ");
+            cmd_string = concatenate(COMPILER_STRING_OBJ, target.output_path, " ");
         case C_Output_Type.DYNAMIC_LIBRARY;
-            cmd_string = concatenate("cl /nologo /INCREMENTAL:NO /LD /Fe:", target.output_path, " ");
+            cmd_string = concatenate(COMPILER_STRING_DLL, target.output_path, " ");
         case C_Output_Type.COPY_FILE;
             assert(target.dependencies.count == 1);
             in := target.dependencies[0];
@@ -186,6 +224,14 @@ C_compiler_build_target :: (target: C_Target) -> string {
         data := cmd_string.data;
         cmd_string = concatenate(cmd_string, C_compiler_build_target(<< it), " ");
         if data free(data);
+    }
+
+    for target.libs {
+        #if OS_LINUX {
+            old := cmd_string.data;
+            cmd_string = concatenate(cmd_string, "-l ", it, " ");
+            if old free(old);
+        }
     }
 
     if (cmd_string.count) {

@@ -159,6 +159,12 @@
 #ifndef MINIZ_HEADER_INCLUDED
 #define MINIZ_HEADER_INCLUDED
 
+#ifdef _WIN32
+#define MINIZ_EXPORT _declspec(dllexport)
+#else
+#define MINIZ_EXPORT
+#endif
+
 #include <stdlib.h>
 
 // Defines to completely disable specific portions of miniz.c:
@@ -382,7 +388,7 @@ int mz_inflateEnd(mz_streamp pStream);
 
 // Single-call decompression.
 // Returns MZ_OK on success, or one of the error codes from mz_inflate() on failure.
-_declspec(dllexport) int mz_uncompress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len);
+MINIZ_EXPORT int mz_uncompress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len);
 
 // Returns a string description of the specified error code, or NULL if the error code is invalid.
 const char *mz_error(int err);
@@ -1313,7 +1319,7 @@ int mz_inflateEnd(mz_streamp pStream)
   return MZ_OK;
 }
 
-_declspec(dllexport) int mz_uncompress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len)
+MINIZ_EXPORT int mz_uncompress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len)
 {
   mz_stream stream;
   int status;
