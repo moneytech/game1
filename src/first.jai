@@ -21,16 +21,18 @@ setup_build :: () -> Build_Options {
     miniz_src := C_compiler_make_source_file("src/miniz.c");
     // compile stb lib
      #if OS_WINDOWS {
-        stb_lib := C_compiler_make_dynamic_lib("run_tree/stb.dll", stb_src);
-        miniz_lib := C_compiler_make_dynamic_lib("run_tree/miniz.dll", miniz_src);
+        stb_lib := C_compiler_make_lib("run_tree/stb.dll", true, stb_src);
+        miniz_lib := C_compiler_make_lib("run_tree/miniz.dll", true, miniz_src);
     } else {
-        stb_lib := C_compiler_make_dynamic_lib("run_tree/libstb.so", stb_src);
-        miniz_lib := C_compiler_make_dynamic_lib("run_tree/libminiz.so", miniz_src);
+        stb_lib := C_compiler_make_lib("run_tree/libstb.so", true, stb_src);
+        miniz_lib := C_compiler_make_lib("run_tree/libminiz.so", true, miniz_src);
+
+        stb_stat := C_compiler_make_lib("run_tree/libstb.a", false,  C_compiler_make_object("run_tree/stb.o", stb_src));
+        miniz_stat := C_compiler_make_lib("run_tree/libminiz.a", false, C_compiler_make_object("run_tree/miniz.o", miniz_src));
+        C_compiler_build_target(<< stb_stat);
+        C_compiler_build_target(<< miniz_stat);
     }
 
-    
-
-    C_compiler_add_lib(stb_lib, C_LIB_MATH);
     C_compiler_build_target(<< stb_lib);
     C_compiler_build_target(<< miniz_lib);
 
@@ -123,8 +125,10 @@ get_file_timestamp :: (path: string) -> u64 {
 
 C_LIB_MATH :: "m";
 
-COMPILER_STRING_OBJ :: "gcc -fno-exceptions -fno-rtti -fPIC -c -o";
-COMPILER_STRING_DLL :: "gcc -fPIC -shared -o";
+COMPILER_FLAG_PIC_STRING :: "-fPIC";
+COMPILER_STRING_OBJ :: "gcc -fno-exceptions -fno-rtti -c -o ";
+COMPILER_STRING_DLL :: "gcc -fPIC -shared -o ";
+COMPILER_STRING_STATIC :: "ar rcs ";
 
 get_file_timestamp :: (path: string) -> u64 {
     p := to_c_string(path);
@@ -152,13 +156,13 @@ C_compiler_make_source_file :: (filepath: string) -> *C_Target {
     return target;
 }
 
-C_compiler_make_object :: (output: string, inputs: .. string) -> *C_Target {
+C_compiler_make_object :: (output: string, inputs: .. *C_Target) -> *C_Target {
     target := New(C_Target);
     target.output_type = C_Output_Type.OBJECT;
     target.output_path = copy_string(output);
 
     for inputs {
-        array_add(*target.dependencies, C_compiler_make_source_file(it));
+        array_add(*target.dependencies, it);
     }
 
     return target;
@@ -169,9 +173,11 @@ C_compiler_add_lib :: (target: *C_Target, libname: string) {
     array_add(*target.libs, copy_string(libname));
 }
 
-C_compiler_make_dynamic_lib :: (output: string, inputs: .. *C_Target) -> *C_Target {
+C_compiler_make_lib :: (output: string, dynamic: bool, inputs: .. *C_Target) -> *C_Target {
     target := New(C_Target);
-    target.output_type = C_Output_Type.DYNAMIC_LIBRARY;
+    if dynamic target.output_type = C_Output_Type.DYNAMIC_LIBRARY;
+    else target.output_type = C_Output_Type.STATIC_LIBRARY;
+
     target.output_path = copy_string(output);
 
     for inputs {
@@ -197,7 +203,7 @@ C_compiler_is_target_outdated :: (target: C_Target) -> bool {
 }
 
 // builds the target and returns a path to its output
-C_compiler_build_target :: (target: C_Target) -> string {
+C_compiler_build_target :: (target: C_Target, flag_string: string = "") -> string {
     if (!C_compiler_is_target_outdated(target)) return target.output_path;
 
     print("Building %...\n", target.output_path);
@@ -206,9 +212,11 @@ C_compiler_build_target :: (target: C_Target) -> string {
     if target.output_type == {
         case C_Output_Type.NO_OUTPUT; // for hand written files (read: source files)
         case C_Output_Type.OBJECT;
-            cmd_string = concatenate(COMPILER_STRING_OBJ, target.output_path, " ");
+            cmd_string = concatenate(COMPILER_STRING_OBJ, target.output_path, " ", flag_string, " ");
         case C_Output_Type.DYNAMIC_LIBRARY;
-            cmd_string = concatenate(COMPILER_STRING_DLL, target.output_path, " ");
+            cmd_string = concatenate(COMPILER_STRING_DLL, target.output_path, " ", flag_string, " ");
+        case C_Output_Type.STATIC_LIBRARY;
+            cmd_string = concatenate(COMPILER_STRING_STATIC, target.output_path, " ", flag_string, " ");
         case C_Output_Type.COPY_FILE;
             assert(target.dependencies.count == 1);
             in := target.dependencies[0];
@@ -220,9 +228,13 @@ C_compiler_build_target :: (target: C_Target) -> string {
             return target.output_path;
     }
 
+    flags := "";
+    if target.output_type == C_Output_Type.DYNAMIC_LIBRARY {
+        flags = COMPILER_FLAG_PIC_STRING;
+    }
     for target.dependencies {
         data := cmd_string.data;
-        cmd_string = concatenate(cmd_string, C_compiler_build_target(<< it), " ");
+        cmd_string = concatenate(cmd_string, C_compiler_build_target(<< it, flags), " ");
         if data free(data);
     }
 

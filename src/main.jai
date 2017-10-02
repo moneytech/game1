@@ -50,7 +50,7 @@ main :: () {
 
     rdr: GL_Renderer;
     game: Game;
-    window: Window;
+    window: Game_Window;
     window.width = WINDOW_WIDTH;
     window.height = WINDOW_HEIGHT;
     window.handle = win;
@@ -137,7 +137,7 @@ main :: () {
         update_editor(*game, 1.0);
         render(*game);
 
-        os_swap_buffers(win);
+        swap_buffers(win);
         os_pump_input();
 
         // @Note we have to wait long enough for whatever program is

@@ -3,7 +3,6 @@
 #import "GL";
 #import "Compiler";
 
-#load "gl_api.jai";
 #load "os_api.jai";
 
 #scope_file
@@ -88,40 +87,6 @@ HasOverlappedIoCompleted :: inline (overlapped: OVERLAPPED) -> bool {
 
 OS_Window :: HWND;
 OS_GL_Context :: HGLRC;
-
-JOYSTICK_BUTTON_A       :: (1 << 0);
-JOYSTICK_BUTTON_B       :: (1 << 1);
-JOYSTICK_BUTTON_X       :: (1 << 2);
-JOYSTICK_BUTTON_Y       :: (1 << 3);
-JOYSTICK_BUTTON_DUP     :: (1 << 4);
-JOYSTICK_BUTTON_DDOWN   :: (1 << 5);
-JOYSTICK_BUTTON_DLEFT   :: (1 << 6);
-JOYSTICK_BUTTON_DRIGHT  :: (1 << 7);
-JOYSTICK_BUTTON_LBUMPER :: (1 << 8);
-JOYSTICK_BUTTON_RBUMPER :: (1 << 9);
-JOYSTICK_BUTTON_LSTICK  :: (1 << 10);
-JOYSTICK_BUTTON_RSTICK  :: (1 << 11);
-JOYSTICK_BUTTON_START   :: (1 << 12);
-JOYSTICK_BUTTON_BACK    :: (1 << 13);
-
-Joystick :: struct {
-    buttons: u16;
-
-    Axis :: struct {
-        x: float;
-        #place x;
-        left: float;
-
-        y: float;
-        #place y;
-        right: float;
-    }
-
-    triggers, left_thumb, right_thumb: Axis;
-};
-
-joysticks: [..] Joystick;
-file_changes: [..] File_Notification;
 
 XINPUT_GAMEPAD :: struct {
     wButtons: s16;
@@ -294,10 +259,6 @@ os_close_window :: (win: OS_Window) {
     DestroyWindow(win);
 }
 
-os_swap_buffers :: (win: OS_Window) {
-    SwapBuffers(GetDC(win));
-}
-
 wglSwapIntervalStub :: (interval: s16) -> s16 #c_callback {
     assert(false);
     return 0;
@@ -368,23 +329,6 @@ os_set_vsync :: (on: bool) {
 
 os_make_current :: (win: OS_Window, ctx: OS_GL_Context) {
     wglMakeCurrent(GetDC(win), ctx);
-}
-
-os_get_window_dimensions :: (win: OS_Window, width: *s32, height: *s32) {
-    rect: RECT;
-    GetWindowRect(win, *rect);
-    <<width = (rect.right - rect.left);
-    <<height = (rect.bottom - rect.top);
-}
-
-os_get_mouse_position :: (win: OS_Window, x: *s32, y: *s32) -> bool {
-    rect: RECT;
-    GetWindowRect(win, *rect);
-    pt: POINT;
-    GetCursorPos(*pt);
-    <<x = (pt.x - rect.left);
-    <<y = (pt.y - rect.top);
-    return true;
 }
 
 gl_lib: HMODULE;
