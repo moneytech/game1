@@ -36,7 +36,9 @@ main :: () {
         setcwd(opts.output_path);
     } else {
         path := get_path_of_running_executable();
-        setcwd(path);
+        final_path := find_and_truncate_character_from_right(path, #char "/");
+        defer free(path);
+        setcwd(final_path);
     }
     // os_watch_dir("assets");
     // os_watch_dir("assets/shaders");

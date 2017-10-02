@@ -105,8 +105,10 @@ C_Target :: struct {
 
 C_LIB_MATH :: ""; // cl seems to link in the math lib by default
 
+COMPILER_FLAG_PIC_STRING :: "";
 COMPILER_STRING_OBJ :: "cl /nologo /INCREMENTAL:NO /c /Fo:";
 COMPILER_STRING_DLL :: "cl /nologo /INCREMENTAL:NO /LD /Fe:";
+COMPILER_STRING_STATIC :: "ar rcs ";
 
 get_file_timestamp :: (path: string) -> u64 {
     ft: FILETIME;
