@@ -189,7 +189,7 @@ debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, l
     // print("length: %\n", length);
     // print("message: %\n", message);
     // print("userParam: %\n", userParam);
-    print("DEBUG:%\n", point_at_c_string(message));
+    // print("DEBUG:%\n", point_at_c_string(message));
 }
 
 init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {

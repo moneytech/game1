@@ -42,19 +42,18 @@ os_init_platform :: () {
 
     init_global_display();
 
-    // dummy := os_create_window(50, 50, "");
-    // ShowWindow(dummy, SW_HIDE);
-    // glc := os_create_gl_context(dummy);
-    // os_make_current(dummy, glc);
+    dummy := os_create_window(50, 50, "");
+    XUnmapWindow(x_global_display, dummy);
+    glc := os_create_gl_context(dummy);
+    os_make_current(dummy, glc);
 
     // wglChoosePixelFormatARB = xx os_load_gl_func("wglChoosePixelFormatARB");
     // wglCreateContextAttribsARB = xx os_load_gl_func("wglCreateContextAttribsARB");
 
-    // init_gl_extensions(*gl_30_api);
+    init_gl_extensions(*gl_30_api);
 
-    // wglMakeCurrent(0, 0);
-    // wglDeleteContext(glc);
-    // os_close_window(dummy);
+    glXMakeCurrent(x_global_display, None, null);
+    os_close_window(dummy);
 }
 
 os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
@@ -88,7 +87,7 @@ os_set_vsync :: (on: bool) {
 }
 
 os_close_window :: (win: OS_Window) {
-
+	XDestroyWindow(x_global_display, win);
 }
 
  os_pump_input :: () {
