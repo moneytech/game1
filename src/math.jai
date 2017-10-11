@@ -62,6 +62,14 @@ operator- :: (a: Vector3, b: Vector3) -> Vector3 {
     return out;
 }
 
+operator- :: (a: Vector3) -> Vector3 {
+    out: Vector3 = ---;
+    out.x = -a.x;
+    out.y = -a.y;
+    out.z = -a.z;
+    return out;
+}
+
 operator* :: (a: Vector3, s: float) -> Vector3 #symmetric {
     out: Vector3 = ---;
     out.x = a.x * s;

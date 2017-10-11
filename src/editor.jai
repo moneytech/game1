@@ -5,25 +5,35 @@
 update_camera :: (game: *Game, dt: float) {
     using Key_Current_State;
 
-    if input_button_states[Key_Code.MOUSE_BUTTON_MIDDLE] & DOWN {
-        delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
-        q := game.renderer.camera.rotation;
-
+    if input_button_states[Key_Code.MOUSE_BUTTON_RIGHT] & DOWN {
+        delta := make_Vector3(xx mouse_delta_x, xx mouse_delta_y, 0);
         delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
         sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
         delta = mul(delta, make_Vector3(sx, sy, 1));
 
+        rotation_current := game.renderer.camera.rotation;
+        quat := set_angle_vector(delta.x * 1.5, 0, 1, 0) * rotation_current * set_angle_vector(delta.y * 1.5, 1, 0, 0);
+        game.renderer.camera.rotation = quat;
+    } else if input_button_states[Key_Code.MOUSE_BUTTON_MIDDLE] & DOWN {
+        delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
+        delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+        sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+        delta = mul(delta, make_Vector3(sx, sy, 1));
+        q := game.renderer.camera.rotation;
+
         move := delta * 5;
 
-        game.renderer.camera.position += move;
+        game.renderer.camera.position += q * (move * 20);
     }
 
     if input_button_states[#char "."] & DOWN {
-        game.renderer.camera.position.z -= 0.5;
+        q := game.renderer.camera.rotation;
+        game.renderer.camera.position += q * make_Vector3(0.0, 0.0, -0.5);
     }
 
     if input_button_states[#char "E"] & DOWN {
-        game.renderer.camera.position.z += 0.5;
+        q := game.renderer.camera.rotation;
+        game.renderer.camera.position -= (q * set_angle_vector(3.14, 0, 1, 0)) * make_Vector3(0.0, 0.0, 0.5);
     }
 }
 
@@ -33,6 +43,7 @@ selected_points_indices: [..] u32;
 #scope_export
 
 __terrain_line_mesh: *Mesh;
+__terrain_picking_mesh: *Mesh;
 
 add_point :: (m: *Mesh, p: Vector3) {
     array_add(*m.vertices, p);
@@ -65,7 +76,7 @@ update_editor :: (game: *Game, dt: float) {
     update_camera(game, dt);
 
     start_picking(renderer);
-    draw_picking_mesh(<<renderer, <<__terrain, renderer.picking_shader);
+    draw_picking_mesh(<<renderer, <<__terrain_picking_mesh, renderer.picking_shader);
     finish_picking(<<renderer);
     get_picking_data(<<renderer, picking_buf.data, xx picking_buf.count * size_of(u32));
 
@@ -82,8 +93,7 @@ update_editor :: (game: *Game, dt: float) {
                 return;
             }
 
-            // print("x, y: %, %; index: %; %\n", x, game.window.height - y, index, terrain_map.vertices[index]);
-            print("i: %, ix: %, iy: %\n", index, index % xx terrain_map.width, index / xx terrain_map.width);
+            // print("i: %, ix: %, iy: %\n", index, index % xx terrain_map.width, index / xx terrain_map.width);
 
             // @TODO check if point is already in array
             add_point(selected_points_mesh, terrain_map.vertices[index]);
@@ -107,6 +117,7 @@ update_editor :: (game: *Game, dt: float) {
 
     	update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
     	generate_terrain_mesh(terrain_map, __terrain);
+        generate_terrain_picking_mesh(terrain_map, __terrain_picking_mesh);
         generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
     }
 }

@@ -95,10 +95,13 @@ main :: () {
 
     renderer.camera.position.z = 30;
     renderer.camera.position.y = 5;
+    renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
     terrain_map, __terrain = load_heightmap(asset_man, "assets/heightmap.png");
     __terrain_line_mesh = New(Mesh);
     <<__terrain_line_mesh = generate_terrain_line_mesh(terrain_map);
+    __terrain_picking_mesh = New(Mesh);
+    <<__terrain_picking_mesh = generate_terrain_picking_mesh(terrain_map);
 
     while (true) {
         exit := false;

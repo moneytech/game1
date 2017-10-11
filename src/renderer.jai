@@ -516,7 +516,7 @@ start_scene :: (using rdr: *GL_Renderer) {
     glUseProgram(render_to_gbuffer.id);
 
     pos := camera.position;
-    view_matrix = matrix_translate(-pos.x, -pos.y, -pos.z);
+    view_matrix = matrix_rotate(inverse(game.renderer.camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
 }
 
 finish_scene :: (using rdr: GL_Renderer) {
@@ -749,7 +749,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         pos := camera.position;
-        view_matrix = matrix_translate(-pos.x, -pos.y, -pos.z);
+        view_matrix = matrix_rotate(inverse(game.renderer.camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
         glUseProgram(picking_shader.id);
     }
 
@@ -762,7 +762,79 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glBindTexture(GL_TEXTURE_2D, picking_texture);
         glGetTexImage(GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data);
     }
-}
+
+    generate_terrain_picking_mesh :: (map: Height_Map) -> Mesh {
+        m: Mesh;
+        generate_terrain_picking_mesh(map, *m);
+
+        mat := New(Material);
+        mat.diffuse = make_Color(1, 1, 1);
+        m.material = mat;
+        return m;
+    }
+    generate_terrain_picking_mesh :: (map: Height_Map, m: *Mesh) {
+        width := map.width;
+        height := map.height;
+
+        array_reserve(*m.vertices, width*height*6);
+
+        array_reset(*m.vertices);
+        array_reset(*m.normals);
+
+        array_reserve(*m.picking_indices, width*height*6);
+        array_reset(*m.picking_indices);
+
+        add_quad_index :: (arr: *[..] u32, i: u32) {
+            array_add(arr, i);
+            array_add(arr, i);
+            array_add(arr, i);
+
+            array_add(arr, i);
+            array_add(arr, i);
+            array_add(arr, i);
+        }
+
+        // normal := make_Vector3(0, 1, 0);
+        for y: 0..height-2 {
+            for x: 0..width-2 {
+                in0: u32 = xx (y * width + x);
+                in1: u32 = xx (y * width + (x + 1));
+                in2: u32 = xx ((y + 1) * width + (x + 1));
+                in3: u32 = xx ((y + 1) * width + x);
+                v0 := map.vertices[in0];
+                v1 := map.vertices[in1];
+                v2 := map.vertices[in2];
+                v3 := map.vertices[in3];
+
+                // we subdivide the surface here so
+                // when we need to pick the vertex in
+                // the mesh, we automatically pick the
+                // nearest vertex
+                v01 := (v0 + v1) * 0.5;
+                v02 := (v0 + v2) * 0.5;
+                v03 := (v0 + v3) * 0.5;
+                v23 := (v2 + v3) * 0.5;
+                v12 := (v1 + v2) * 0.5;
+
+                // add_quad(*m.vertices, v0, v1, v2, v3);
+                add_quad(*m.vertices, v0, v01, v02, v03);
+                add_quad(*m.vertices, v01, v1, v12, v02);
+                add_quad(*m.vertices, v02, v12, v2, v23);
+                add_quad(*m.vertices, v03, v02, v23, v3);
+
+
+                #if DEVELOPER {
+                    add_quad_index(*m.picking_indices, in0);
+                    add_quad_index(*m.picking_indices, in1);
+                    add_quad_index(*m.picking_indices, in2);
+                    add_quad_index(*m.picking_indices, in3);
+                }
+            }
+        }
+
+        store_mesh_in_buffer(m);
+    }
+} // DEVELOPER
 
 draw_mesh_wireframe :: (rdr: GL_Renderer, m: Mesh) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -927,11 +999,6 @@ generate_terrain_mesh :: (map: Height_Map, m: *Mesh) {
     array_reset(*m.vertices);
     array_reset(*m.normals);
 
-    #if DEVELOPER {
-        array_reserve(*m.picking_indices, width*height*6);
-        array_reset(*m.picking_indices);
-    }
-
     add_quad_index :: (arr: *[..] u32, i: u32) {
         array_add(arr, i);
         array_add(arr, i);
@@ -942,7 +1009,7 @@ generate_terrain_mesh :: (map: Height_Map, m: *Mesh) {
         array_add(arr, i);
     }
 
-    normal := make_Vector3(0, 1, 0);
+    // normal := make_Vector3(0, 1, 0);
     for y: 0..height-2 {
         for x: 0..width-2 {
             in0: u32 = xx (y * width + x);
@@ -964,24 +1031,23 @@ generate_terrain_mesh :: (map: Height_Map, m: *Mesh) {
             v23 := (v2 + v3) * 0.5;
             v12 := (v1 + v2) * 0.5;
 
-            // add_quad(*m.vertices, v0, v1, v2, v3);
-            add_quad(*m.vertices, v0, v01, v02, v03);
-            add_quad(*m.vertices, v01, v1, v12, v02);
-            add_quad(*m.vertices, v02, v12, v2, v23);
-            add_quad(*m.vertices, v03, v02, v23, v3);
-
-            add_quad(*m.normals, normal, normal, normal, normal);
-            add_quad(*m.normals, normal, normal, normal, normal);
-            add_quad(*m.normals, normal, normal, normal, normal);
-            add_quad(*m.normals, normal, normal, normal, normal);
+            add_quad(*m.vertices, v0, v1, v2, v3);
 
 
-            #if DEVELOPER {
-                add_quad_index(*m.picking_indices, in0);
-                add_quad_index(*m.picking_indices, in1);
-                add_quad_index(*m.picking_indices, in2);
-                add_quad_index(*m.picking_indices, in3);
-            }
+            e0 := normalize(v1 - v0);
+            e1 := normalize(v1 - v2);
+            normal1 := cross(e0, e1);
+
+            e0 = normalize(v3 - v0);
+            e1 = normalize(v3 - v2);
+            normal2 := cross(e1, e0);
+            array_add(*m.normals, normal1);
+            array_add(*m.normals, normal1);
+            array_add(*m.normals, normal1);
+
+            array_add(*m.normals, normal2);
+            array_add(*m.normals, normal2);
+            array_add(*m.normals, normal2);
         }
     }
 
