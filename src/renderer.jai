@@ -82,6 +82,8 @@ Mesh :: struct {
     buffer_id: u32;
     primitive_type: Primitive_Type = Primitive_Type.TRIANGLES;
 
+    buffer_size: s64;
+
     vertices: [..] Vector3;
     normals: [..] Vector3;
     tangent_normals: [..] Vector3;
@@ -89,8 +91,21 @@ Mesh :: struct {
 
     #if DEVELOPER {
         picking_indices: [..] u32;
+        map_position: [..] Vector2;
     }
-};
+}
+
+reset_mesh_arrays :: (using m: *Mesh) {
+    array_reset(*vertices);
+    array_reset(*normals);
+    array_reset(*tangent_normals);
+    array_reset(*tex_coords);
+
+    #if DEVELOPER {
+        array_reset(*picking_indices);
+        array_reset(*map_position);
+    }
+}
 
 Model :: struct {
     meshes: [..] *Mesh;
@@ -171,6 +186,7 @@ GL_Renderer :: struct {
     #if DEVELOPER {
         picking_framebuffer: u32;
         picking_texture: u32;
+        picking_pos_texture: u32;
         picking_depth: u32;
         picking_shader: *Shader;
     }
@@ -182,14 +198,16 @@ GL_Renderer :: struct {
 
 
 debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
-    // print("source: %\n", source);
-    // print("type: %\n", type);
-    // print("id: %\n", id);
-    // print("severity: %\n", severity);
-    // print("length: %\n", length);
-    // print("message: %\n", message);
-    // print("userParam: %\n", userParam);
-    // print("DEBUG:%\n", point_at_c_string(message));
+    #if OS_WINDOWS {
+        print("source: %\n", source);
+        print("type: %\n", type);
+        print("id: %\n", id);
+        print("severity: %\n", severity);
+        print("length: %\n", length);
+        print("message: %\n", message);
+        print("userParam: %\n", userParam);
+        print("DEBUG:%\n", point_at_c_string(message));
+    }
 }
 
 init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
@@ -252,8 +270,15 @@ init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, picking_texture, 0);
 
-        attach: [1] u32 = {:u32: GL_COLOR_ATTACHMENT0};
-        glDrawBuffers(1, attach.data);
+        glGenTextures(1, *picking_pos_texture);
+        glBindTexture(GL_TEXTURE_2D, picking_pos_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, xx screen_width, xx screen_height, 0, GL_RG, GL_FLOAT, null);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, picking_pos_texture, 0);
+
+        attach: [2] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, attach.data);
 
         glGenRenderbuffers(1, *picking_depth);
         glBindRenderbuffer(GL_RENDERBUFFER, picking_depth);
@@ -730,15 +755,19 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         normal_size := m.normals.count * size_of(Vector3);
         tex_size    := m.tex_coords.count * size_of(Vector2);
         tangent_size := m.tangent_normals.count * size_of(Vector3);
+        picking_size := m.picking_indices.count * size_of(u32);
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(2);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
         glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size+picking_size));
 
         glDrawArrays(GL_TRIANGLES, 0, xx m.vertices.count);
 
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(2);
 
         glDisable(GL_DEPTH_TEST);
     }
@@ -758,9 +787,14 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glUseProgram(0);
     }
 
-    get_picking_data :: (using rdr: GL_Renderer, data: *u32, bytes: u32) {
+    get_picking_index_data :: (using rdr: GL_Renderer, data: *u32) {
         glBindTexture(GL_TEXTURE_2D, picking_texture);
         glGetTexImage(GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data);
+    }
+
+    get_picking_position_data :: (using rdr: GL_Renderer, data: *Vector2) {
+        glBindTexture(GL_TEXTURE_2D, picking_pos_texture);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RG, GL_FLOAT, data);
     }
 
     generate_terrain_picking_mesh :: (map: Height_Map) -> Mesh {
@@ -777,12 +811,9 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         height := map.height;
 
         array_reserve(*m.vertices, width*height*6);
-
-        array_reset(*m.vertices);
-        array_reset(*m.normals);
-
         array_reserve(*m.picking_indices, width*height*6);
-        array_reset(*m.picking_indices);
+
+        reset_mesh_arrays(m);
 
         add_quad_index :: (arr: *[..] u32, i: u32) {
             array_add(arr, i);
@@ -801,26 +832,48 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
                 in1: u32 = xx (y * width + (x + 1));
                 in2: u32 = xx ((y + 1) * width + (x + 1));
                 in3: u32 = xx ((y + 1) * width + x);
-                v0 := map.vertices[in0];
-                v1 := map.vertices[in1];
-                v2 := map.vertices[in2];
-                v3 := map.vertices[in3];
 
-                // we subdivide the surface here so
-                // when we need to pick the vertex in
-                // the mesh, we automatically pick the
-                // nearest vertex
-                v01 := (v0 + v1) * 0.5;
-                v02 := (v0 + v2) * 0.5;
-                v03 := (v0 + v3) * 0.5;
-                v23 := (v2 + v3) * 0.5;
-                v12 := (v1 + v2) * 0.5;
+                {
+                    v0 := map.vertices[in0];
+                    v1 := map.vertices[in1];
+                    v2 := map.vertices[in2];
+                    v3 := map.vertices[in3];
 
-                // add_quad(*m.vertices, v0, v1, v2, v3);
-                add_quad(*m.vertices, v0, v01, v02, v03);
-                add_quad(*m.vertices, v01, v1, v12, v02);
-                add_quad(*m.vertices, v02, v12, v2, v23);
-                add_quad(*m.vertices, v03, v02, v23, v3);
+                    // we subdivide the surface here so
+                    // when we need to pick the vertex in
+                    // the mesh, we automatically pick the
+                    // nearest vertex
+                    v01 := (v0 + v1) * 0.5;
+                    v02 := (v0 + v2) * 0.5;
+                    v03 := (v0 + v3) * 0.5;
+                    v23 := (v2 + v3) * 0.5;
+                    v12 := (v1 + v2) * 0.5;
+
+                    // add_quad(*m.vertices, v0, v1, v2, v3);
+                    add_quad(*m.vertices, v0, v01, v02, v03);
+                    add_quad(*m.vertices, v01, v1, v12, v02);
+                    add_quad(*m.vertices, v02, v12, v2, v23);
+                    add_quad(*m.vertices, v03, v02, v23, v3);
+                }
+
+                {
+                    xf := cast(float) x;
+                    yf := cast(float) y;
+                    v0 := make_Vector2(xf,   yf);
+                    v1 := make_Vector2(xf+1, yf);
+                    v2 := make_Vector2(xf+1, yf+1);
+                    v3 := make_Vector2(xf,   yf+1);
+                    v01 := (v0 + v1) * 0.5;
+                    v02 := (v0 + v2) * 0.5;
+                    v03 := (v0 + v3) * 0.5;
+                    v23 := (v2 + v3) * 0.5;
+                    v12 := (v1 + v2) * 0.5;
+
+                    add_quad(*m.map_position, v0, v01, v02, v03);
+                    add_quad(*m.map_position, v01, v1, v12, v02);
+                    add_quad(*m.map_position, v02, v12, v2, v23);
+                    add_quad(*m.map_position, v03, v02, v23, v3);
+                }
 
 
                 #if DEVELOPER {
@@ -844,7 +897,7 @@ draw_mesh_wireframe :: (rdr: GL_Renderer, m: Mesh) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-store_mesh_in_buffer :: (m: *Mesh, dynamic := false) {
+store_mesh_in_buffer :: (m: *Mesh, dynamic := true) {
     vertex_size := m.vertices.count * size_of(Vector3);
     normal_size := m.normals.count * size_of(Vector3);
     tex_size    := m.tex_coords.count * size_of(Vector2);
@@ -853,7 +906,8 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false) {
 
     #if DEVELOPER {
         picking_size := m.picking_indices.count * size_of(u32);
-        total_size += picking_size;
+        picking_pos_size := m.map_position.count * size_of(Vector2);
+        total_size += picking_size + picking_pos_size;
     }
 
     if !m.buffer_id {
@@ -861,16 +915,36 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false) {
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
-    if dynamic glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_DYNAMIC_DRAW);
-    else glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_STATIC_DRAW);
-
-    glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m.vertices.data);
-    glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m.normals.data);
-    glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m.tex_coords.data);
-    glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size, tangent_size, m.tangent_normals.data);
-    #if DEVELOPER {
-        glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size+tangent_size, picking_size, m.picking_indices.data);
+    if total_size > m.buffer_size {
+        if m.buffer_size {
+            print("resizing buffer: %\n", total_size);
+        }
+        m.buffer_size = total_size;
+        if dynamic glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_DYNAMIC_DRAW);
+        else glBufferData(GL_ARRAY_BUFFER, total_size, null, GL_STATIC_DRAW);
     }
+
+    ptr := glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+    memcpy(ptr+(0), m.vertices.data, vertex_size);
+    memcpy(ptr+(vertex_size), m.normals.data, normal_size);
+    memcpy(ptr+(vertex_size+normal_size), m.tex_coords.data, tex_size);
+    memcpy(ptr+(vertex_size+normal_size+tex_size), m.tangent_normals.data, tangent_size);
+    #if DEVELOPER {
+        memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size), m.picking_indices.data, picking_size);
+        memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size+picking_size), m.map_position.data, picking_pos_size);
+    }
+
+    // glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_size, m.vertices.data);
+    // glBufferSubData(GL_ARRAY_BUFFER, vertex_size, normal_size, m.normals.data);
+    // glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size, tex_size, m.tex_coords.data);
+    // glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size, tangent_size, m.tangent_normals.data);
+    // #if DEVELOPER {
+    //     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size+tangent_size, picking_size, m.picking_indices.data);
+    //     glBufferSubData(GL_ARRAY_BUFFER, vertex_size+normal_size+tex_size+tangent_size+picking_size, picking_pos_size, m.map_position.data);
+    // }
+
+    glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
 draw_model :: (rdr: GL_Renderer, m: Model) {
@@ -970,7 +1044,7 @@ height_lookup :: inline (map: Height_Map, x: int, y: int) -> float {
     return map.map[y * map.width + x];
 }
 
-add_quad :: (arr: *[..] Vector3, v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3) {
+add_quad :: (arr: *[..] $T, v0: T, v1: T, v2: T, v3: T) {
     array_add(arr, v2);
     array_add(arr, v1);
     array_add(arr, v0);
@@ -996,8 +1070,7 @@ generate_terrain_mesh :: (map: Height_Map, m: *Mesh) {
     array_reserve(*m.vertices, width*height*6);
     array_reserve(*m.normals, width*height*6);
 
-    array_reset(*m.vertices);
-    array_reset(*m.normals);
+    reset_mesh_arrays(m);
 
     add_quad_index :: (arr: *[..] u32, i: u32) {
         array_add(arr, i);
@@ -1071,8 +1144,7 @@ generate_terrain_line_mesh :: (map: Height_Map, m: *Mesh) {
     array_reserve(*m.vertices, width*height*6);
     array_reserve(*m.normals, width*height*6);
 
-    array_reset(*m.vertices);
-    array_reset(*m.normals);
+    reset_mesh_arrays(m);
 
     normal := make_Vector3(0, 0, 0);
     for y: 0..height-2 {

@@ -26,19 +26,42 @@ update_camera :: (game: *Game, dt: float) {
         game.renderer.camera.position += q * (move * 20);
     }
 
-    if input_button_states[#char "."] & DOWN {
+    if mouse_delta_z != 0 {
         q := game.renderer.camera.rotation;
-        game.renderer.camera.position += q * make_Vector3(0.0, 0.0, -0.5);
+        game.renderer.camera.position += q * make_Vector3(0.0, 0.0, -mouse_delta_z * 0.1);
     }
 
-    if input_button_states[#char "E"] & DOWN {
-        q := game.renderer.camera.rotation;
-        game.renderer.camera.position -= (q * set_angle_vector(3.14, 0, 1, 0)) * make_Vector3(0.0, 0.0, 0.5);
-    }
 }
 
 selected_points_mesh: *Mesh;
 selected_points_indices: [..] u32;
+picking_buf: [] u32;
+picking_position_buf: [] Vector2;
+
+Tool_Mode :: enum u16 {
+    VERTEX_PICK,
+    BRUSH_ADD
+}
+
+current_tool_mode := Tool_Mode.BRUSH_ADD;
+
+collect_indices_around_circle :: (map: Height_Map, p: Vector2, radius: float) {
+    array_reset(*selected_points_indices);
+    reset_mesh_arrays(selected_points_mesh);
+    // @Speed better circle picking
+    for y: 0..terrain_map.height-1 {
+        for x: 0..terrain_map.width-1 {
+            in: u32 = xx (x + y * terrain_map.width); 
+            cur := make_Vector2(xx x, xx y);
+            if length(cur - p) < radius {
+                add_point(selected_points_mesh, map.vertices[in]);
+                array_add(*selected_points_indices, in);
+            }
+        }
+    }
+
+    store_mesh_in_buffer(selected_points_mesh, true);
+}
 
 #scope_export
 
@@ -48,12 +71,10 @@ __terrain_picking_mesh: *Mesh;
 add_point :: (m: *Mesh, p: Vector3) {
     array_add(*m.vertices, p);
     array_add(*m.normals, make_Vector3(0, 0, 0));
-    store_mesh_in_buffer(m);
 }
 
 update_point_mesh :: (m: *Mesh, map: Height_Map, indices: [] u32) {
-	array_reset(*m.vertices);
-	array_reset(*m.normals);
+	reset_mesh_arrays(m);
 
 	for indices {
 		array_add(*m.vertices, map.vertices[it]);
@@ -70,55 +91,87 @@ init_editor :: (game: *Game) {
     m.primitive_type = Primitive_Type.POINTS;
 
     selected_points_mesh = m;
+
+    picking_buf.count = game.window.width * game.window.height;
+    picking_buf.data = alloc(picking_buf.count*size_of(u32));
+
+    picking_position_buf.count = game.window.width * game.window.height;
+    picking_position_buf.data = alloc(picking_position_buf.count*size_of(Vector2));
 }
 
 update_editor :: (game: *Game, dt: float) {
+    x, y, success := get_mouse_pointer_position(true);
+    if !success return;
+
     update_camera(game, dt);
 
     start_picking(renderer);
     draw_picking_mesh(<<renderer, <<__terrain_picking_mesh, renderer.picking_shader);
     finish_picking(<<renderer);
-    get_picking_data(<<renderer, picking_buf.data, xx picking_buf.count * size_of(u32));
+    get_picking_index_data(<<renderer, picking_buf.data);
+    get_picking_position_data(<<renderer, picking_position_buf.data);
+
+    in := (y * game.window.width) + x;
 
     using Key_Current_State;
-    if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
-        x, y, success := get_mouse_pointer_position(true);
-        if success {
-            assert(x >= 0 && x < game.window.width);
-            assert(y >= 0 && y < game.window.height);
 
-            in := (y * game.window.width) + x;
-            index := picking_buf[in];
-            if index > (terrain_map.width * terrain_map.height) {
-                return;
+    if current_tool_mode == Tool_Mode.VERTEX_PICK {
+        if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
+            if success {
+                assert(x >= 0 && x < game.window.width);
+                assert(y >= 0 && y < game.window.height);
+
+                index := picking_buf[in];
+                if index > (terrain_map.width * terrain_map.height) {
+                    return;
+                }
+
+                // print("i: %, ix: %, iy: %\n", index, index % xx terrain_map.width, index / xx terrain_map.width);
+
+                // @TODO check if point is already in array
+                add_point(selected_points_mesh, terrain_map.vertices[index]);
+                store_mesh_in_buffer(selected_points_mesh);
+                array_add(*selected_points_indices, index);
+            }
+        }
+
+        if input_button_states[#char "Z"] & DOWN {
+        	delta := make_Vector3(xx mouse_delta_x, xx -mouse_delta_y, 0);
+            q := game.renderer.camera.rotation;
+
+            delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+            sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+            delta = mul(delta, make_Vector3(sx, sy, 1)) * 20;
+
+        	for selected_points_indices {
+        		vert_current := terrain_map.vertices[it];
+        		out := vert_current + delta;
+        		terrain_map.vertices[it] = out;
+        	}
+
+        	update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
+        	generate_terrain_mesh(terrain_map, __terrain);
+            generate_terrain_picking_mesh(terrain_map, __terrain_picking_mesh);
+            generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
+        }
+    } else if current_tool_mode == Tool_Mode.BRUSH_ADD {
+        if !(x >= 0 && x < game.window.width) return;
+        if !(y >= 0 && y < game.window.height) return;
+        collect_indices_around_circle(terrain_map, picking_position_buf[in], 10.0);
+
+        if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & DOWN {
+            delta := make_Vector3(0, 0.2, 0.0);
+            for selected_points_indices {
+                vert_current := terrain_map.vertices[it];
+                out := vert_current + delta;
+                terrain_map.vertices[it] = out;
             }
 
-            // print("i: %, ix: %, iy: %\n", index, index % xx terrain_map.width, index / xx terrain_map.width);
-
-            // @TODO check if point is already in array
-            add_point(selected_points_mesh, terrain_map.vertices[index]);
-            array_add(*selected_points_indices, index);
+            update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
+            generate_terrain_mesh(terrain_map, __terrain);
+            generate_terrain_picking_mesh(terrain_map, __terrain_picking_mesh);
+            generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
         }
-    }
-
-    if input_button_states[#char "Z"] & DOWN {
-    	delta := make_Vector3(xx mouse_delta_x, xx -mouse_delta_y, 0);
-        q := game.renderer.camera.rotation;
-
-        delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
-        sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
-        delta = mul(delta, make_Vector3(sx, sy, 1)) * 20;
-
-    	for selected_points_indices {
-    		vert_current := terrain_map.vertices[it];
-    		out := vert_current + delta;
-    		terrain_map.vertices[it] = out;
-    	}
-
-    	update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
-    	generate_terrain_mesh(terrain_map, __terrain);
-        generate_terrain_picking_mesh(terrain_map, __terrain_picking_mesh);
-        generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
     }
 }
 

@@ -25,6 +25,12 @@ Game_Window :: struct {
 #import "Compiler";
 terrain_map: Height_Map;
 
+// new_terrain_map :: (w: u32, h: u32) -> Height_Map, *Mesh {
+//     map: Height_Map;
+//     map.width = w;
+//     map.height = w;
+// }
+
 main :: () {
     os_init_platform();
 
@@ -73,11 +79,6 @@ main :: () {
     rdr.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
     rdr.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
 
-    #if DEVELOPER {
-        picking_buf.count = game.window.width * game.window.height;
-        picking_buf.data = alloc(picking_buf.count*size_of(u32)); // this is wasteful maybe we can store 8bits of the index in each channel in GL ?
-    }
-
     init_editor(*game);
 
     // Font fnt;
@@ -97,6 +98,7 @@ main :: () {
     renderer.camera.position.y = 5;
     renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
+    // terrain_map, __terrain = new_terrain_map(128, 128);
     terrain_map, __terrain = load_heightmap(asset_man, "assets/heightmap.png");
     __terrain_line_mesh = New(Mesh);
     <<__terrain_line_mesh = generate_terrain_line_mesh(terrain_map);
@@ -166,9 +168,6 @@ renderer: *GL_Renderer;
 font: *Font;
 __model: *Model;
 __terrain: *Mesh;
-#if DEVELOPER {
-    picking_buf: [] u32;
-}
 
 /*
 struct Html_Phase {

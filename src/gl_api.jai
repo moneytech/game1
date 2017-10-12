@@ -134,12 +134,23 @@ GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER :: 0x8CDB;
 GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER :: 0x8CDC;
 GL_FRAMEBUFFER_UNSUPPORTED        :: 0x8CDD;
 
+GL_READ_ONLY                     :: 0x88B8;
+GL_WRITE_ONLY                    :: 0x88B9;
+GL_READ_WRITE                    :: 0x88BA;
+
 GL_RED                           :: 0x1903;
 GL_R32UI                         :: 0x8236;
 GL_RED_INTEGER                   :: 0x8D94;
 GL_RGBA32UI                      :: 0x8D70;
 GL_RGBA_INTEGER                  :: 0x8D99;
 GL_UNSIGNED_INT_8_8_8_8          :: 0x8035;
+GL_RGB32F                        :: 0x8815;
+GL_R16F                          :: 0x822D;
+GL_R32F                          :: 0x822E;
+GL_RG16F                         :: 0x822F;
+GL_RG32F                         :: 0x8230;
+GL_RG                            :: 0x8227;
+GL_RG_INTEGER                    :: 0x8228;
 
 GL_POINTS                        :: 0x0000;
 GL_LINES                         :: 0x0001;
@@ -227,6 +238,9 @@ GL_3_0_API :: struct {
 
     glVertexAttrib3f: (index: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) #foreign;
     // glGetnTexImage: (target: GLenum, level: GLint, format: GLenum, type: GLenum, bufSize: GLsizei, pixels: *void) #foreign;
+
+    glMapBuffer: (target: GLenum, access: GLenum) -> *void #foreign;
+    glUnmapBuffer: (target: GLenum) -> GLboolean #foreign;
 }
 
 #if OS_WINDOWS {

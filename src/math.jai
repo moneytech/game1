@@ -166,6 +166,10 @@ dot :: (a: Vector2, b: Vector2) -> float {
     return a.x*b.x + a.y*b.y;
 }
 
+length :: (v: Vector2) -> float {
+    return sqrt(v.x*v.x + v.y*v.y);
+}
+
 
 Quaternion :: struct {
     w: float;
