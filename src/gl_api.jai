@@ -151,6 +151,8 @@ GL_RG16F                         :: 0x822F;
 GL_RG32F                         :: 0x8230;
 GL_RG                            :: 0x8227;
 GL_RG_INTEGER                    :: 0x8228;
+GL_R8                            :: 0x8229;
+GL_R16                           :: 0x822A;
 
 GL_POINTS                        :: 0x0000;
 GL_LINES                         :: 0x0001;

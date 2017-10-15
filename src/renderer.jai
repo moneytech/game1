@@ -23,6 +23,7 @@ Texture :: struct {
 
 Font :: struct {
     id: u32;
+    char_height: float;
     bwidth: s16;
     bheight: s16;
     cdata: [96] stbtt_bakedchar; // ASCII 32..126 is 95 glyphs
@@ -182,6 +183,8 @@ GL_Renderer :: struct {
     render_to_gbuffer: *Shader;
     render_light_using_gbuffer: *Shader;
     render_plain_texture: *Shader;
+    render_text: *Shader;
+    render_rect: *Shader;
 
     #if DEVELOPER {
         picking_framebuffer: u32;
@@ -377,26 +380,53 @@ clear_screen :: (r: float, g: float, b: float, a: float) {
     // glDepthFunc(GL_LEQUAL);
 }
 
-draw_rect :: (rect: Rectangle) {
+draw_rect :: (using rdr: GL_Renderer, rect: Rectangle, color: Color, alpha := 1.0) {
     x := rect.x;
     y := rect.y;
     width := rect.width;
     height := rect.height;
 
-    draw_rect(x, y, width, height);
+    draw_rect(rdr, x, y, width, height, color, alpha);
 }
 
-draw_rect :: (x: float, y: float, width: float, height: float) {
+draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color, alpha := 1.0) {
+    glUseProgram(render_rect.id);
+    update_matrices(rdr, matrix_identity(), render_rect);
+
+    al := glGetUniformLocation(render_rect.id, "alpha");
+    glUniform1f(al, alpha);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     xw := x+width;
     yh := y+height;
-    // glBegin(GL_QUADS);
-    //     glVertex2f(x, y);
-    //     glVertex2f(x, yh);
-    //     glVertex2f(xw, yh);
-    //     glVertex2f(xw, y);
-    // glEnd();
 
-    assert(false);
+    arr: [6] Vector2;
+    arr[0] = make_Vector2(xw, yh);    
+    arr[1] = make_Vector2(xw, y);
+    arr[2] = make_Vector2(x,  y);
+    arr[3] = make_Vector2(xw, yh);
+    arr[4] = make_Vector2(x,  y);
+    arr[5] = make_Vector2(x,  yh);
+
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vector2), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttrib3f(1, color.r, color.g, color.b);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, null);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    
+    glDisableVertexAttribArray(0);
+    glDeleteBuffers(1, *buf);
+
+    glDisable(GL_BLEND);
 }
 
 draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float) {
@@ -505,31 +535,74 @@ create_font :: (font: *Font, bwidth: s16, bheight: s16, data: *void) {
     font.bheight = bheight;
     glGenTextures(1, *font.id);
     glBindTexture(GL_TEXTURE_2D, font.id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bwidth, bheight, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, bwidth, bheight, 0, GL_RED, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
-draw_text :: (font: Font, text: string, x: float, y: float) -> x {
+draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: string, str_args: .. Any) -> x {
+    glUseProgram(rdr.render_text.id);
+    update_matrices(rdr, matrix_identity(), render_text);
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, font.id);
-    // glBegin(GL_QUADS);
-    // while (*text) {
-    //     if (*text >= 32 && *text < 128) {
-    //         stbtt_aligned_quad q;
-    //         stbtt_GetBakedQuad(font->cdata, font->bwidth, font->bheight, *text-32, &x,&y,&q,1);//1=opengl & d3d10+,0=d3d9
-    //         glTexCoord2f(q.s0,q.t0); glVertex2f(q.x0,q.y0);
-    //         glTexCoord2f(q.s0,q.t1); glVertex2f(q.x0,q.y1);
-    //         glTexCoord2f(q.s1,q.t1); glVertex2f(q.x1,q.y1);
-    //         glTexCoord2f(q.s1,q.t0); glVertex2f(q.x1,q.y0);
-    //     }
-    //     ++text;
-    // }
-    // glEnd();
+    tex := glGetUniformLocation(render_text.id, "in_texture");
+    glUniform1i(tex, 0);
+
+
+    Temp_Vertex_Array :: struct {
+        vertex: Vector2;
+        tex_coords: Vector2;
+    }
+    make_TVA :: (x: float, y: float, tx: float, ty: float) -> Temp_Vertex_Array {
+        tva: Temp_Vertex_Array = ---;
+        tva.vertex.x = x;
+        tva.vertex.y = y;
+        tva.tex_coords.x = tx;
+        tva.tex_coords.y = ty;
+        return tva;
+    }
+    arr: [..] Temp_Vertex_Array;
+
+    builder: String_Builder;
+    print_to_builder(*builder, text, ..str_args);
+
+    text_data: [] u8;
+    text_data.count = builder.base_buffer.occupied;
+    text_data.data = builder.base_buffer.data.data;
+    for c: text_data {
+        if (c >= 32 && c < 128) {
+            q: stbtt_aligned_quad;
+            stbtt_GetBakedQuad(font.cdata.data, font.bwidth, font.bheight, c-32, *x, *y, *q,1);//1=opengl & d3d10+,0=d3d9
+            v0 := make_TVA(q.x0,q.y0, q.s0,q.t0);
+            v1 := make_TVA(q.x0,q.y1, q.s0,q.t1);
+            v2 := make_TVA(q.x1,q.y1, q.s1,q.t1);
+            v3 := make_TVA(q.x1,q.y0, q.s1,q.t0);
+            add_quad_reverse(*arr, v0, v1, v2, v3);
+        }
+    }
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Temp_Vertex_Array), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glVertexAttrib3f(2, 1.0, 1.0, 1.0);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(Temp_Vertex_Array), null);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, size_of(Temp_Vertex_Array), cast(*void) size_of(Vector2));
+
+    glDrawArrays(GL_TRIANGLES, 0, xx arr.count);
+    
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    glDeleteBuffers(1, *buf);
 
     glDisable(GL_BLEND);
-    assert(false);
 
     return x;
 }
@@ -627,18 +700,22 @@ draw_cube :: (x: float, y: float, z: float, size: float) {
     assert(false);
 }
 
+update_matrices :: (using rdr: GL_Renderer, model_matrix: Matrix4, sh: *Shader) {
+    proj := glGetUniformLocation(sh.id, "projection");
+    view := glGetUniformLocation(sh.id, "view");
+    model := glGetUniformLocation(sh.id, "model");
+    glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
+    glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
+    glUniformMatrix4fv(model, 1, GL_TRUE, model_matrix.flat.data);
+}
+
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glEnable(GL_DEPTH_TEST);
 
     // @TODO model matrix
     t := matrix_identity();
 
-    proj := glGetUniformLocation(render_to_gbuffer.id, "projection");
-    view := glGetUniformLocation(render_to_gbuffer.id, "view");
-    model := glGetUniformLocation(render_to_gbuffer.id, "model");
-    glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
-    glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
-    glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
+    update_matrices(rdr, t, render_to_gbuffer);
 
     viewer_pos := glGetUniformLocation(render_to_gbuffer.id, "camera_position");
     glUniform3f(viewer_pos, camera.position.x, camera.position.y, camera.position.z);
@@ -1052,6 +1129,16 @@ add_quad :: (arr: *[..] $T, v0: T, v1: T, v2: T, v3: T) {
     array_add(arr, v3);
     array_add(arr, v2);
     array_add(arr, v0);
+}
+
+add_quad_reverse :: (arr: *[..] $T, v0: T, v1: T, v2: T, v3: T) {
+    array_add(arr, v0);
+    array_add(arr, v1);
+    array_add(arr, v2);
+
+    array_add(arr, v0);
+    array_add(arr, v2);
+    array_add(arr, v3);
 }
 
 generate_heightmap_vertex_data :: (map: *Height_Map) {

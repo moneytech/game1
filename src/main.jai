@@ -78,13 +78,16 @@ main :: () {
     rdr.render_light_using_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
     rdr.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
     rdr.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
+    rdr.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
+    rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
+
 
     init_editor(*game);
 
-    // Font fnt;
-    // my_stbtt_initfont(&fnt);
-    // rdr.create_font(&fnt, 512, 512, &temp_bitmap[0]);
-    // font = &fnt;
+    fnt: Font;
+    my_stbtt_initfont(*fnt);
+    create_font(*fnt, 512, 512, temp_bitmap.data);
+    font = *fnt;
 
     // key := load_model(asset_man, "assets/keyOGA.obj");
     // __model = load_model(asset_man, "assets/well.coveredopen.obj");
@@ -253,18 +256,18 @@ render :: (game: *Game) {
 }
 
 
-/*
-unsigned char ttf_buffer[1<<20];
-unsigned char temp_bitmap[512*512];
 
-void my_stbtt_initfont(Font *font)
-{
-    FILE *f = fopen("c:/windows/fonts/times.ttf", "rb");
-    fread(ttf_buffer, 1, 1<<20, f);
-    stbtt_BakeFontBitmap(ttf_buffer,0, 32.0, temp_bitmap,512,512, 32,96, font->cdata); // no guarantee this fits!
-    fclose(f);
+ttf_buffer: [1<<20] u8;
+temp_bitmap: [512*512] u8;
+
+my_stbtt_initfont :: (font: *Font) {
+    f, success := file_open("c:/windows/fonts/times.ttf");
+    if !success assert(false);
+    file_read(f, ttf_buffer.data, ttf_buffer.count);
+    font.char_height = 16.0;
+    stbtt_BakeFontBitmap(ttf_buffer.data,0, 16.0, temp_bitmap.data,512,512, 32,96, font.cdata.data); // no guarantee this fits!
+    file_close(*f);
 }
-*/
 
 
 file_update_callback :: (notif: *File_Notification, userdata: *void) {

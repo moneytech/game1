@@ -40,10 +40,15 @@ picking_position_buf: [] Vector2;
 
 Tool_Mode :: enum u16 {
     VERTEX_PICK,
-    BRUSH_ADD
+    BRUSH_ADD,
+    BRUSH_SUBTRACT,
+    BRUSH_SPHERE_ADD,
+    BRUSH_SPHERE_SUBTRACT
 }
 
-current_tool_mode := Tool_Mode.BRUSH_ADD;
+tool_brush_add_sub_vector: Vector3;
+tool_brush_radius := 10.0;
+current_tool_mode := Tool_Mode.BRUSH_SPHERE_SUBTRACT;
 
 collect_indices_around_circle :: (map: Height_Map, p: Vector2, radius: float) {
     array_reset(*selected_points_indices);
@@ -97,6 +102,8 @@ init_editor :: (game: *Game) {
 
     picking_position_buf.count = game.window.width * game.window.height;
     picking_position_buf.data = alloc(picking_position_buf.count*size_of(Vector2));
+
+    tool_brush_add_sub_vector = make_Vector3(0.0, 0.2, 0.0);
 }
 
 update_editor :: (game: *Game, dt: float) {
@@ -154,14 +161,42 @@ update_editor :: (game: *Game, dt: float) {
             generate_terrain_picking_mesh(terrain_map, __terrain_picking_mesh);
             generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
         }
-    } else if current_tool_mode == Tool_Mode.BRUSH_ADD {
+    } else if current_tool_mode == Tool_Mode.BRUSH_ADD || current_tool_mode == Tool_Mode.BRUSH_SUBTRACT {
         if !(x >= 0 && x < game.window.width) return;
         if !(y >= 0 && y < game.window.height) return;
-        collect_indices_around_circle(terrain_map, picking_position_buf[in], 10.0);
+        collect_indices_around_circle(terrain_map, picking_position_buf[in], tool_brush_radius);
 
         if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & DOWN {
-            delta := make_Vector3(0, 0.2, 0.0);
+            delta := tool_brush_add_sub_vector;
+            if current_tool_mode == Tool_Mode.BRUSH_SUBTRACT delta = -delta;
             for selected_points_indices {
+                vert_current := terrain_map.vertices[it];
+                out := vert_current + delta;
+                terrain_map.vertices[it] = out;
+            }
+
+            update_point_mesh(selected_points_mesh, terrain_map, selected_points_indices);
+            generate_terrain_mesh(terrain_map, __terrain);
+            generate_terrain_picking_mesh(terrain_map, __terrain_picking_mesh);
+            generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
+        }
+    } else if current_tool_mode == Tool_Mode.BRUSH_SPHERE_ADD || current_tool_mode == Tool_Mode.BRUSH_SPHERE_SUBTRACT {
+        if !(x >= 0 && x < game.window.width) return;
+        if !(y >= 0 && y < game.window.height) return;
+        p := picking_position_buf[in];
+        collect_indices_around_circle(terrain_map, p, tool_brush_radius);
+
+        if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & DOWN {
+            for selected_points_indices {
+                x := it % terrain_map.width;
+                y := it / terrain_map.width;
+                cur := make_Vector2(xx x, xx y);
+
+                // not technically spherical, but achieves a good enough effect
+                d := length(cur - p) / tool_brush_radius;
+                delta := mul(make_Vector3(0, (1.0 - d), 0), tool_brush_add_sub_vector);
+                if current_tool_mode == Tool_Mode.BRUSH_SPHERE_SUBTRACT delta = -delta;
+
                 vert_current := terrain_map.vertices[it];
                 out := vert_current + delta;
                 terrain_map.vertices[it] = out;
@@ -187,4 +222,10 @@ render_editor :: (game: *Game) {
     set_point_size(<<renderer, 5.0);
     draw_mesh(<<renderer, <<selected_points_mesh);
     finish_scene(<<renderer);
+
+    renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+    draw_rect(<<renderer, 0, 40, 500, font.char_height*3, make_Color(0.2, 0.2, 0.2), 0.5);
+    draw_text(<<renderer, <<font, 0, 50.0+font.char_height*0, "Current Tool: %", current_tool_mode);
+    draw_text(<<renderer, <<font, 0, 50.0+font.char_height*1, "Brush Radius: %", tool_brush_radius);
+    draw_text(<<renderer, <<font, 0, 50.0+font.char_height*2, "Add/Sub Vector: %", tool_brush_add_sub_vector);
 }
