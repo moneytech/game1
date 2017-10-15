@@ -224,8 +224,10 @@ render_editor :: (game: *Game) {
     finish_scene(<<renderer);
 
     renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
-    draw_rect(<<renderer, 0, 40, 500, font.char_height*3, make_Color(0.2, 0.2, 0.2), 0.5);
-    draw_text(<<renderer, <<font, 0, 50.0+font.char_height*0, "Current Tool: %", current_tool_mode);
-    draw_text(<<renderer, <<font, 0, 50.0+font.char_height*1, "Brush Radius: %", tool_brush_radius);
-    draw_text(<<renderer, <<font, 0, 50.0+font.char_height*2, "Add/Sub Vector: %", tool_brush_add_sub_vector);
+    draw_rect(<<renderer, 0, 0, 500, font.char_height*3, make_Color(0.2, 0.2, 0.2), 0.5);
+    
+    h := font.char_height*0.75;
+    draw_text(<<renderer, <<font, 0, h+font.char_height*0, "Current Tool: %", current_tool_mode);
+    draw_text(<<renderer, <<font, 0, h+font.char_height*1, "Brush Radius: %", tool_brush_radius);
+    draw_text(<<renderer, <<font, 0, h+font.char_height*2, "Add/Sub Vector: %", tool_brush_add_sub_vector);
 }

@@ -173,14 +173,21 @@ __XInputSetState: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #foreign;
 wglChoosePixelFormatARB: (hDC: HDC, piAttribIList: *s32, pfAttribFList: *float, nMaxFormats: u32, piFormats: *s32, nNumFormats: *u32) -> BOOL #foreign;
 wglCreateContextAttribsARB: (hDC: HDC, hShareContext: HGLRC, attribList: *s32) -> HGLRC #foreign;
 
+WINDOWED_STYLE : s32   : WS_VISIBLE | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_SIZEBOX;
+FULLSCREEN_STYLE : s32 : WS_VISIBLE | WS_POPUP;
 os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
     if (!window_class_initted) {
         init_window_class();
     }
 
+    rect: RECT;
+    rect.right = width;
+    rect.bottom = height;
+    AdjustWindowRect(*rect, WINDOWED_STYLE, 0);
+
     hInstance := GetModuleHandleA(null);
     c_title := to_c_string(title);
-    ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, width, height, 0, 0, hInstance, null);
+    ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, rect.right-rect.left, rect.bottom-rect.top, 0, 0, hInstance, null);
     free(c_title);
     return ret;
 }
