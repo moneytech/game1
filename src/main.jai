@@ -12,6 +12,7 @@ Game :: struct {
     window: *Game_Window;
 
     fov: float = 60;
+    water_distort_offset: float;
 }
 
 Game_Window :: struct {
@@ -23,7 +24,6 @@ Game_Window :: struct {
 }
 
 #import "Compiler";
-terrain_map: Height_Map;
 
 // new_terrain_map :: (w: u32, h: u32) -> Height_Map, *Mesh {
 //     map: Height_Map;
@@ -80,6 +80,7 @@ main :: () {
     rdr.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
     rdr.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
     rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
+    rdr.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
 
 
     init_editor(*game);
@@ -101,12 +102,6 @@ main :: () {
     renderer.camera.position.y = 5;
     renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
-    // terrain_map, __terrain = new_terrain_map(128, 128);
-    terrain_map, __terrain = load_heightmap(asset_man, "assets/heightmap.png");
-    __terrain_line_mesh = New(Mesh);
-    <<__terrain_line_mesh = generate_terrain_line_mesh(terrain_map);
-    __terrain_picking_mesh = New(Mesh);
-    <<__terrain_picking_mesh = generate_terrain_picking_mesh(terrain_map);
 
     while (true) {
         exit := false;
@@ -170,7 +165,6 @@ tex: *Texture;
 renderer: *GL_Renderer;
 font: *Font;
 __model: *Model;
-__terrain: *Mesh;
 
 /*
 struct Html_Phase {

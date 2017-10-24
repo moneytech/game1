@@ -134,6 +134,16 @@ GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER :: 0x8CDB;
 GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER :: 0x8CDC;
 GL_FRAMEBUFFER_UNSUPPORTED        :: 0x8CDD;
 
+GL_CLIP_DISTANCE0                :: 0x3000;
+GL_CLIP_DISTANCE1                :: 0x3001;
+GL_CLIP_DISTANCE2                :: 0x3002;
+GL_CLIP_DISTANCE3                :: 0x3003;
+GL_CLIP_DISTANCE4                :: 0x3004;
+GL_CLIP_DISTANCE5                :: 0x3005;
+GL_CLIP_DISTANCE6                :: 0x3006;
+GL_CLIP_DISTANCE7                :: 0x3007;
+GL_MAX_CLIP_DISTANCES            :: 0x0D32;
+
 GL_READ_ONLY                     :: 0x88B8;
 GL_WRITE_ONLY                    :: 0x88B9;
 GL_READ_WRITE                    :: 0x88BA;
@@ -153,6 +163,7 @@ GL_RG                            :: 0x8227;
 GL_RG_INTEGER                    :: 0x8228;
 GL_R8                            :: 0x8229;
 GL_R16                           :: 0x822A;
+GL_DEPTH_COMPONENT32F            :: 0x8CAC;
 
 GL_POINTS                        :: 0x0000;
 GL_LINES                         :: 0x0001;
@@ -256,6 +267,8 @@ glGetTexImage :: (target: GLenum, level: GLint, format: GLenum, type: GLenum, pi
 glPointSize :: (size: GLfloat) #foreign GL;
 glReadBuffer: (mode: GLenum) #foreign GL;
 glReadPixels: (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, data: *GLvoid) #foreign GL;
+
+glTexSubImage2D :: (target: GLenum,  level: GLint, xoffset: GLint, yoffset: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, data: *GLvoid) #foreign GL;
 
 glGetUniformLocation :: (program: GLuint, name: string) -> GLint {
     using gl_30_api;

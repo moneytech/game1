@@ -16,10 +16,14 @@ uniform mat4 projection;
 
 uniform bool use_normal_map;
 
+uniform vec4 clip_plane;
+
 void main() {
     vec4 world_pos = model * vec4(in_pos, 1.0);
     frag_pos = world_pos.xyz;
     tex_coords = in_tex_coords;
+
+    gl_ClipDistance[0] = dot(world_pos, clip_plane);
 
     mat3 normal_matrix = transpose(inverse(mat3(model)));
 

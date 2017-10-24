@@ -24,6 +24,15 @@ make_Vector4 :: (v: Vector3, w: float) -> Vector4 {
     return o;
 }
 
+make_Vector4 :: (x: float, y: float, z: float, w: float) -> Vector4 {
+    o: Vector4 = ---;
+    o.x = x;
+    o.y = y;
+    o.z = z;
+    o.w = w;
+    return o;
+}
+
 Vector3 :: struct {
     x: float;
     y: float;
@@ -170,7 +179,6 @@ length :: (v: Vector2) -> float {
     return sqrt(v.x*v.x + v.y*v.y);
 }
 
-
 Quaternion :: struct {
     w: float;
     x: float;
@@ -187,6 +195,13 @@ set_angle_vector :: (angle: float, vx: float, vy: float, vz: float) -> Quaternio
     q.y = vy * s;
     q.z = vz * s;
     return q;
+}
+
+get_euler_angles :: (using q: Quaternion) -> float64, float64, float64 {
+    phi := atan2(y*z + w*x, 0.5 - (x*x + y*y));
+    theta := asin(-2.0 * (x*z - w*y));
+    gamma := atan2(x*y + w*z, 0.5 - (y*y + z*z));
+    return phi, theta, gamma;
 }
 
 operator* :: (q0: Quaternion, q1: Quaternion) -> Quaternion {
