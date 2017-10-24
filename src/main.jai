@@ -27,7 +27,7 @@ Game_Window :: struct {
 }
 
 create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) -> Mesh {
-    UP :: make_Vector3(0, 1, 0);
+    UP := make_Vector3(0, 1, 0);
     plane_normal = normalize(plane_normal);
     axis := cross(UP, plane_normal);
     angle := dot(UP, plane_normal);
@@ -41,22 +41,43 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) ->
 
     m: Mesh;
 
+    off_white := make_Color(0.1, 0.1, 0.1);
+    white := make_Color(1, 1, 1);
+
     for y: y_start..hh-1 {
+        is_white := false;
+        if y % 2 != 0 is_white = true;
+
         for x: x_start..hw-1 {
             v0 := rotation * make_Vector3(x, 0, y);
             v1 := rotation * make_Vector3(x+1, 0, y);
             v2 := rotation * make_Vector3(x+1, 0, y+1);
             v3 := rotation * make_Vector3(x, 0, y+1);
 
-            add_quad();
+            add_quad(*m.verticies, v0, v1, v2, v3);
+            add_quad(*m.normals, plane_normal, plane_normal, plane_normal, plane_normal);
+
+            if is_white {
+                add_quad(*m.colors, white, white, white, white);
+            } else {
+                add_quad(*m.colors, off_white, off_white, off_white, off_white);
+            }
         }
     }
 
+    mat := New(Material);
+    mat.diffuse = make_Color(1, 1, 1);
+    m.material = mat;
+    store_mesh_in_buffer(*m);
     return m;
 }
 
 create_test_scene :: () -> Scene {
+    sc: Scene;
+    test_model: Model;
+    array_add(*test_model.meshes, create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16));
 
+    array_add(*sc.models, test_model);
 }
 
 main :: () {
