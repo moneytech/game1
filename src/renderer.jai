@@ -167,7 +167,8 @@ Mesh :: struct {
     normals: [..] Vector3;
     tangent_normals: [..] Vector3;
     tex_coords: [..] Vector2;
-    indices: [..] u16; // @Volatile size must match glDrawElements and glBufferData calls
+    colors: [..] Color;
+    indices: [..] u16; // @Volatile type must match glDrawElements and glBufferData calls
 
     #if DEVELOPER {
         map_position: [..] Vector2;
@@ -240,6 +241,15 @@ Camera :: struct {
     position: Vector3;
     rotation: Quaternion;
 };
+
+#run { print("@Imcomplete: make a flag on model to differentiate between water and non-water models.\n"); };
+Scene :: struct {
+    models: [..] Model;
+    cameras: [..] Camera;
+    lights: [..] Light;
+
+    active_camera: Camera;
+}
 
 GL_Renderer :: struct {
     game: *Game;
@@ -921,6 +931,13 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size));
     }
 
+    if m.colors.count {
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
+    } else {
+        glVertexAttrib3f(4, 1, 1, 1); // this will just get multiplied by the material color
+    }
+
     prim_type: GLenum;
 
     if m.primitive_type == {
@@ -1055,10 +1072,11 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
         normal_size := m.normals.count * size_of(Vector3);
         tex_size    := m.tex_coords.count * size_of(Vector2);
         tangent_size := m.tangent_normals.count * size_of(Vector3);
+        color_size := m.colors.count * size_of(Color);
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size+color_size));
 
         assert(m.primitive_type == Primitive_Type.TRIANGLES);
         if m.indices.count {
@@ -1109,7 +1127,8 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
     normal_size := m.normals.count * size_of(Vector3);
     tex_size    := m.tex_coords.count * size_of(Vector2);
     tangent_size := m.tangent_normals.count * size_of(Vector3);
-    total_size := vertex_size + tex_size + normal_size + tangent_size;
+    color_size := m.colors.count * size_of(Color);
+    total_size := vertex_size + tex_size + normal_size + tangent_size + color_size;
 
     #if DEVELOPER {
         picking_pos_size := m.map_position.count * size_of(Vector2);
@@ -1138,8 +1157,9 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
     if update_others {
         memcpy(ptr+(vertex_size+normal_size), m.tex_coords.data, tex_size);
         memcpy(ptr+(vertex_size+normal_size+tex_size), m.tangent_normals.data, tangent_size);
+        memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size), m.colors.data, color_size);
         #if DEVELOPER {
-            memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size), m.map_position.data, picking_pos_size);
+            memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size+color_size), m.map_position.data, picking_pos_size);
         }
     }
 

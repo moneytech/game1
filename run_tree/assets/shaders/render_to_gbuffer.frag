@@ -7,6 +7,7 @@ layout (location = 2) out vec4 g_albedospec;
 in vec2 tex_coords;
 in vec3 frag_pos;
 in vec3 normal;
+in vec3 vertex_color;
 in mat3 TBN;
 
 uniform sampler2D diffuse_map;
@@ -37,9 +38,9 @@ void main() {
 
     if (use_diffuse_map) {
         // i think this is right...
-        g_albedospec.rgb = material.diffuse.rgb * texture(diffuse_map, tex_coords).rgb;
+        g_albedospec.rgb = material.diffuse.rgb * texture(diffuse_map, tex_coords).rgb * vertex_color;
     } else {
-    	g_albedospec.rgb = material.diffuse.rgb;
+    	g_albedospec.rgb = material.diffuse.rgb * vertex_color;
         g_albedospec.a = 1;
     }
 

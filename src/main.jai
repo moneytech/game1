@@ -1,3 +1,6 @@
+
+#import "Compiler";
+
 #load "renderer.jai";
 #load "lexer.jai";
 #load "asset_manager.jai";
@@ -23,13 +26,38 @@ Game_Window :: struct {
     glc: OS_GL_Context;
 }
 
-#import "Compiler";
+create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) -> Mesh {
+    UP :: make_Vector3(0, 1, 0);
+    plane_normal = normalize(plane_normal);
+    axis := cross(UP, plane_normal);
+    angle := dot(UP, plane_normal);
 
-// new_terrain_map :: (w: u32, h: u32) -> Height_Map, *Mesh {
-//     map: Height_Map;
-//     map.width = w;
-//     map.height = w;
-// }
+    rotation := set_angle_vector(angle, axis.x, axis.y, axis.z);
+
+    hw := width/2;
+    hh := height/2;
+    x_start := -hw;
+    y_start := -hh;
+
+    m: Mesh;
+
+    for y: y_start..hh-1 {
+        for x: x_start..hw-1 {
+            v0 := rotation * make_Vector3(x, 0, y);
+            v1 := rotation * make_Vector3(x+1, 0, y);
+            v2 := rotation * make_Vector3(x+1, 0, y+1);
+            v3 := rotation * make_Vector3(x, 0, y+1);
+
+            add_quad();
+        }
+    }
+
+    return m;
+}
+
+create_test_scene :: () -> Scene {
+
+}
 
 main :: () {
     os_init_platform();
