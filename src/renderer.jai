@@ -505,7 +505,7 @@ clear_screen :: (r: float, g: float, b: float, a: float) {
     glClearColor(r, g, b, a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glEnable(GL_CULL_FACE);
+    // glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
     // glDepthFunc(GL_LEQUAL);
@@ -911,6 +911,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     vertex_size := m.vertices.count * size_of(Vector3);
     normal_size := m.normals.count * size_of(Vector3);
     tex_size    := m.tex_coords.count * size_of(Vector2);
+    tangent_size := m.tangent_normals.count * size_of(Vector3);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
     
@@ -932,7 +933,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     }
 
     if m.colors.count {
-        glEnableVertexAttribArray(3);
+        glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
     } else {
         glVertexAttrib3f(4, 1, 1, 1); // this will just get multiplied by the material color
@@ -971,6 +972,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     
     if (tex_size) glDisableVertexAttribArray(2);
     if (normal_tex) glDisableVertexAttribArray(3);
+    if m.colors.count glDisableVertexAttribArray(4);
 
     glDisable(GL_DEPTH_TEST);
 
@@ -1178,6 +1180,12 @@ draw_model :: (rdr: GL_Renderer, m: Model) {
     for m.meshes {
         draw_mesh(rdr, << it);
     }
+}
+
+draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
+    start_scene(rdr);
+    for sc.models draw_model(<<rdr, it);
+    finish_scene(rdr);
 }
 
 PI :: 3.14159;

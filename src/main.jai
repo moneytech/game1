@@ -26,11 +26,11 @@ Game_Window :: struct {
     glc: OS_GL_Context;
 }
 
-create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) -> Mesh {
+create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) -> Mesh {
     UP := make_Vector3(0, 1, 0);
-    plane_normal = normalize(plane_normal);
-    axis := cross(UP, plane_normal);
-    angle := dot(UP, plane_normal);
+    pn := normalize(plane_normal);
+    axis := cross(UP, pn);
+    angle := dot(UP, pn);
 
     rotation := set_angle_vector(angle, axis.x, axis.y, axis.z);
 
@@ -41,7 +41,7 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) ->
 
     m: Mesh;
 
-    off_white := make_Color(0.1, 0.1, 0.1);
+    off_white := make_Color(0.1, 0.3, 0.1);
     white := make_Color(1, 1, 1);
 
     for y: y_start..hh-1 {
@@ -49,19 +49,20 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) ->
         if y % 2 != 0 is_white = true;
 
         for x: x_start..hw-1 {
-            v0 := rotation * make_Vector3(x, 0, y);
-            v1 := rotation * make_Vector3(x+1, 0, y);
-            v2 := rotation * make_Vector3(x+1, 0, y+1);
-            v3 := rotation * make_Vector3(x, 0, y+1);
+            v0 := rotation * make_Vector3(xx x, 0, xx y);
+            v1 := rotation * make_Vector3(xx x+1, 0, xx y);
+            v2 := rotation * make_Vector3(xx x+1, 0, xx y+1);
+            v3 := rotation * make_Vector3(xx x, 0, xx y+1);
 
-            add_quad(*m.verticies, v0, v1, v2, v3);
-            add_quad(*m.normals, plane_normal, plane_normal, plane_normal, plane_normal);
+            add_quad(*m.vertices, v0, v1, v2, v3);
+            add_quad(*m.normals, pn, pn, pn, pn);
 
             if is_white {
                 add_quad(*m.colors, white, white, white, white);
             } else {
                 add_quad(*m.colors, off_white, off_white, off_white, off_white);
             }
+            is_white = !is_white;
         }
     }
 
@@ -75,10 +76,16 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: u16, height: u16) ->
 create_test_scene :: () -> Scene {
     sc: Scene;
     test_model: Model;
-    array_add(*test_model.meshes, create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16));
+    test_mesh: *Mesh = New(Mesh);
+    <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16);
+    array_add(*test_model.meshes, test_mesh);
 
     array_add(*sc.models, test_model);
+
+    return sc;
 }
+
+main_scene: Scene;
 
 main :: () {
     os_init_platform();
@@ -131,7 +138,6 @@ main :: () {
     rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     rdr.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
 
-
     init_editor(*game);
 
     fnt: Font;
@@ -150,6 +156,8 @@ main :: () {
     renderer.camera.position.z = 30;
     renderer.camera.position.y = 5;
     renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
+
+    main_scene = create_test_scene();
 
 
     while (true) {
@@ -188,7 +196,7 @@ main :: () {
         // }
 
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
-        update_editor(*game, 1.0);
+        // update_editor(*game, 1.0);
         render(*game);
 
         swap_buffers(win);
@@ -267,15 +275,10 @@ void render_html_dom(Html_Dom *dom) {
 
 render :: (game: *Game) {
     glViewport(0, 0, xx game.window.width, xx game.window.height);
-    // start_scene(renderer);
-    // clear_screen(0.0, 0.0, 0.0, 1.0);
-    // // renderer->draw_cube(0, 0, -2, 1);
-    // // draw_model(<<renderer, <<__model);
-    // draw_mesh(<<renderer, <<__terrain);
-    // finish_scene(<<renderer);
+    draw_scene(game.renderer, main_scene);
 
     #if DEVELOPER {
-        render_editor(game);    
+        // render_editor(game);  
     }
 
     // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
