@@ -6,6 +6,7 @@
 #load "asset_manager.jai";
 #load "editor.jai";
 #load "FBX.jai";
+#load "physics.jai";
 miniz :: #foreign_library "miniz";
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
 
@@ -80,7 +81,11 @@ create_test_scene :: () -> Scene {
     <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16);
     array_add(*test_model.meshes, test_mesh);
 
-    array_add(*sc.models, test_model);
+    sphere := create_sphere(10, 10, 10);
+    sphere.meshes[0].material = New(Material);
+    sphere.meshes[0].material.diffuse = make_Color(1, 0, 0);
+    // array_add(*sc.models, test_model);
+    array_add(*sc.models, <<sphere);
 
     return sc;
 }
@@ -195,6 +200,7 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
+        update_camera(*game, 1.0/60.0);
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         // update_editor(*game, 1.0);
         render(*game);

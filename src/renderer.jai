@@ -242,7 +242,7 @@ Camera :: struct {
     rotation: Quaternion;
 };
 
-#run { print("@Imcomplete: make a flag on model to differentiate between water and non-water models.\n"); };
+#run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
 Scene :: struct {
     models: [..] Model;
     cameras: [..] Camera;
@@ -1178,7 +1178,8 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
 
 draw_model :: (rdr: GL_Renderer, m: Model) {
     for m.meshes {
-        draw_mesh(rdr, << it);
+        // draw_mesh(rdr, << it);
+        draw_mesh_wireframe(rdr, << it);
     }
 }
 
@@ -1193,12 +1194,16 @@ PI :: 3.14159;
 get_sphere_vertex :: (theta: float, phi: float) -> Vector3 {
     v: Vector3 = ---;
     v.x = sin(theta * PI * 2) * cos(phi * PI * 2);
-    v.y = cos(theta * PI * 2);
-    v.z = sin(theta * PI * 2) * sin(phi * PI * 2);
+    v.z = cos(theta * PI * 2);
+    v.y = sin(theta * PI * 2) * sin(phi * PI * 2);
     return v;
 }
 
 create_sphere :: (radius: float, latitude_slices: int, longitude_slices: int) -> *Model {
+    return create_capsule(radius, latitude_slices, longitude_slices, 0);
+}
+
+create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, length: float = 1.0) -> *Model {
     mod := New(Model);
     m := New(Mesh);
     array_add(*mod.meshes, m);
@@ -1215,6 +1220,38 @@ create_sphere :: (radius: float, latitude_slices: int, longitude_slices: int) ->
             v1 := get_sphere_vertex(theta + xstep, phi);
             v2 := get_sphere_vertex(theta + xstep, phi + ystep);
             v3 := get_sphere_vertex(theta,         phi + ystep);
+
+            v0.y += length;
+            v1.y += length;
+            v2.y += length;
+            v3.y += length;
+
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, normalize(v0));
+            array_add(*m.vertices, v1);
+            array_add(*m.normals, normalize(v1));
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, normalize(v2));
+
+            array_add(*m.vertices, v0);
+            array_add(*m.normals, normalize(v0));
+            array_add(*m.vertices, v2);
+            array_add(*m.normals, normalize(v2));
+            array_add(*m.vertices, v3);
+            array_add(*m.normals, normalize(v3));
+        }
+    }
+
+    if length > 0 {
+        for xa: 0..longitude_slices-1 {
+            theta: float = cast(float) xa * xstep;
+
+            v0 := get_sphere_vertex(theta,         0);
+            v1 := get_sphere_vertex(theta + xstep, 0);
+            v2 := v1;
+            v2.y += length;
+            v3 := v0;
+            v3.y += length;
 
             array_add(*m.vertices, v0);
             array_add(*m.normals, normalize(v0));

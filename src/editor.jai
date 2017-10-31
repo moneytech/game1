@@ -1,7 +1,3 @@
-
-
-#scope_file
-
 update_camera :: (game: *Game, dt: float) {
     using Key_Current_State;
 
@@ -32,6 +28,8 @@ update_camera :: (game: *Game, dt: float) {
     }
 
 }
+
+#scope_file
 
 water_reflect_frame_buffer: Frame_Buffer;
 water_refract_frame_buffer: Frame_Buffer;
