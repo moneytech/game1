@@ -35,90 +35,71 @@ same_direction :: (a: Vector3, b: Vector3) -> bool {
     return dot(a, b) > 0;
 }
 
-do_simplex :: (points: *[..] Vector3, a: Vector3) -> Vector3, bool {
-    o: Vector3; // (0, 0, 0)
-    ao := o - a;
-    dir: Vector3 = ---;
-
-    if points.count == 2 {
-        b := points[0];
-        ab := b - a;
-        if same_direction(ab, ao) {
-            points[0] = a;
-            points[1] = b;
-            dir = cross(cross(ab, ao), ab);
-        } else {
-            points[0] = a;
-            points.count = 1;
-            dir = ao;
-        }
-    } else if points.count == 3 {
-        c := points[0];
-        b := points[1];
-
-        ab := b - a;
-        ac := c - a;
-        abc := cross(ab, ac);
-
-        if same_direction(cross(abc, ac), ao) {
-            if same_direction(ac, ao) {
-                points[0] = a;
-                points[1] = c;
-                points.count = 2;
-                dir = cross(cross(ac, ao), ac);
-            } else if same_direction(ab, ao) {
-                points[0] = a;
-                points[1] = b;
-                points.count = 2;
-                dir = cross(cross(ab, ao), ab);
-            } else {
-                points[0] = a;
-                points.count = 1;
-                dir = ao;
-            }
-        } else if same_direction(cross(ab, abc), ao) {
-            if same_direction(ab, ao) {
-                points[0] = a;
-                points[1] = b;
-                points.count = 2;
-                dir = cross(cross(ab, ao), ab);
-            } else {
-                points[0] = a;
-                points.count = 1;
-                dir = ao;
-            }
-        } else if same_direction(abc, ao) {
-            points[0] = a;
-            points[1] = b;
-            points[2] = c;
-            dir = abc;
-        } else {
-            points[0] = a;
-            points[1] = c;
-            points[2] = b;
-            dir = -abc;
-        }
-    } else if points.count == 4 {
-
-        return dir, true;
-    }
-
-    return dir, false;
+gjk_support :: (a: Sphere, dir: Vector3) -> Vector3 {
+    return a.center + (normalize(dir) * a.radius);
 }
 
-do_gjk :: () -> bool {
-    points: [..] Vector3;
-    s := gjk_support(make_Vector3(0, 1, 0));
-    array_add(*points, s);
-    d := -s;
+Simplex :: struct(VectorT: Type) {
+    b: VectorT;
+    c: VectorT;
+    d: VectorT;
+
+    count: u8;
+
+    penetration: VectorT;
+}
+
+add :: (using s: *Simplex($T), a: T) {
+    if count == {
+     case 0;
+        b = a;
+        count += 1;
+     case 1;
+        c = b;
+        b = a;
+        count += 1;
+    case 2;
+        d = c;
+        c = b;
+        b = a;
+        count += 1;
+     case;
+        assert(false);
+    }
+}
+
+do_simplex :: (sim: *Simplex($VectorType), a: VectorType) -> bool, VectorType {
+    if sim.count < 2 { // we should never actually hit these cases
+        assert(false);
+        return false;
+    }
+
+    ao := -a;
+
+    if sim.count == 2 {
+        ab := sim.b - a;
+        if same_direction(ab, ao) {
+            return false, cross(cross(ab, ao), ab);
+        } else {
+            return false, ao;
+        }
+    }
+}
+
+do_gjk :: (obja: Sphere, objb: Sphere) -> bool {
+    sim: Simplex(Vector3);
+    d := make_Vector3(0, 1, 0);
+    s := gjk_support(obja, d) - gjk_support(objb, -d);
+    add(*sim, s);
+    d = -s;
 
     while true {
-        a := gjk_support(d);
+        a := gjk_support(obja, d) - gjk_support(objb, -d);
         if dot(a, d) < 0 return false;
-        array_add(*points, a);
+        add(*sim, a);
 
-        intersects: bool = ---;
-        d, intersects = do_simplex(*points, d);
+        intersects: bool;
+        intersects, d = do_simplex(*sim, d);
         if intersects break;
     }
 
