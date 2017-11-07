@@ -305,6 +305,8 @@ Matrix4 :: struct {
 	m: [4][4] float;
 	#place m;
 	flat: [16] float;
+
+    #constructor identity;
 }
 
 // float& operator[](unsigned int index) {
@@ -445,8 +447,7 @@ operator* :: (using _mat: Matrix4, mat: Matrix4) -> Matrix4 {
 }
 
 matrix_screen_space :: (halfWidth: float, halfHeight: float) -> Matrix4 {
-	mat := matrix_identity();
-
+	mat: Matrix4;
     mat.m[0][0] = halfWidth;
     mat.m[1][1] =-halfHeight;
     mat.m[0][3] = halfWidth;
@@ -462,7 +463,7 @@ matrix_viewport :: (x: float, y: float, width: float, height: float) -> Matrix4 
 }
 
 matrix_rotate :: (degrees: float64, tx: float, ty: float, tz: float) -> Matrix4 {
-    result := matrix_identity();
+    result: Matrix4;
 
     x, y, z := tx, ty, tz;
     length := sqrt(x * x + y * y + z * z);
@@ -503,7 +504,15 @@ matrix_rotate :: (q: Quaternion) -> Matrix4 {
 }
 
 matrix_translate :: (x: float, y: float, z: float) -> Matrix4 {
-    mat := matrix_identity();
+    mat: Matrix4;
+    mat.m[0][3] = x;
+    mat.m[1][3] = y;
+    mat.m[2][3] = z;
+    return mat;
+}
+
+matrix_translate :: (using v: Vector3) -> Matrix4 {
+    mat: Matrix4;
     mat.m[0][3] = x;
     mat.m[1][3] = y;
     mat.m[2][3] = z;
@@ -511,7 +520,7 @@ matrix_translate :: (x: float, y: float, z: float) -> Matrix4 {
 }
 
 matrix_scale :: (x: float, y: float, z: float) -> Matrix4 {
-    mat := matrix_identity();
+    mat: Matrix4;
     mat.m[0][0] = x;
     mat.m[1][1] = y;
     mat.m[2][2] = z;
@@ -533,7 +542,7 @@ viewport_scale :: (fov: float, aspect: float, _near: float) -> float, float {
 }
 
 matrix_frustum :: (left: float, right: float, bottom: float, top: float, _near: float, _far: float) -> Matrix4 {
-    mat := matrix_identity();
+    mat: Matrix4;
 
     A := (right + left) / (right - left);
     B := (top + bottom) / (top - bottom);
@@ -552,7 +561,7 @@ matrix_frustum :: (left: float, right: float, bottom: float, top: float, _near: 
 }
 
 matrix_ortho :: (left: float, right: float, bottom: float, top: float, _near: float, _far: float) -> Matrix4 {
-    mat := matrix_identity();
+    mat: Matrix4;
     mat.m[0][0] = 2.0 / (right - left);
     mat.m[0][3] = - (right + left) / (right - left);
     mat.m[1][1] = 2.0 / (top - bottom);
@@ -564,9 +573,14 @@ matrix_ortho :: (left: float, right: float, bottom: float, top: float, _near: fl
 
 matrix_identity :: () -> Matrix4 {
     mat: Matrix4;
-    mat.m[0][0] = 1.0;
+    return mat;
+}
+
+#scope_file
+identity :: (mat: *Matrix4) {
+    memset(mat, 0, size_of(Matrix4));
+	mat.m[0][0] = 1.0;
     mat.m[1][1] = 1.0;
     mat.m[2][2] = 1.0;
     mat.m[3][3] = 1.0;
-    return mat;
 }

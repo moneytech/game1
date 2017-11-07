@@ -170,9 +170,17 @@ Mesh :: struct {
     colors: [..] Color;
     indices: [..] u16; // @Volatile type must match glDrawElements and glBufferData calls
 
+    model_matrix: Matrix4;
+
     #if DEVELOPER {
         map_position: [..] Vector2;
     }
+
+    #constructor Mesh_con;
+}
+
+Mesh_con :: (m: *Mesh) {
+    m.model_matrix = matrix_identity();
 }
 
 reset_mesh_arrays :: (using m: *Mesh) {
@@ -842,16 +850,15 @@ update_matrices :: (using rdr: GL_Renderer, model_matrix: Matrix4, sh: *Shader) 
     model := glGetUniformLocation(sh.id, "model");
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
-    glUniformMatrix4fv(model, 1, GL_TRUE, model_matrix.flat.data);
+
+    t := model_matrix;
+    glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
 }
 
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glEnable(GL_DEPTH_TEST);
 
-    // @TODO model matrix
-    t := matrix_identity();
-
-    update_matrices(rdr, t, render_to_gbuffer);
+    update_matrices(rdr, m.model_matrix, render_to_gbuffer);
 
     // @Cleanup not used in render_to_gbuffer ??
     viewer_pos := glGetUniformLocation(render_to_gbuffer.id, "camera_position");
@@ -1058,15 +1065,12 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
     draw_picking_mesh :: (using rdr: GL_Renderer, m:Mesh, sh: *Shader) {
         glEnable(GL_DEPTH_TEST);
 
-        // @TODO model matrix
-        t := matrix_identity();
-
         proj := glGetUniformLocation(sh.id, "projection");
         view := glGetUniformLocation(sh.id, "view");
         model := glGetUniformLocation(sh.id, "model");
         glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
         glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
-        glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
+        glUniformMatrix4fv(model, 1, GL_TRUE, m.model_matrix.flat.data); // @TODO why doesn't this use update_matrices ?
 
         glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
 
@@ -1293,6 +1297,10 @@ create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, l
             array_add(*m.vertices, v0);
             array_add(*m.normals, normalize(v0));
         }
+    }
+
+    for * m.vertices {
+        <<it *= radius;
     }
 
     store_mesh_in_buffer(m);

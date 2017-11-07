@@ -1,4 +1,29 @@
+/*
+Test_Struct :: struct {
+    x: Vector3;
+    y: Vector3;
+}
+test :: (t: *Test_Struct, new_x: Vector3, new_y: Vector3) {
+    t.x = new_x;
+    t.y = new_y;
+}
 
+test2 :: (t: *Test_Struct, args: .. Vector3) {
+    assert(args.count == 2);
+    t.x = args[0];
+    t.y = args[1];
+}
+
+#run {
+    ts: Test_Struct;
+    ts.x = make_Vector3(1, 0, 0);
+    ts.y = make_Vector3(0, 0, 1);
+    print("ts: %\n", ts);
+    test2(*ts, ts.y, ts.x);
+    print("ts: %\n", ts);
+    return;
+};
+*/
 #import "Compiler";
 
 #load "renderer.jai";
@@ -74,18 +99,68 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) ->
     return m;
 }
 
-create_test_scene :: () -> Scene {
+__simplex_mesh: Mesh;
+__the_simplex: Simplex(Vector3);
+sphere_a: Sphere;
+sphere_b: Sphere;
+minkowski_sphere: Sphere;
+make_sphere_mesh :: (sp: Sphere) -> *Model {
+    out := create_sphere(sp.radius, 8, 8);
+    out.meshes[0].material = New(Material);
+    out.meshes[0].material.diffuse = make_Color(1, 1, 1);
+    out.meshes[0].model_matrix = matrix_translate(sp.center);
+    out.meshes[0].normals.count = 0;
+    store_mesh_in_buffer(out.meshes[0]);
+    return out;
+}
+
+create_test_scene :: (game: *Game) -> Scene {
     sc: Scene;
     test_model: Model;
     test_mesh: *Mesh = New(Mesh);
     <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16);
     array_add(*test_model.meshes, test_mesh);
-
-    sphere := create_sphere(10, 10, 10);
-    sphere.meshes[0].material = New(Material);
-    sphere.meshes[0].material.diffuse = make_Color(1, 0, 0);
     // array_add(*sc.models, test_model);
+
+    sphere_a.radius = 1;
+    sphere_a.center = make_Vector3(-1.5, 1, -10);
+    sphere_b.radius = 1;
+    sphere_b.center = make_Vector3(0, 0, -10);
+    sphere := make_sphere_mesh(sphere_a);
     array_add(*sc.models, <<sphere);
+
+    sphere2 := make_sphere_mesh(sphere_b);
+    array_add(*sc.models, <<sphere2);
+
+    simplex_model: Model;
+    array_add(*simplex_model.meshes, *__simplex_mesh);
+
+    __the_simplex = start_debug_gjk(sphere_a, sphere_b);
+    Mesh_con(*__simplex_mesh);
+    update_simplex_mesh(*__simplex_mesh, __the_simplex);
+
+    {
+        origin_mesh := New(Mesh);
+        origin_mesh.material = New(Material);
+        origin_mesh.material.diffuse = make_Color(1, 1, 0);
+
+        origin_mesh.primitive_type = Primitive_Type.POINTS;
+        array_add(*origin_mesh.vertices, make_Vector3(0, 0, 0));
+        array_add(*origin_mesh.normals, make_Vector3(0, 0, 0));
+        store_mesh_in_buffer(origin_mesh);
+
+        array_add(*simplex_model.meshes, origin_mesh);
+    }
+
+    array_add(*sc.models, simplex_model);
+    minkowski_sphere.radius = sphere_a.radius + sphere_b.radius;
+    minkowski_sphere.center = sphere_a.center - sphere_b.center;
+    {
+        sp := make_sphere_mesh(minkowski_sphere);
+        array_add(*sc.models, <<sp);
+    }
+
+    set_point_size(<<game.renderer, 5);
 
     return sc;
 }
@@ -162,7 +237,7 @@ main :: () {
     renderer.camera.position.y = 5;
     renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
-    main_scene = create_test_scene();
+    main_scene = create_test_scene(*game);
 
 
     while (true) {
@@ -190,6 +265,13 @@ main :: () {
             }
 
             if (joy.buttons & JOYSTICK_BUTTON_BACK) exit = true;
+        }
+
+        if input_button_states[#char "E"] & Key_Current_State.START {
+            stop, inter := step_debug_gjk(*__the_simplex, sphere_a, sphere_b);
+            if inter {
+                main_scene.models[main_scene.models.count-1].meshes[0].material.diffuse = make_Color(1, 0, 1);
+            }
         }
 
         if (exit) break;

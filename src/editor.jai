@@ -24,7 +24,7 @@ update_camera :: (game: *Game, dt: float) {
 
     if mouse_delta_z != 0 {
         q := game.renderer.camera.rotation;
-        game.renderer.camera.position += q * make_Vector3(0.0, 0.0, -mouse_delta_z * 0.1);
+        game.renderer.camera.position += q * make_Vector3(0.0, 0.0, -mouse_delta_z * 0.01);
     }
 
 }
