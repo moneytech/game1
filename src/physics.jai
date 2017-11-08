@@ -45,6 +45,9 @@ Simplex :: struct(VectorT: Type) {
     c: VectorT;
     d: VectorT;
 
+    #place a;
+    global_support: [4] VectorT;
+
     count: u8;
 
     debug_dir: VectorT;
@@ -96,20 +99,7 @@ set :: (using s: *Simplex($T), args: .. T) {
 
 operator[] :: (using s: Simplex($T), index: int) -> T {
     assert(index >= 0 && index < count);
-    if index == {
-     case 0;
-        return a;
-     case 1;
-        return b;
-     case 2;
-        return c;
-    }
-
-    #if T == Vector3 {
-        if index == 3 return d;
-    }
-
-    assert(index <= size_of(T) / size_of(float));
+    return s.global_support[index];
 }
 
 do_triange_simplex :: (sim: *Simplex($VectorType), a: VectorType, b: VectorType, c: VectorType, ao: VectorType) -> VectorType {
@@ -216,12 +206,223 @@ do_gjk :: (obja: $T, objb: $R, $VectorType: Type) -> bool, Simplex($VectorType) 
 }
 
 do_epa :: (gjk_output: *Simplex($VectorType), obja: $T, objb: $T) -> VectorType {
+
+    EPSILON :: 0.000001;
+
+    Entry :: struct {
+        vtx: [3] VectorType;
+        v: Vector3;
+        v_len: float;
+        normal: VectorType;
+        is_obsolete: bool;
+        is_internal: bool;
+    }
+
+    origin: Vector3;
+
+    make_Entry :: (a: VectorType, b: VectorType, c: VectorType) -> Entry {
+        e: Entry;
+        e.vtx[0] = a;
+        e.vtx[1] = b;
+        e.vtx[2] = c;
+
+        e.v = closest_point_triangle_to_point(a, b, c, origin);
+        e.v_len = length(v);
+        e.normal = cross(b - a, c - a);
+        return e;
+    }
+
+    entries: [..] Entry;
+
     sim := <<gjk_output;
 
-    while true {
-        
+    array_add(*entries, make_Entry(c, b, d));
+    array_add(*entries, make_Entry(a, b, c));
+    array_add(*entries, make_Entry(a, c, d));
+    array_add(*entries, make_Entry(a, d, b));
+
+    ent := pop(*entries);
+    dist := 100000.0; // infinity..
+    while ent.v_len < dist && entries.count {
+        if !ent.is_obsolete {
+            v := ent.v;
+            w := gjk_support(obja, v) - gjk_support(objb, -v);
+            dist = min(dist, dot(w, normalize(v)));
+
+            if ent.v_len < dist {
+                ent.is_obsolete = true;
+                new_ent: Entry;
+                for 0..2 {
+                    // ???????
+                }
+
+                new_entries := make_entries();
+
+                for new_entries {
+                    if t.is_internal array_add(*entries, it);
+                }
+            }
+        }
+
+        ent = pop(*entries);
     }
+
+    return ent.v;
 }
+
+
+closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
+    invlen := 1.0 / length(b - a);
+    n := (b - a) * invlen;
+
+    u := dot((q - a), n) * invlen;
+    v := dot((b - q), n) * invlen;
+
+    if u <= 0 return b;
+    if v <= 0 return a;
+    else return u*a + v*b;
+}
+
+
+// based on Erin Catto's http://box2d.org/2014/02/computing-a-basis/
+compute_basis :: (a: Vector3) -> Vector3, Vector3 {
+    b: Vector3 = ---;
+    if abs(a.x) > 0.57735 {
+        b.x =  a.y;
+        b.y = -a.x;
+        b.z =  0;
+    } else {
+        b.x =  0;
+        b.y =  a.z;
+        b.z = -a.y;
+    }
+
+    b = normalize(b);
+    c := cross(a, b);
+    return b, c;
+}
+
+// from Eberly's geometric tools https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
+// this can probably be simplified by just returing base, v1, v2 when the point q on the triangle plane is
+// in regions 2, 4, or 6; this should work fine for the time being. -josh 7 November 2017
+closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3 {
+    base_to_point := base - target_point;
+    e0 := v1 - base;
+    e2 := v2 - base;
+
+    a := dot(e0, e0);
+    b := dot(e0, e1);
+    c := dot(e1, e1);
+    d := dot(e0, base_to_point);
+    e := dot(e1, base_to_point);
+    f := dot(base_to_point, base_to_point);
+
+    s := b*e - c*d;
+    t := b*d - a*e;
+    det := a*c - b*b;
+
+    if (s+t) <= det {
+        if s < 0 {
+            if t < 0 {
+                t = 0;
+                
+                if -d >= a
+                    s = 1;
+                else
+                    s = -d/a;
+            } else {
+                s = 0;
+
+                if e >= 0
+                    t = 0;
+                else if -e >= c
+                    t = 1;
+                else
+                    t = -e/c;
+            }
+        } else if t < 0 {
+            t = 0;
+            if d >= 0
+                s = 0;
+            else if -d >= a
+                s = 1;
+            else
+                s = -d/a;
+        } else {
+            invdet := 1.0 / det;
+            s /= invdet;
+            t /= invdet;
+        }
+    } else {
+        if s < 0 {
+            t0 := b + d;
+            t1 := c + e;
+
+            if t1 > t0 {
+                n := t1 - t0;
+                den := a - 2*b + c;
+
+                if n >= den
+                    s = 1;
+                else
+                    s = n / den;
+
+                t = 1 - s;
+            } else {
+                s = 0;
+
+                if t1 <= 0
+                    t = 1;
+                if e >= 0
+                    t = 0;
+                else
+                    t = -e/c;
+            }
+        } else if t < 0 {
+            t0 := b + e;
+            t1 := a + d;
+
+            if t1 > t0 {
+                n := t1 - t0;
+                den := a - 2*b + c;
+
+                if n >= den
+                    t = 1;
+                else
+                    t = n / den;
+
+                s = 1 - t;
+            } else {
+                t = 0;
+
+                if t1 <= 0
+                    s = 1;
+                if d >= 0
+                    s = 0;
+                else
+                    s = -d/a;
+            }
+        } else {
+            n := (c + e) - (b + d);
+            if n <= 0
+                s = 0;
+            else {
+                den := a - 2*b + c;
+
+                if n >= den
+                    s = 1;
+                else
+                    s = n / den;
+            }
+
+            t = 1 - s;
+        }
+    }
+
+    return base + e0*s + e1*t;
+}
+
+// debugging stuff
 
 start_debug_gjk :: (obja: $ShapeA, objb: $ShapeB) -> Simplex(Vector3) {
     sim: Simplex(Vector3);
@@ -254,6 +455,7 @@ add_normal :: (m: *Mesh, a: $VectorT, b: VectorT, c: VectorT, color: Color) {
     array_add(*m.colors, color);
     array_add(*m.colors, color);
 }
+
 
 update_simplex_mesh :: (m: *Mesh, sim: Simplex($T)) {
     if !m.material {
@@ -377,18 +579,7 @@ update_simplex_mesh :: (m: *Mesh, sim: Simplex($T)) {
     print("%\n", sim);
 }
 
-
-closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
-    invlen := 1.0 / length(b - a);
-    n := (b - a) * invlen;
-
-    u := dot((q - a), n) * invlen;
-    v := dot((b - q), n) * invlen;
-
-    if u <= 0 return b;
-    if v <= 0 return a;
-    else return u*a + v*b;
-}
+// end debugging stuff
 
 
 // old stuff
