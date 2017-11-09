@@ -7,7 +7,7 @@
 setup_build :: () -> Build_Options {
     options := get_build_options();
     set_optimization_level(*options, 0, 0);
-    options.backend = Backend.X64;
+    options.backend = Backend.LLVM;
     options.llvm_options.enable_split_modules = false;
 
     options.output_type = Build_Output_Type.NO_OUTPUT;

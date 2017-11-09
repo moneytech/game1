@@ -32,12 +32,14 @@ void main() {
 
     float specular_exp = texture(g_albedospec, tex_coords).a;
     vec3 frag_pos = texture(g_position, tex_coords).rgb;
-    vec3 normal = normalize(texture(g_normal, tex_coords).rgb);
+    vec3 normal = texture(g_normal, tex_coords).rgb;
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
     if (length(normal) < 0.5) {
         frag_color = vec4(in_diffuse, 1);
         return;
     }
+
+    normal = normalize(normal);
     
     // @Temporary
     vec3 light_pos = vec3(64, 1000, -64);

@@ -34,6 +34,7 @@ void main() {
         g_normal = out_normal;
     } else {
         if (length(normal) > 0) g_normal = normalize(normal);
+        else g_normal = vec3(0, 0, 0);
     }
 
     if (use_diffuse_map) {

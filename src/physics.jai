@@ -187,7 +187,7 @@ do_simplex :: (sim: *Simplex($VectorType), a: VectorType) -> bool, VectorType {
     return false, ao;
 }
 
-do_gjk :: (obja: $T, objb: $R, $VectorType: Type) -> bool, Simplex($VectorType) {
+do_gjk :: (obja: $T, objb: $R, $VectorType: Type) -> bool, Simplex(VectorType) {
     sim: Simplex(VectorType);
     d := normalize(make_Vector3(1, 0, 0));
     s := gjk_support(obja, d) - gjk_support(objb, -d);
@@ -203,71 +203,25 @@ do_gjk :: (obja: $T, objb: $R, $VectorType: Type) -> bool, Simplex($VectorType) 
         intersects, d = do_simplex(*sim, a);
         if intersects return true, sim;
     }
+
+    return false, sim;
 }
 
-do_epa :: (gjk_output: *Simplex($VectorType), obja: $T, objb: $T) -> VectorType {
 
+do_epa :: (gjk_output: *Simplex($VectorType), obja: $T, objb: $R) -> VectorType {
+    assert(gjk_output.count == 4);
     EPSILON :: 0.000001;
 
-    Entry :: struct {
-        vtx: [3] VectorType;
-        v: Vector3;
-        v_len: float;
-        normal: VectorType;
+    Edge :: struct {
+        vtx: [2] Vector3;
+        neighbor: [2] *Edge;
         is_obsolete: bool;
-        is_internal: bool;
     }
 
-    origin: Vector3;
-
-    make_Entry :: (a: VectorType, b: VectorType, c: VectorType) -> Entry {
-        e: Entry;
-        e.vtx[0] = a;
-        e.vtx[1] = b;
-        e.vtx[2] = c;
-
-        e.v = closest_point_triangle_to_point(a, b, c, origin);
-        e.v_len = length(v);
-        e.normal = cross(b - a, c - a);
-        return e;
+    Tri :: struct {
+        edges: [3] *Edge;
     }
 
-    entries: [..] Entry;
-
-    sim := <<gjk_output;
-
-    array_add(*entries, make_Entry(c, b, d));
-    array_add(*entries, make_Entry(a, b, c));
-    array_add(*entries, make_Entry(a, c, d));
-    array_add(*entries, make_Entry(a, d, b));
-
-    ent := pop(*entries);
-    dist := 100000.0; // infinity..
-    while ent.v_len < dist && entries.count {
-        if !ent.is_obsolete {
-            v := ent.v;
-            w := gjk_support(obja, v) - gjk_support(objb, -v);
-            dist = min(dist, dot(w, normalize(v)));
-
-            if ent.v_len < dist {
-                ent.is_obsolete = true;
-                new_ent: Entry;
-                for 0..2 {
-                    // ???????
-                }
-
-                new_entries := make_entries();
-
-                for new_entries {
-                    if t.is_internal array_add(*entries, it);
-                }
-            }
-        }
-
-        ent = pop(*entries);
-    }
-
-    return ent.v;
 }
 
 
@@ -287,7 +241,7 @@ closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
 // based on Erin Catto's http://box2d.org/2014/02/computing-a-basis/
 compute_basis :: (a: Vector3) -> Vector3, Vector3 {
     b: Vector3 = ---;
-    if abs(a.x) > 0.57735 {
+    if fabs(a.x) > 0.57735 {
         b.x =  a.y;
         b.y = -a.x;
         b.z =  0;
@@ -305,10 +259,10 @@ compute_basis :: (a: Vector3) -> Vector3, Vector3 {
 // from Eberly's geometric tools https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
 // this can probably be simplified by just returing base, v1, v2 when the point q on the triangle plane is
 // in regions 2, 4, or 6; this should work fine for the time being. -josh 7 November 2017
-closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3 {
+closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3, bool {
     base_to_point := base - target_point;
     e0 := v1 - base;
-    e2 := v2 - base;
+    e1 := v2 - base;
 
     a := dot(e0, e0);
     b := dot(e0, e1);
@@ -320,6 +274,8 @@ closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, tar
     s := b*e - c*d;
     t := b*d - a*e;
     det := a*c - b*b;
+
+    internal: bool = false;
 
     if (s+t) <= det {
         if s < 0 {
@@ -352,6 +308,8 @@ closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, tar
             invdet := 1.0 / det;
             s /= invdet;
             t /= invdet;
+
+            internal = true;
         }
     } else {
         if s < 0 {
@@ -419,7 +377,7 @@ closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, tar
         }
     }
 
-    return base + e0*s + e1*t;
+    return base + e0*s + e1*t, internal;
 }
 
 // debugging stuff

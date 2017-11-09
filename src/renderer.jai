@@ -970,7 +970,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     }
     else glDrawArrays(prim_type, 0, xx m.vertices.count);
 
-    if prim_type == GL_LINES {
+    if prim_type == GL_TRIANGLES {
         glDisable(GL_POLYGON_OFFSET_FILL);
     }
 

@@ -122,10 +122,20 @@ create_test_scene :: (game: *Game) -> Scene {
     array_add(*test_model.meshes, test_mesh);
     // array_add(*sc.models, test_model);
 
-    sphere_a.radius = 1;
-    sphere_a.center = make_Vector3(-1.5, 1, -10);
-    sphere_b.radius = 1;
+    sphere_a.radius = 1.5;
+    sphere_a.center = make_Vector3(-1, 1, -10);
+    sphere_b.radius = 0.5;
     sphere_b.center = make_Vector3(0, 0, -10);
+
+    intersects, simplex := do_gjk(sphere_a, sphere_b, Vector3);
+    if intersects {
+        separate := do_epa(*simplex, sphere_a, sphere_b);
+        print("separate: %\n", separate);
+
+        sphere_a.center += separate * 0.5;
+        // sphere_b.center += separate * 0.5;
+    }
+
     sphere := make_sphere_mesh(sphere_a);
     array_add(*sc.models, <<sphere);
 
