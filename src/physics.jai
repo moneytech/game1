@@ -4,6 +4,13 @@ Segment :: struct {
     direction: Vector3;
 }
 
+make_Segment :: (a: Vector3, b: Vector3) -> Segment {
+    s: Segment = ---;
+    s.origin = a;
+    s.direction = b - a;
+    return s;
+}
+
 Capsule :: struct {
     segment: Segment;
     radius: float;
@@ -18,12 +25,31 @@ make_Capsule :: (origin: Vector3, end: Vector3, radius: float) -> Capsule {
 }
 
 AABB :: struct {
-    xmin: float;
-    xmax: float;
-    ymin: float;
-    ymax: float;
-    zmin: float;
-    zmax: float;
+    center: Vector3;
+    halfs: Vector3;
+}
+
+make_AABB :: (center: Vector3, widths: Vector3) -> AABB {
+    o: AABB = ---;
+    o.center = center;
+    o.halfs = widths * 0.5;
+    return o;
+}
+
+gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
+    n := normalize(dir);
+
+    min := a.center - a.halfs;
+    max := a.center + a.halfs;
+
+    out: Vector3 = ---;
+    if n.x < 0 out.x = min.x;
+    else out.x = max.x;
+    if n.y < 0 out.y = min.y;
+    else out.y = max.y;
+    if n.z < 0 out.z = min.z;
+    else out.z = max.z;
+    return out;
 }
 
 Sphere :: struct {
@@ -31,81 +57,88 @@ Sphere :: struct {
     radius: float;
 }
 
-same_direction :: (a: Vector3, b: Vector3) -> bool {
-    return dot(a, b) > 0;
-}
-
 gjk_support :: (a: Sphere, dir: Vector3) -> Vector3 {
     return a.center + (normalize(dir) * a.radius);
 }
 
-Simplex :: struct(VectorT: Type) {
-    a: VectorT;
-    b: VectorT;
-    c: VectorT;
-    d: VectorT;
-
-    #place a;
-    global_support: [4] VectorT;
-
-    count: u8;
-
-    debug_dir: VectorT;
-
-    penetration: VectorT;
+gjk_support :: (a: $T, b: $R, dir: Vector3) -> Support_Point {
+    p: Support_Point = ---;
+    p.val_a = gjk_support(a, dir);
+    p.val_b = gjk_support(b, -dir);
+    p.val = p.val_a - p.val_b;
+    return p;
 }
 
-add :: (using s: *Simplex($T), new_a: T) {
+same_direction :: (a: Vector3, b: Vector3) -> bool {
+    return dot(a, b) > 0;
+}
+
+Support_Point :: struct {
+    val: Vector3;
+    val_a: Vector3;
+    val_b: Vector3;
+}
+
+operator== :: (a: Support_Point, b: Support_Point) -> bool {
+    return a.val == b.val; // ignore val_a and val_b for now
+}
+
+Simplex :: struct {
+    a: Support_Point;
+    b: Support_Point;
+    c: Support_Point;
+    d: Support_Point;
+    count: u8;
+}
+
+add :: (using s: *Simplex, new_a: Support_Point) {
     if count == {
     case 0;
         a = new_a;
         count += 1;
+		return;
     case 1;
         b = a;
         a = new_a;
         count += 1;
+		return;
     case 2;
         c = b;
         b = a;
         a = new_a;
         count += 1;
+		return;
+    case 3;
+        d = c;
+        c = b;
+        b = a;
+        a = new_a;
+        count += 1;
+        return;
     }
 
-    #if T == Vector3 {
-        if count == 3 {
-            d = c;
-            c = b;
-            b = a;
-            a = new_a;
-            count += 1;
-        }
-    }
-
-    assert(count <= (size_of(T) / size_of(float)) + 1);
+    assert(false);
 }
 
-set :: (using s: *Simplex($T), args: .. T) {
+set :: (using s: *Simplex, args: .. Support_Point) {
     assert(args.count < 5);
     s.count = xx args.count;
 
     if args.count s.a = args[0];
     if args.count > 1 s.b = args[1];
     if args.count > 2 s.c = args[2];
-
-    #if T == Vector3 {
-        if args.count > 3 s.d = args[3];
-    }
+    if args.count > 3 s.d = args[3];
 }
 
-operator[] :: (using s: Simplex($T), index: int) -> T {
-    assert(index >= 0 && index < count);
-    return s.global_support[index];
-}
-
-do_triange_simplex :: (sim: *Simplex($VectorType), a: VectorType, b: VectorType, c: VectorType, ao: VectorType) -> VectorType {
-    ab := b - a;
-    ac := c - a;
+do_triange_simplex :: (sim: *Simplex, a: Support_Point, b: Support_Point, c: Support_Point, ao: Vector3) -> Vector3 {
+    ab := b.val - a.val;
+    ac := c.val - a.val;
     abc := cross(ab, ac);
+    v := __closest_point_triangle_to_point(a.val, b.val, c.val, ORIGIN);
+    if length(v) < (EPSILON * EPSILON) {
+        set(sim, sim.b, sim.c);
+        return ao;
+    }
     if same_direction(cross(abc, ac), ao) {
         if same_direction(ac, ao) {
             set(sim, a, c);
@@ -134,8 +167,9 @@ do_triange_simplex :: (sim: *Simplex($VectorType), a: VectorType, b: VectorType,
     }
 }
 
-do_simplex :: (sim: *Simplex($VectorType), a: VectorType) -> bool, VectorType {
-    ao := -a;
+
+do_simplex :: (sim: *Simplex, a: Support_Point) -> bool, Vector3 {
+    ao := -a.val;
 
     if sim.count < 2 { // we should never actually hit these cases
         assert(false);
@@ -143,9 +177,8 @@ do_simplex :: (sim: *Simplex($VectorType), a: VectorType) -> bool, VectorType {
     }
 
     if sim.count == 2 {
-        ab := sim.b - a;
+        ab := sim.b.val - a.val;
         if same_direction(ab, ao) {
-            // set(sim, a, sim.b);
             return false, cross(ab, cross(ao, ab));
         } else {
             set(sim, a);
@@ -153,33 +186,29 @@ do_simplex :: (sim: *Simplex($VectorType), a: VectorType) -> bool, VectorType {
         }
     } else if sim.count == 3 {
         return false, do_triange_simplex(sim, a, sim.b, sim.c, ao);
-    } else #if VectorType == Vector3 {
-        if sim.count == 4 {
-            // bcd is our old triangle and we already know that the origin is in the direction of the normal of bcd
-            // add_normal(m, c, b, d, green);
-            // add_normal(m, a, b, c, green);
-            // add_normal(m, a, c, d, green);
-            // add_normal(m, a, d, b, green);
+    } else if sim.count == 4 {
+        // bcd is our old triangle and we already know that the origin is in the direction of the normal of bcd
+        // add_normal(m, c, b, d, green);
+        // add_normal(m, a, b, c, green);
+        // add_normal(m, a, c, d, green);
+        // add_normal(m, a, d, b, green);
 
-            b := sim.b;
-            c := sim.c;
-            d := sim.d;
+        bv := sim.b.val;
+        cv := sim.c.val;
+        dv := sim.d.val;
+        av := a.val;
 
-            abc := cross(b - a, c - a);
-            acd := cross(c - a, d - a);
-            adb := cross(d - a, b - a);
-            if same_direction(abc, ao) {
-                return false, do_triange_simplex(sim, a, b, c, ao);
-            } else if same_direction(acd, ao) {
-                return false, do_triange_simplex(sim, a, c, d, ao);
-            } else if same_direction(adb, ao) {
-                return false, do_triange_simplex(sim, a, d, b, ao);
-            } else {
-                return true, ao;
-            }
+        abc := cross(bv - av, cv - av);
+        acd := cross(cv - av, dv - av);
+        adb := cross(dv - av, bv - av);
+        if same_direction(abc, ao) {
+            return false, do_triange_simplex(sim, a, sim.b, sim.c, ao);
+        } else if same_direction(acd, ao) {
+            return false, do_triange_simplex(sim, a, sim.c, sim.d, ao);
+        } else if same_direction(adb, ao) {
+            return false, do_triange_simplex(sim, a, sim.d, sim.b, ao);
         } else {
-            assert(false);
-            return false, ao;
+            return true, ao;
         }
     }
 
@@ -187,16 +216,16 @@ do_simplex :: (sim: *Simplex($VectorType), a: VectorType) -> bool, VectorType {
     return false, ao;
 }
 
-do_gjk :: (obja: $T, objb: $R, $VectorType: Type) -> bool, Simplex(VectorType) {
-    sim: Simplex(VectorType);
-    d := normalize(make_Vector3(1, 0, 0));
-    s := gjk_support(obja, d) - gjk_support(objb, -d);
+do_gjk :: (obja: $T, objb: $R) -> bool, Simplex {
+    sim: Simplex;
+    d := normalize(make_Vector3(1, 1, 0));
+    s := gjk_support(obja, objb, d);
     add(*sim, s);
-    d = -s;
+    d = normalize(make_Vector3(1, -1, 0));
 
     while true {
-        a := gjk_support(obja, d) - gjk_support(objb, -d);
-        if dot(a, d) < 0 return false, sim;
+        a := gjk_support(obja, objb, d);
+        if dot(a.val, d) < 0 return false, sim;
         add(*sim, a);
 
         intersects: bool;
@@ -207,23 +236,175 @@ do_gjk :: (obja: $T, objb: $R, $VectorType: Type) -> bool, Simplex(VectorType) {
     return false, sim;
 }
 
+ORIGIN: Vector3;
 
-do_epa :: (gjk_output: *Simplex($VectorType), obja: $T, objb: $R) -> VectorType {
-    assert(gjk_output.count == 4);
-    EPSILON :: 0.000001;
-
-    Edge :: struct {
-        vtx: [2] Vector3;
-        neighbor: [2] *Edge;
-        is_obsolete: bool;
-    }
-
-    Tri :: struct {
-        edges: [3] *Edge;
-    }
-
+Contact_Point :: struct {
+    normal: Vector3;
+    dist: float;
+    point: Vector3;
 }
 
+Entry :: struct {
+    p: [3] Support_Point;
+    
+    v: Vector3;
+    vlen: float;
+    y: [3] float;
+    
+    adj: [3] *Entry;
+    j: [3] s32;
+    internal: bool;
+    obsolete: bool;
+}
+
+make_Entry :: (a: Support_Point, b: Support_Point, c: Support_Point) -> *Entry {
+    e := New(Entry);
+    e.p[0] = a;
+    e.p[1] = b;
+    e.p[2] = c;
+
+    av := a.val;
+    bv := b.val;
+    cv := c.val;
+
+    e.v, e.y[0], e.y[1], e.y[2] = __closest_point_triangle_to_point(av, bv, cv, ORIGIN);
+    e.vlen = dot(e.v, e.v);
+    assert(e.vlen > 0);
+    internal := (e.y[0] >= 0 && e.y[0] <= 1) && (e.y[1] >= 0 && e.y[1] <= 1) && (e.y[2] >= 0 && e.y[2] <= 1);
+    e.internal = internal;
+    return e;
+}
+
+Set :: struct {
+    e: *Entry;
+    i: s32;
+}
+
+silhouette :: (e: *Entry, i: s32, w: Vector3, E: *[..] Set) {
+    if !e.obsolete {
+        if dot(e.v, w) < dot(e.v, e.v) {
+            s: Set = ---;
+            s.e = e;
+            s.i = i;
+            array_add(E, s);
+        } else {
+            e.obsolete = true;
+            i0 := (i + 1) % 3;
+            i1 := (i + 2) % 3;
+            silhouette(e.adj[i0], e.j[i0], w, E);
+            silhouette(e.adj[i1], e.j[i1], w, E);
+        }
+    }
+}
+
+do_epa :: (sim: Simplex, obja: $T, objb: $R) -> Contact_Point {
+    Q: [..] *Entry;
+    mu := 1000000.0;
+
+    {
+        a := sim.a;
+        b := sim.b;
+        c := sim.c;
+        d := sim.d;
+
+        cbd := make_Entry(c, b, d);
+        abc := make_Entry(a, b, c);
+        acd := make_Entry(a, c, d);
+        adb := make_Entry(a, d, b);
+
+        abc.adj[0] = adb;
+        abc.adj[1] = cbd;
+        abc.adj[2] = acd;
+        abc.j[0] = 0;
+        abc.j[1] = 0;
+        abc.j[2] = 2;
+
+        cbd.adj[0] = abc;
+        cbd.adj[1] = adb;
+        cbd.adj[2] = acd;
+        cbd.j[0] = 1;
+        cbd.j[1] = 1;
+        cbd.j[2] = 1;
+        
+        acd.adj[0] = abc;
+        acd.adj[1] = cbd;
+        acd.adj[2] = adb;
+        acd.j[0] = 2;
+        acd.j[1] = 2;
+        acd.j[2] = 0;
+
+        adb.adj[0] = acd;
+        adb.adj[1] = cbd;
+        adb.adj[2] = abc;
+        adb.j[0] = 0;
+        adb.j[1] = 1;
+        adb.j[2] = 2;
+
+        array_add(*Q, cbd);
+        array_add(*Q, abc);
+        array_add(*Q, acd);
+        array_add(*Q, adb);
+    }
+
+    cp: Contact_Point;
+    while Q.count {
+        entry := pop(*Q);
+
+        if !entry.obsolete {
+            v := entry.v;
+            w := gjk_support(obja, objb, v);
+            mu = min(mu, dot(w.val, v));
+
+            {
+                cp.normal = normalize(v);
+                cp.dist = length(v);
+
+                a := entry.p[0].val_a;
+                b := entry.p[1].val_a;
+                c := entry.p[2].val_a;
+                cp.point = a*entry.y[0] + b*entry.y[1] + c*entry.y[2];
+            }
+
+            if entry.vlen < mu {
+                entry.obsolete = true;
+                E: [..] Set;
+
+                for 0..2 {
+                    silhouette(entry.adj[it], entry.j[it], w.val, *E);
+                }
+
+                new_ents: [..] *Entry;
+                for E {
+                    ex := it.e;
+                    i := it.i;
+                    y := make_Entry(ex.p[(i+1)%3], entry.p[i], w);
+                    y.adj[0] = ex;
+                    y.j[0] = i;
+                    ex.adj[i] = y;
+                    ex.j[i] = 0;
+
+                    array_add(*new_ents, y);
+                }
+
+                for new_ents {
+                    ex1 := new_ents[(it_index+1) % new_ents.count];
+
+                    it.adj[1] = ex1;
+                    it.j[1] = 2;
+                    ex1.adj[2] = it;
+                    ex1.j[2] = 1;
+
+                    if it.internal {
+                        array_add(*Q, it);
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    return cp;
+}
 
 closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
     invlen := 1.0 / length(b - a);
@@ -256,10 +437,25 @@ compute_basis :: (a: Vector3) -> Vector3, Vector3 {
     return b, c;
 }
 
+// @Return point on triangle; barycentric coordinates
+closest_point_triangle_to_point :: (v0: Vector3, v1: Vector3, v2: Vector3, p: Vector3) -> Vector3, float, float, float {
+    u := v1-v0;
+    v := v2-v0;
+
+    n := cross(u, v);
+    w := p - v0;
+
+    nl := dot(n, n);
+    y := dot(cross(u, w), n) / nl;
+    b := dot(cross(w, v), n) / nl;
+    a := 1 - y - b;
+    return v0*a + v1*b + v2*y, a, b, y;
+}
+
 // from Eberly's geometric tools https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
 // this can probably be simplified by just returing base, v1, v2 when the point q on the triangle plane is
 // in regions 2, 4, or 6; this should work fine for the time being. -josh 7 November 2017
-closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3, bool {
+__closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3, float, float, float {
     base_to_point := base - target_point;
     e0 := v1 - base;
     e1 := v2 - base;
@@ -274,8 +470,6 @@ closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, tar
     s := b*e - c*d;
     t := b*d - a*e;
     det := a*c - b*b;
-
-    internal: bool = false;
 
     if (s+t) <= det {
         if s < 0 {
@@ -306,10 +500,8 @@ closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, tar
                 s = -d/a;
         } else {
             invdet := 1.0 / det;
-            s /= invdet;
-            t /= invdet;
-
-            internal = true;
+            s *= invdet;
+            t *= invdet;
         }
     } else {
         if s < 0 {
@@ -377,171 +569,11 @@ closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, tar
         }
     }
 
-    return base + e0*s + e1*t, internal;
+    return base + e0*s + e1*t, s, t, 1.0 - (s+t);
 }
-
-// debugging stuff
-
-start_debug_gjk :: (obja: $ShapeA, objb: $ShapeB) -> Simplex(Vector3) {
-    sim: Simplex(Vector3);
-    d := normalize(make_Vector3(0, 1, 1));
-    s := gjk_support(obja, d) - gjk_support(objb, -d);
-    add(*sim, s);
-    d = -s;
-    sim.debug_dir = d;
-    return sim;
-}
-
-step_debug_gjk :: (sim: *Simplex($T), obja: $ShapeA, objb: $ShapeB) -> bool /* stop */, bool /* intersects */ {
-    d := sim.debug_dir;
-    a := gjk_support(obja, d) - gjk_support(objb, -d);
-    if dot(a, d) < 0 return true, false;
-    add(sim, a);
-
-    intersects: bool;
-    intersects, d = do_simplex(sim, a);
-    sim.debug_dir = d;
-    update_simplex_mesh(*__simplex_mesh, <<sim);
-    if intersects return true, true;
-    return false, false;
-}
-
-add_normal :: (m: *Mesh, a: $VectorT, b: VectorT, c: VectorT, color: Color) {
-    array_add(*m.vertices, (a + b + c) * (1.0 / 3.0));
-    array_add(*m.vertices, ((a + b + c) * (1.0 / 3.0)) + normalize(cross(b - a, c - a)));
-
-    array_add(*m.colors, color);
-    array_add(*m.colors, color);
-}
-
-
-update_simplex_mesh :: (m: *Mesh, sim: Simplex($T)) {
-    if !m.material {
-        m.material = New(Material);
-        m.material.diffuse = make_Color(1, 1, 1);
-    }
-
-    m.vertices.count = 0;
-    m.colors.count = 0;
-    red := make_Color(1, 0, 0);
-    green := make_Color(0, 1, 0);
-
-    if sim.count < 2 {
-        m.primitive_type = Primitive_Type.POINTS;
-        array_add(*m.vertices, sim.a);
-        array_add(*m.colors, red);
-    } else if sim.count <= 3 {
-        m.primitive_type = Primitive_Type.LINES;
-
-        a := sim.a;
-        b := sim.b;
-        c := sim.c;
-
-        m.primitive_type = Primitive_Type.LINES;
-
-        array_add(*m.vertices, a);
-        array_add(*m.vertices, b);
-
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        if sim.count > 2 {
-            array_add(*m.vertices, c);
-            array_add(*m.vertices, a);
-
-            array_add(*m.colors, red);
-            array_add(*m.colors, red);
-
-            array_add(*m.vertices, b);
-            array_add(*m.vertices, c);
-
-            array_add(*m.colors, red);
-            array_add(*m.colors, red);
-
-            // we also draw the outward facing normal
-
-            add_normal(m, a, b, c, green);
-        }
-    } else {
-        a := sim.a;
-        b := sim.b;
-        c := sim.c;
-        d := sim.d;
-
-        m.primitive_type = Primitive_Type.LINES;
-
-        array_add(*m.vertices, a);
-        array_add(*m.vertices, b);
-        array_add(*m.vertices, b);
-        array_add(*m.vertices, c);
-        array_add(*m.vertices, c);
-        array_add(*m.vertices, a);
-
-        array_add(*m.vertices, b);
-        array_add(*m.vertices, c);
-        array_add(*m.vertices, c);
-        array_add(*m.vertices, d);
-        array_add(*m.vertices, d);
-        array_add(*m.vertices, b);
-
-        array_add(*m.vertices, c);
-        array_add(*m.vertices, d);
-        array_add(*m.vertices, d);
-        array_add(*m.vertices, a);
-        array_add(*m.vertices, a);
-        array_add(*m.vertices, c);
-
-        array_add(*m.vertices, d);
-        array_add(*m.vertices, a);
-        array_add(*m.vertices, a);
-        array_add(*m.vertices, b);
-        array_add(*m.vertices, b);
-        array_add(*m.vertices, d);
-
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-
-
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-        array_add(*m.colors, red);
-
-        add_normal(m, c, b, d, green);
-        add_normal(m, a, b, c, green);
-        add_normal(m, a, c, d, green);
-        add_normal(m, a, d, b, green);
-    }
-
-    store_mesh_in_buffer(m);
-
-    print("%\n", sim);
-}
-
-// end debugging stuff
-
 
 // old stuff
-
+/*
 do_intersect :: (s: Sphere, b: AABB) -> bool {
     sqr_dist: float64;
     d: float64;
@@ -621,3 +653,4 @@ distance :: (p: Segment, q: Segment) -> float, Segment {
     out_segment.direction = point1 - point0;
     return length(out_segment.direction), out_segment;
 }
+*/

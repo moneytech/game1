@@ -99,11 +99,8 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) ->
     return m;
 }
 
-__simplex_mesh: Mesh;
-__the_simplex: Simplex(Vector3);
 sphere_a: Sphere;
 sphere_b: Sphere;
-minkowski_sphere: Sphere;
 make_sphere_mesh :: (sp: Sphere) -> *Model {
     out := create_sphere(sp.radius, 8, 8);
     out.meshes[0].material = New(Material);
@@ -111,6 +108,62 @@ make_sphere_mesh :: (sp: Sphere) -> *Model {
     out.meshes[0].model_matrix = matrix_translate(sp.center);
     out.meshes[0].normals.count = 0;
     store_mesh_in_buffer(out.meshes[0]);
+    return out;
+}
+
+add_line :: (m: *Mesh, a: Vector3, b: Vector3, color: Color) {
+    array_add(*m.vertices, a);
+    array_add(*m.vertices, b);
+
+    array_add(*m.colors, color);
+    array_add(*m.colors, color);
+}
+
+make_aabb_mesh :: (a: AABB) -> *Model {
+    out := New(Model);
+
+    m := New(Mesh);
+    m.material = New(Material);
+    m.material.diffuse = make_Color(1, 1, 1);
+
+    m.primitive_type = Primitive_Type.LINES;
+
+    p0 := a.center - a.halfs;
+    p1 := a.center + a.halfs;
+    p2 := make_Vector3(p1.x, p0.y, p0.z);
+    p3 := make_Vector3(p1.x, p1.y, p0.z);
+    p4 := make_Vector3(p0.x, p1.y, p0.z);
+
+    p5 := make_Vector3(p0.x, p0.y, p1.z);
+    p6 := make_Vector3(p1.x, p0.y, p1.z);
+    p7 := make_Vector3(p0.x, p1.y, p1.z);
+
+    white := make_Color(1, 1, 1);
+    red := make_Color(1, 0, 0);
+    green := make_Color(0, 1, 0);
+    blue := make_Color(0, 0, 1);
+
+    add_line(m, p0, p2, white);
+    add_line(m, p0, p4, white);
+    add_line(m, p2, p3, white);
+    add_line(m, p3, p4, white);
+
+    add_line(m, p1, p7, white);
+    add_line(m, p1, p6, white);
+    add_line(m, p6, p5, white);
+    add_line(m, p5, p7, white);
+
+    add_line(m, p0, p5, white);
+    add_line(m, p2, p6, white);
+    add_line(m, p3, p1, white);
+    add_line(m, p4, p7, white);
+
+    add_line(m, a.center, a.center + make_Vector3(1, 0, 0) * a.halfs.x, red);
+    add_line(m, a.center, a.center + make_Vector3(0, 1, 0) * a.halfs.y, green);
+    add_line(m, a.center, a.center + make_Vector3(0, 0, 1) * a.halfs.z, blue);
+
+    array_add(*out.meshes, m);
+    store_mesh_in_buffer(m);
     return out;
 }
 
@@ -122,18 +175,26 @@ create_test_scene :: (game: *Game) -> Scene {
     array_add(*test_model.meshes, test_mesh);
     // array_add(*sc.models, test_model);
 
-    sphere_a.radius = 1.5;
-    sphere_a.center = make_Vector3(-1, 1, -10);
-    sphere_b.radius = 0.5;
+
+    // aabb := make_AABB(make_Vector3(0, 0, -10), make_Vector3(1.5, 1, 1));
+    // aabb2 := make_AABB(make_Vector3(-1, 0, -10), make_Vector3(1, 1, 1));
+
+	// test_vector := normalize(aabb.center);
+
+    sphere_a.radius = 0.5;
+    sphere_a.center = make_Vector3(-1, 0, -10);
+    sphere_b.radius = 0.6;
     sphere_b.center = make_Vector3(0, 0, -10);
 
-    intersects, simplex := do_gjk(sphere_a, sphere_b, Vector3);
+    intersects, simplex := do_gjk(sphere_a, sphere_b);
+    print("test:\n");
     if intersects {
-        separate := do_epa(*simplex, sphere_a, sphere_b);
+        separate := do_epa(simplex, sphere_a, sphere_b);
         print("separate: %\n", separate);
 
-        sphere_a.center += separate * 0.5;
-        // sphere_b.center += separate * 0.5;
+        sphere_a.center -= separate.normal * separate.dist;
+        // sphere_a.center += separate.normal * (separate.dist * 0.5);
+        // sphere_b.center += separate.normal * (separate.dist * 0.5);
     }
 
     sphere := make_sphere_mesh(sphere_a);
@@ -142,33 +203,12 @@ create_test_scene :: (game: *Game) -> Scene {
     sphere2 := make_sphere_mesh(sphere_b);
     array_add(*sc.models, <<sphere2);
 
-    simplex_model: Model;
-    array_add(*simplex_model.meshes, *__simplex_mesh);
+    // aabb_mesh := make_aabb_mesh(aabb);
+    // array_add(*sc.models, <<aabb_mesh);
 
-    __the_simplex = start_debug_gjk(sphere_a, sphere_b);
-    Mesh_con(*__simplex_mesh);
-    update_simplex_mesh(*__simplex_mesh, __the_simplex);
+    // aabb2_mesh := make_aabb_mesh(aabb2);
+    // array_add(*sc.models, <<aabb2_mesh);
 
-    {
-        origin_mesh := New(Mesh);
-        origin_mesh.material = New(Material);
-        origin_mesh.material.diffuse = make_Color(1, 1, 0);
-
-        origin_mesh.primitive_type = Primitive_Type.POINTS;
-        array_add(*origin_mesh.vertices, make_Vector3(0, 0, 0));
-        array_add(*origin_mesh.normals, make_Vector3(0, 0, 0));
-        store_mesh_in_buffer(origin_mesh);
-
-        array_add(*simplex_model.meshes, origin_mesh);
-    }
-
-    array_add(*sc.models, simplex_model);
-    minkowski_sphere.radius = sphere_a.radius + sphere_b.radius;
-    minkowski_sphere.center = sphere_a.center - sphere_b.center;
-    {
-        sp := make_sphere_mesh(minkowski_sphere);
-        array_add(*sc.models, <<sp);
-    }
 
     set_point_size(<<game.renderer, 5);
 
@@ -275,13 +315,6 @@ main :: () {
             }
 
             if (joy.buttons & JOYSTICK_BUTTON_BACK) exit = true;
-        }
-
-        if input_button_states[#char "E"] & Key_Current_State.START {
-            stop, inter := step_debug_gjk(*__the_simplex, sphere_a, sphere_b);
-            if inter {
-                main_scene.models[main_scene.models.count-1].meshes[0].material.diffuse = make_Color(1, 0, 1);
-            }
         }
 
         if (exit) break;

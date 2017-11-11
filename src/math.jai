@@ -2,7 +2,7 @@
 
 // vector math
 
-clamp :: (val: float, min: float, max: float) -> float {
+clamp :: (val: float, min: float, max: float) -> float #c_callback {
     if (val > max) return max;
     if (val < min) return min;
     return val;
@@ -55,6 +55,10 @@ make_Vector3 :: (i: Vector4) -> Vector3 {
     return v;
 }
 
+operator== :: (a: Vector3, b: Vector3) -> bool #c_callback {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
 operator+ :: (a: Vector3, b: Vector3) -> Vector3 {
     out: Vector3 = ---;
     out.x = a.x + b.x;
@@ -104,7 +108,7 @@ mul :: (a: Vector3, b: Vector3) -> Vector3 {
     return out;
 }
 
-dot :: (a: Vector3, b: Vector3) -> float {
+dot :: (a: Vector3, b: Vector3) -> float #c_callback {
     return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
@@ -116,7 +120,7 @@ cross :: (a: Vector3, b: Vector3) -> Vector3 {
     return out;
 }
 
-length :: (v: Vector3) -> float {
+length :: (v: Vector3) -> float #c_callback {
     return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
 
@@ -171,11 +175,11 @@ operator* :: (a: Vector2, f64: float64) -> Vector2 #symmetric {
     return out;
 }
 
-dot :: (a: Vector2, b: Vector2) -> float {
+dot :: (a: Vector2, b: Vector2) -> float #c_callback {
     return a.x*b.x + a.y*b.y;
 }
 
-length :: (v: Vector2) -> float {
+length :: (v: Vector2) -> float #c_callback {
     return sqrt(v.x*v.x + v.y*v.y);
 }
 
@@ -262,7 +266,7 @@ operator- :: (q0: Quaternion, q1: Quaternion) -> Quaternion {
     return o;
 }
 
-length :: (q: Quaternion) -> float {
+length :: (q: Quaternion) -> float #c_callback {
     return sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
 }
 
@@ -286,7 +290,7 @@ normalize :: (q: Quaternion) -> Quaternion {
     return o;
 }
 
-dot :: (a: Quaternion, b: Quaternion) -> float {
+dot :: (a: Quaternion, b: Quaternion) -> float #c_callback {
     return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
@@ -314,7 +318,7 @@ Matrix4 :: struct {
 //     return flat[index];
 // }
 
-determinate :: (using mat: Matrix4) -> float {
+determinate :: (using mat: Matrix4) -> float #c_callback {
     return
     m[0][3] * m[1][2] * m[2][1] * m[3][0] - m[0][2] * m[1][3] * m[2][1] * m[3][0] -
 
@@ -575,6 +579,22 @@ matrix_identity :: () -> Matrix4 {
     mat: Matrix4;
     return mat;
 }
+
+// floating point stuff
+
+EPSILON :: 0.000001;
+
+max :: (min: $T, a: T, b: T) -> T {
+    val := max(a, b);
+    if val < min
+        val = min;
+    return val;
+}
+
+floats_are_equal :: inline (a: $T, b: T) -> bool {
+    return fabs(a - b) <= EPSILON * max(cast(float64) 1.0, fabs(a), fabs(b));
+}
+
 
 #scope_file
 identity :: (mat: *Matrix4) {
