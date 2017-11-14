@@ -100,7 +100,7 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) ->
 }
 
 sphere_a: Sphere;
-sphere_b: Sphere;
+// sphere_b: Sphere;
 make_sphere_mesh :: (sp: Sphere) -> *Model {
     out := create_sphere(sp.radius, 8, 8);
     out.meshes[0].material = New(Material);
@@ -176,20 +176,20 @@ create_test_scene :: (game: *Game) -> Scene {
     // array_add(*sc.models, test_model);
 
 
-    // aabb := make_AABB(make_Vector3(0, 0, -10), make_Vector3(1.5, 1, 1));
+    aabb := make_AABB(make_Vector3(0, 0, -10), make_Vector3(1.5, 1, 1));
     // aabb2 := make_AABB(make_Vector3(-1, 0, -10), make_Vector3(1, 1, 1));
 
 	// test_vector := normalize(aabb.center);
 
     sphere_a.radius = 0.5;
     sphere_a.center = make_Vector3(-1, 0, -10);
-    sphere_b.radius = 0.6;
-    sphere_b.center = make_Vector3(0, 0, -10);
+    // sphere_b.radius = 0.6;
+    // sphere_b.center = make_Vector3(0, 0, -10);
 
-    intersects, simplex := do_gjk(sphere_a, sphere_b);
+    intersects, simplex := do_gjk(sphere_a, aabb);
     print("test:\n");
     if intersects {
-        separate := do_epa(simplex, sphere_a, sphere_b);
+        separate := do_epa(simplex, sphere_a, aabb);
         print("separate: %\n", separate);
 
         sphere_a.center -= separate.normal * separate.dist;
@@ -200,11 +200,11 @@ create_test_scene :: (game: *Game) -> Scene {
     sphere := make_sphere_mesh(sphere_a);
     array_add(*sc.models, <<sphere);
 
-    sphere2 := make_sphere_mesh(sphere_b);
-    array_add(*sc.models, <<sphere2);
+    // sphere2 := make_sphere_mesh(sphere_b);
+    // array_add(*sc.models, <<sphere2);
 
-    // aabb_mesh := make_aabb_mesh(aabb);
-    // array_add(*sc.models, <<aabb_mesh);
+    aabb_mesh := make_aabb_mesh(aabb);
+    array_add(*sc.models, <<aabb_mesh);
 
     // aabb2_mesh := make_aabb_mesh(aabb2);
     // array_add(*sc.models, <<aabb2_mesh);
