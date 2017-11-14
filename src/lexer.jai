@@ -193,8 +193,8 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 								out = #char "\f";
 							case #char "\\";
 								out = #char "\\";
-							case #char "\'";
-								out = #char "\'";
+							case #char "'";
+								out = #char "'";
 							case #char "\"";
 								out = #char "\"";
 							case;

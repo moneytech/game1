@@ -352,7 +352,7 @@ do_epa :: (sim: Simplex, obja: $T, objb: $R) -> Contact_Point {
 
         if !entry.obsolete {
             v := entry.v;
-            w := gjk_support(obja, objb, v);
+            w := gjk_support(obja, objb, -v);
             mu = min(mu, dot(w.val, v));
 
             {

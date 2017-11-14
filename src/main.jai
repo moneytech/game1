@@ -176,13 +176,13 @@ create_test_scene :: (game: *Game) -> Scene {
     // array_add(*sc.models, test_model);
 
 
-    aabb := make_AABB(make_Vector3(0, 0, -10), make_Vector3(1.5, 1, 1));
+    aabb := make_AABB(make_Vector3(0, -5, -10), make_Vector3(10, 10, 10));
     // aabb2 := make_AABB(make_Vector3(-1, 0, -10), make_Vector3(1, 1, 1));
 
 	// test_vector := normalize(aabb.center);
 
-    sphere_a.radius = 0.5;
-    sphere_a.center = make_Vector3(-1, 0, -10);
+    sphere_a.radius = 1;
+    sphere_a.center = make_Vector3(-1, 0.6, -10);
     // sphere_b.radius = 0.6;
     // sphere_b.center = make_Vector3(0, 0, -10);
 
@@ -190,8 +190,13 @@ create_test_scene :: (game: *Game) -> Scene {
     print("test:\n");
     if intersects {
         separate := do_epa(simplex, sphere_a, aabb);
+
         print("separate: %\n", separate);
 
+        // @Incomplete since obja is a sphere we can just use separate.point as our separation vector but really we want to gradiate
+        // between the normals of the three corners of our EPA triangle see http://www.dtecta.com/files/GDC2012_vandenBergen_Gino_Physics_Tut.pdf
+        // separate.normal = normalize(separate.point);
+        // print("separate: %\n", separate);
         sphere_a.center -= separate.normal * separate.dist;
         // sphere_a.center += separate.normal * (separate.dist * 0.5);
         // sphere_b.center += separate.normal * (separate.dist * 0.5);
