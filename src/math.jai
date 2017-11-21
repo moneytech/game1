@@ -305,6 +305,8 @@ nlerp :: (t: float, q0: Quaternion, q1: Quaternion) -> Quaternion {
     return normalize((1 - t) * q0 + t * q1);
 }
 
+// 4x4 matrix
+
 Matrix4 :: struct {
 	m: [4][4] float;
 	#place m;
@@ -580,6 +582,167 @@ matrix_identity :: () -> Matrix4 {
     return mat;
 }
 
+
+// 3x3 matrix
+
+Matrix3 :: struct {
+    m: [3][3] float;
+    #place m;
+    flat: [9] float;
+
+    #constructor identity;
+}
+
+orthonormalize :: (using _mat: *Matrix3) {
+    // hmm.. this is column vectors but i'm pretty sure we use row vectors
+    // so maybe we have to reverse these indices!
+    x := make_Vector3(m[0][0], m[1][0], m[2][0]);
+    y := make_Vector3(m[0][1], m[1][1], m[2][1]);
+
+    x = normalize(x);
+    z := normalize(cross(x, y));
+    y = normalize(cross(z, x));
+
+    m[0][0] = x.x;
+    m[1][0] = x.y;
+    m[2][0] = x.z;
+
+    m[0][1] = y.x;
+    m[2][1] = y.z;
+    m[1][1] = y.y;
+
+    m[0][2] = z.x;
+    m[2][2] = z.z;
+    m[1][2] = z.y;
+
+}
+
+matrix_orientation :: (degrees: float64, tx: float, ty: float, tz: float) -> Matrix3 {
+    result: Matrix3;
+
+    x, y, z := tx, ty, tz;
+    length := sqrt(x * x + y * y + z * z);
+    if length == 0.0 return result;
+    x /= length;
+    y /= length;
+    z /= length;
+
+    angle := degrees * (3.14159265359 / 180.0);
+    c := cast(float) cos(angle);
+    omc := 1.0 - c;
+    s := cast(float) sin(angle);
+
+    result.flat[0] = x * x * omc + c;
+    result.flat[1] = x * y * omc - z * s;
+    result.flat[2] = x * z * omc + y * s;
+
+    result.flat[3] = y * x * omc + z * s;
+    result.flat[4] = y * y * omc + c;
+    result.flat[5] = y * z * omc - x * s;
+
+    result.flat[6] = x * z * omc - y * s;
+    result.flat[7] = y * z * omc + x * s;
+    result.flat[8] = z * z * omc + c;
+    return result;
+}
+
+
+operator* :: (using mat: Matrix3, v: Vector3) -> Vector3 {
+    result: Vector3 = ---;
+    result.x = m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z;
+    result.y = m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z;
+    result.z = m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z;
+    return result;
+}
+
+operator* :: (using _mat: Matrix3, mat: Matrix3) -> Matrix3 {
+    result: Matrix3 = ---;
+    result.flat[0] = m[0][0] * mat.m[0][0] + m[0][1] * mat.m[1][0] + m[0][2] * mat.m[2][0];
+    result.flat[1] = m[0][0] * mat.m[0][1] + m[0][1] * mat.m[1][1] + m[0][2] * mat.m[2][1];
+    result.flat[2] = m[0][0] * mat.m[0][2] + m[0][1] * mat.m[1][2] + m[0][2] * mat.m[2][2];
+
+    result.flat[0] = m[1][0] * mat.m[0][0] + m[1][1] * mat.m[1][0] + m[1][2] * mat.m[2][0];
+    result.flat[1] = m[1][0] * mat.m[0][1] + m[1][1] * mat.m[1][1] + m[1][2] * mat.m[2][1];
+    result.flat[2] = m[1][0] * mat.m[0][2] + m[1][1] * mat.m[1][2] + m[1][2] * mat.m[2][2];
+
+    result.flat[0] = m[2][0] * mat.m[0][0] + m[2][1] * mat.m[1][0] + m[2][2] * mat.m[2][0];
+    result.flat[1] = m[2][0] * mat.m[0][1] + m[2][1] * mat.m[1][1] + m[2][2] * mat.m[2][1];
+    result.flat[2] = m[2][0] * mat.m[0][2] + m[2][1] * mat.m[1][2] + m[2][2] * mat.m[2][2];
+    return result;
+}
+
+operator+ :: (m0: Matrix3, m1: Matrix3) -> Matrix3 {
+    o: Matrix3 = ---;
+
+    for m0.flat {
+        o.flat[it_index] = it + m1.flat[it_index];
+    }
+
+    return o;
+}
+
+operator* :: (_mat: Matrix3, s: float) -> Matrix3 #symmetric {
+    o: Matrix3 = ---;
+    for _mat.flat {
+        o.flat[it_index] = it * s;
+    }
+    return o;
+}
+
+transpose :: (using _mat: Matrix3) -> Matrix3 {
+    o: Matrix3 = ---;
+    o.m[0][0] = m[0][0];
+    o.m[1][0] = m[0][1];
+    o.m[2][0] = m[0][2];
+
+    o.m[0][1] = m[1][0];
+    o.m[1][1] = m[1][1];
+    o.m[2][1] = m[1][2];
+
+    o.m[0][2] = m[2][0];
+    o.m[1][2] = m[2][1];
+    o.m[2][2] = m[2][2];
+    return o;
+}
+
+to_mat4 :: (m: Matrix3) -> Matrix4 {
+    out: Matrix4;
+    out.m[0][0] = m.m[0][0];
+    out.m[0][1] = m.m[0][1];
+    out.m[0][2] = m.m[0][2];
+
+    out.m[1][0] = m.m[1][0];
+    out.m[1][1] = m.m[1][1];
+    out.m[1][2] = m.m[1][2];
+
+    out.m[2][0] = m.m[2][0];
+    out.m[2][1] = m.m[2][1];
+    out.m[2][2] = m.m[2][2];
+    return out;
+}
+
+
+// @Note I don't remember if this is actually needed since
+// the ~ operator on a vector is equivalent to a cross product
+// (unless we need to multiply this matrix against the orientation ?)
+// -josh 18 November 2017
+operator~ :: (v: Vector3) -> Matrix3 {
+    out: Matrix3 = ---;
+    out.m[0][0] = 0;
+    out.m[0][1] = -v.z;
+    out.m[0][2] = v.y;
+
+    out.m[1][0] = v.z;
+    out.m[1][1] = 0;
+    out.m[1][2] = -v.x;
+
+    out.m[2][0] = -v.y;
+    out.m[2][1] = v.x;
+    out.m[2][2] = 0;
+    return out;
+}
+
+
 // floating point stuff
 
 EPSILON :: 0.000001;
@@ -597,10 +760,18 @@ floats_are_equal :: inline (a: $T, b: T) -> bool {
 
 
 #scope_file
+
 identity :: (mat: *Matrix4) {
     memset(mat, 0, size_of(Matrix4));
 	mat.m[0][0] = 1.0;
     mat.m[1][1] = 1.0;
     mat.m[2][2] = 1.0;
     mat.m[3][3] = 1.0;
+}
+
+identity :: (mat: *Matrix3) {
+    memset(mat, 0, size_of(Matrix3));
+    mat.m[0][0] = 1.0;
+    mat.m[1][1] = 1.0;
+    mat.m[2][2] = 1.0;
 }

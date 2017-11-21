@@ -1,28 +1,66 @@
 
-Segment :: struct {
-    origin:    Vector3;
-    direction: Vector3;
+
+Rigid_Body :: struct {
+    inverse_mass: float;
+
+    position: Vector3;
+    velocity: Vector3;
+    force: Vector3;
+
+    inverse_inertia_tensor: Matrix3; // body-space
+    world_inertia_tensor: Matrix3;
+    orientation: Matrix3;
+    angular_momentum: Vector3;
+    angular_velocity: Vector3;
+    torque: Vector3;
+
+    shape_type: Type;
+    shape: void;
+
+    #place shape;
+    sphere: Sphere;
+
+    #place shape;
+    aabb: AABB;
 }
 
-make_Segment :: (a: Vector3, b: Vector3) -> Segment {
-    s: Segment = ---;
-    s.origin = a;
-    s.direction = b - a;
-    return s;
+Rigid_Body_con :: (using rb: *Rigid_Body, sh: $Shape_Type) {
+    shape_type = Shape_Type;
+    inverse_inertia_tensor = transpose(moment_of_inertia(sh, <<rb));
+    orientation = make_orientation(0, 0, 1, 0);
+    <<(cast(*Shape_Type) *shape) = sh;
+
+    world_inertia_tensor = orientation * inverse_inertia_tensor * transpose(orientation);
+    angular_velocity = world_inertia_tensor * angular_momentum;
 }
 
-Capsule :: struct {
-    segment: Segment;
-    radius: float;
+integrate :: (using rb: *Rigid_Body, dt: float) {
+
+    {
+        acceleration := force * inverse_mass * dt;
+        position += (0.5 * acceleration * dt) + velocity * dt;
+        velocity += acceleration;
+    }
+
+    {
+        // @Speed it's probably faster to multiply dt to angular_velocity
+        // before we make it a skew symmetric matrix
+        orientation += dt * (~angular_velocity) * orientation;
+        angular_momentum += dt * torque;
+
+        orthonormalize(*orientation);
+        
+        world_inertia_tensor += orientation * inverse_inertia_tensor * transpose(orientation);
+        angular_velocity += world_inertia_tensor * angular_momentum;
+    }
+
 }
 
-make_Capsule :: (origin: Vector3, end: Vector3, radius: float) -> Capsule {
-    out: Capsule = ---;
-    out.segment.origin = origin;
-    out.segment.direction = end - origin;
-    out.radius = radius;
-    return out;
+
+impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body) {
+    
 }
+
 
 AABB :: struct {
     center: Vector3;
@@ -34,6 +72,39 @@ make_AABB :: (center: Vector3, widths: Vector3) -> AABB {
     o.center = center;
     o.halfs = widths * 0.5;
     return o;
+}
+
+Sphere :: struct {
+    center: Vector3;
+    radius: float;
+}
+
+moment_of_inertia :: (s: Sphere, body: Rigid_Body) -> Matrix3 {
+    m: Matrix3;
+    t := 2.0 * ((1.0 / body.inverse_mass) * s.radius * s.radius) / 5.0;
+    m.m[0][0] = t;
+    m.m[1][1] = t;
+    m.m[2][2] = t;
+    return m;
+}
+
+moment_of_inertia :: (b: AABB, body: Rigid_Body) -> Matrix3 {
+    w2 := b.halfs.x*2;
+    w2 = w2*w2;
+
+    h2 := b.halfs.y*2;
+    h2 = h2*h2;
+
+    d2 := b.halfs.z*2;
+    d2 = d2*d2;
+
+    mass := (1.0 / 12.0) * (1.0 / body.inverse_mass);
+
+    m: Matrix3;
+    m.m[0][0] = mass * (h2 + d2);
+    m.m[1][1] = mass * (w2 + d2);
+    m.m[2][2] = mass * (w2 + h2);
+    return m;
 }
 
 gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
@@ -50,11 +121,6 @@ gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
     if n.z < 0 out.z = min.z;
     else out.z = max.z;
     return out;
-}
-
-Sphere :: struct {
-    center: Vector3;
-    radius: float;
 }
 
 gjk_support :: (a: Sphere, dir: Vector3) -> Vector3 {
@@ -572,8 +638,36 @@ __closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, t
     return base + e0*s + e1*t, s, t, 1.0 - (s+t);
 }
 
+
 // old stuff
 /*
+
+Segment :: struct {
+    origin:    Vector3;
+    direction: Vector3;
+}
+
+make_Segment :: (a: Vector3, b: Vector3) -> Segment {
+    s: Segment = ---;
+    s.origin = a;
+    s.direction = b - a;
+    return s;
+}
+
+Capsule :: struct {
+    segment: Segment;
+    radius: float;
+}
+
+make_Capsule :: (origin: Vector3, end: Vector3, radius: float) -> Capsule {
+    out: Capsule = ---;
+    out.segment.origin = origin;
+    out.segment.direction = end - origin;
+    out.radius = radius;
+    return out;
+}
+
+
 do_intersect :: (s: Sphere, b: AABB) -> bool {
     sqr_dist: float64;
     d: float64;
