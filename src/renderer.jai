@@ -252,7 +252,7 @@ Camera :: struct {
 
 #run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
 Scene :: struct {
-    models: [..] Model;
+    models: [..] *Model;
     cameras: [..] Camera;
     lights: [..] Light;
 
@@ -1189,7 +1189,7 @@ draw_model :: (rdr: GL_Renderer, m: Model) {
 
 draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
     start_scene(rdr);
-    for sc.models draw_model(<<rdr, it);
+    for sc.models draw_model(<<rdr, <<it);
     finish_scene(rdr);
 }
 

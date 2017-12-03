@@ -1,11 +1,8 @@
 
+#load "math.jai";
 
 Rigid_Body :: struct {
     inverse_mass: float;
-
-    position: Vector3;
-    velocity: Vector3;
-    force: Vector3;
 
     inverse_inertia_tensor: Matrix3; // body-space
     world_inertia_tensor: Matrix3;
@@ -14,8 +11,20 @@ Rigid_Body :: struct {
     angular_velocity: Vector3;
     torque: Vector3;
 
+    elasticity: float = 0.3;
+
+    is_static: bool;
+
+    velocity: Vector3;
+    force: Vector3;
+
+    support_func: (sh: *void, dir: Vector3) -> Vector3;
+
     shape_type: Type;
     shape: void;
+
+    #place shape; // it's imperitive that this is placed at shape for the centers of the colliders to update magically
+    position: Vector3;    
 
     #place shape;
     sphere: Sphere;
@@ -24,11 +33,23 @@ Rigid_Body :: struct {
     aabb: AABB;
 }
 
-Rigid_Body_con :: (using rb: *Rigid_Body, sh: $Shape_Type) {
+Rigid_Body_con :: (using rb: *Rigid_Body, mass: float, sh: $Shape_Type) {
     shape_type = Shape_Type;
+    inverse_mass = 1.0 / mass;
     inverse_inertia_tensor = transpose(moment_of_inertia(sh, <<rb));
-    orientation = make_orientation(0, 0, 1, 0);
+    orientation = matrix_orientation(0, 0, 1, 0);
     <<(cast(*Shape_Type) *shape) = sh;
+
+    sup: (sh: Shape_Type, dir: Vector3) -> Vector3;
+
+    // yuck
+    #if Shape_Type == Sphere {
+        sup = sphere_gjk_support;
+    }
+    #if Shape_Type == AABB {
+        sup = aabb_gjk_support;
+    }
+    support_func = xx sup;
 
     world_inertia_tensor = orientation * inverse_inertia_tensor * transpose(orientation);
     angular_velocity = world_inertia_tensor * angular_momentum;
@@ -57,8 +78,29 @@ integrate :: (using rb: *Rigid_Body, dt: float) {
 }
 
 
-impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body) {
-    
+impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
+    cr := clamp(rb0.elasticity + rb1.elasticity, 0.0, 1.0);
+    rv := rb0.velocity - rb1.velocity;
+    n := cp.normal;
+    r_a := cp.point_on_a - rb0.position;
+    r_b := cp.point_on_b - rb1.position;
+
+    d1 := (rb0.inverse_mass + rb1.inverse_mass);
+    ia := cross(cross(r_a, n), r_a)  * rb0.inverse_inertia_tensor;
+    ib := cross(cross(r_b, n), r_b)  * rb1.inverse_inertia_tensor;
+    d2 := dot(ia + ib, n);
+
+    j := dot(-(1 + cr) * rv, n) / (d1);
+
+    rb0.velocity += (j * cp.normal) * rb0.inverse_mass;
+    // rb0.angular_velocity -= cross(cp.point_on_a, (j * cp.normal)) * rb0.inverse_inertia_tensor;
+
+    rb1.velocity += (j * cp.normal) * rb1.inverse_mass;
+    // rb1.angular_velocity += cross(cp.point_on_b, (j * cp.normal)) * rb1.inverse_inertia_tensor;
+
+    print("RB0: %\n", (-j * cp.normal) * rb0.inverse_mass);
+    print("RB1: %\n", (j * cp.normal) * rb1.inverse_mass);
+    //assert(false);
 }
 
 
@@ -107,7 +149,7 @@ moment_of_inertia :: (b: AABB, body: Rigid_Body) -> Matrix3 {
     return m;
 }
 
-gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
+aabb_gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
     n := normalize(dir);
 
     min := a.center - a.halfs;
@@ -123,14 +165,14 @@ gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
     return out;
 }
 
-gjk_support :: (a: Sphere, dir: Vector3) -> Vector3 {
+sphere_gjk_support :: (a: Sphere, dir: Vector3) -> Vector3 {
     return a.center + (normalize(dir) * a.radius);
 }
 
-gjk_support :: (a: $T, b: $R, dir: Vector3) -> Support_Point {
+gjk_support :: (a: Rigid_Body, b: Rigid_Body, dir: Vector3) -> Support_Point {
     p: Support_Point = ---;
-    p.val_a = gjk_support(a, dir);
-    p.val_b = gjk_support(b, -dir);
+    p.val_a = a.support_func(*a.shape, dir);
+    p.val_b = b.support_func(*b.shape, -dir);
     p.val = p.val_a - p.val_b;
     return p;
 }
@@ -282,7 +324,7 @@ do_simplex :: (sim: *Simplex, a: Support_Point) -> bool, Vector3 {
     return false, ao;
 }
 
-do_gjk :: (obja: $T, objb: $R) -> bool, Simplex {
+do_gjk :: (obja: Rigid_Body, objb: Rigid_Body) -> bool, Simplex {
     sim: Simplex;
     d := normalize(make_Vector3(1, 1, 0));
     s := gjk_support(obja, objb, d);
@@ -307,7 +349,8 @@ ORIGIN: Vector3;
 Contact_Point :: struct {
     normal: Vector3;
     dist: float;
-    point: Vector3;
+    point_on_a: Vector3;
+    point_on_b: Vector3;
 }
 
 Entry :: struct {
@@ -363,7 +406,7 @@ silhouette :: (e: *Entry, i: s32, w: Vector3, E: *[..] Set) {
     }
 }
 
-do_epa :: (sim: Simplex, obja: $T, objb: $R) -> Contact_Point {
+do_epa :: (sim: Simplex, obja: Rigid_Body, objb: Rigid_Body) -> Contact_Point {
     Q: [..] *Entry;
     mu := 1000000.0;
 
@@ -425,10 +468,19 @@ do_epa :: (sim: Simplex, obja: $T, objb: $R) -> Contact_Point {
                 cp.normal = normalize(v);
                 cp.dist = length(v);
 
-                a := entry.p[0].val_a;
-                b := entry.p[1].val_a;
-                c := entry.p[2].val_a;
-                cp.point = a*entry.y[0] + b*entry.y[1] + c*entry.y[2];
+                {
+                    a := entry.p[0].val_a;
+                    b := entry.p[1].val_a;
+                    c := entry.p[2].val_a;
+                    cp.point_on_a = a*entry.y[0] + b*entry.y[1] + c*entry.y[2];
+                }
+                {
+                    a := entry.p[2].val_b;
+                    b := entry.p[1].val_b;
+                    c := entry.p[0].val_b;
+                    cp.point_on_b = a*entry.y[0] + b*entry.y[1] + c*entry.y[2];
+                    
+                }
             }
 
             if entry.vlen < mu {

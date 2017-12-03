@@ -1,29 +1,4 @@
-/*
-Test_Struct :: struct {
-    x: Vector3;
-    y: Vector3;
-}
-test :: (t: *Test_Struct, new_x: Vector3, new_y: Vector3) {
-    t.x = new_x;
-    t.y = new_y;
-}
 
-test2 :: (t: *Test_Struct, args: .. Vector3) {
-    assert(args.count == 2);
-    t.x = args[0];
-    t.y = args[1];
-}
-
-#run {
-    ts: Test_Struct;
-    ts.x = make_Vector3(1, 0, 0);
-    ts.y = make_Vector3(0, 0, 1);
-    print("ts: %\n", ts);
-    test2(*ts, ts.y, ts.x);
-    print("ts: %\n", ts);
-    return;
-};
-*/
 #import "Compiler";
 
 #load "renderer.jai";
@@ -99,8 +74,6 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) ->
     return m;
 }
 
-sphere_a: Sphere;
-// sphere_b: Sphere;
 make_sphere_mesh :: (sp: Sphere) -> *Model {
     out := create_sphere(sp.radius, 8, 8);
     out.meshes[0].material = New(Material);
@@ -167,60 +140,109 @@ make_aabb_mesh :: (a: AABB) -> *Model {
     return out;
 }
 
-create_test_scene :: (game: *Game) -> Scene {
-    sc: Scene;
-    test_model: Model;
-    test_mesh: *Mesh = New(Mesh);
-    <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16);
-    array_add(*test_model.meshes, test_mesh);
-    // array_add(*sc.models, test_model);
+unit_sphere_model: *Model;
+aabb_model: *Model;
 
+bodies: [..] *Rigid_Body;
 
-    aabb := make_AABB(make_Vector3(0, -5, -10), make_Vector3(10, 10, 10));
-    // aabb2 := make_AABB(make_Vector3(-1, 0, -10), make_Vector3(1, 1, 1));
+do_collision_detection :: () {
+    assert(bodies.count == 2);
 
-	// test_vector := normalize(aabb.center);
+    b0 := bodies[0];
+    b1 := bodies[1];
 
-    sphere_a.radius = 1;
-    sphere_a.center = make_Vector3(-1, 0.6, -10);
-    // sphere_b.radius = 0.6;
-    // sphere_b.center = make_Vector3(0, 0, -10);
-
-    intersects, simplex := do_gjk(sphere_a, aabb);
-    print("test:\n");
+    intersects, simplex := do_gjk(<<b0, <<b1);
     if intersects {
-        separate := do_epa(simplex, sphere_a, aabb);
+        separate := do_epa(simplex, <<b0, <<b1);
 
-        print("separate: %\n", separate);
-
-        // @Incomplete since obja is a sphere we can just use separate.point as our separation vector but really we want to gradiate
-        // between the normals of the three corners of our EPA triangle see http://www.dtecta.com/files/GDC2012_vandenBergen_Gino_Physics_Tut.pdf
-        // separate.normal = normalize(separate.point);
-        // print("separate: %\n", separate);
-        sphere_a.center -= separate.normal * separate.dist;
-        // sphere_a.center += separate.normal * (separate.dist * 0.5);
-        // sphere_b.center += separate.normal * (separate.dist * 0.5);
+        impulse_response(b0, b1, separate);
     }
-
-    sphere := make_sphere_mesh(sphere_a);
-    array_add(*sc.models, <<sphere);
-
-    // sphere2 := make_sphere_mesh(sphere_b);
-    // array_add(*sc.models, <<sphere2);
-
-    aabb_mesh := make_aabb_mesh(aabb);
-    array_add(*sc.models, <<aabb_mesh);
-
-    // aabb2_mesh := make_aabb_mesh(aabb2);
-    // array_add(*sc.models, <<aabb2_mesh);
-
-
-    set_point_size(<<game.renderer, 5);
-
-    return sc;
 }
 
-main_scene: Scene;
+update_physics :: (game: *Game, dt: float) {
+    for bodies {
+        // if it.is_static continue;
+
+        if it.shape_type == Sphere {
+            gravity := make_Vector3(0, -9, 0);
+            gravity *= (1.0 / it.inverse_mass);
+            it.force += gravity;
+        }
+        integrate(it, dt);
+
+        it.force = make_Vector3(0, 0, 0);
+    }
+
+    do_collision_detection();
+}
+
+draw_debug_bodies :: (game: *Game) {
+    for bodies {
+        pos := it.position;
+        model_matrix := matrix_translate(pos.x, pos.y, pos.z) * to_mat4(it.orientation);
+        if it.shape_type == Sphere {
+            model_matrix = model_matrix * matrix_scale(it.sphere.radius, it.sphere.radius, it.sphere.radius);
+            unit_sphere_model.meshes[0].model_matrix = model_matrix;
+            draw_model(<<game.renderer, <<unit_sphere_model);
+
+            // print("body %: %\n", it.shape_type, <<it);
+        } else if it.shape_type == AABB {
+            model_matrix = model_matrix * matrix_scale(it.aabb.halfs.x*2, it.aabb.halfs.y*2, it.aabb.halfs.z*2);
+            aabb_model.meshes[0].model_matrix = model_matrix;
+            draw_model(<<game.renderer, <<aabb_model);
+        } else {
+            assert(false);
+        }
+
+        // print("body %: %\n", it.shape_type, <<it);
+    }
+}
+
+create_test_scene :: (game: *Game) -> Scene {
+    sc: Scene;
+    // test_model: Model;
+    // test_mesh: *Mesh = New(Mesh);
+    // <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16);
+    // array_add(*test_model.meshes, test_mesh);
+    // array_add(*sc.models, test_model);
+
+    {
+        aabb := make_AABB(make_Vector3(0, 0, 0), make_Vector3(1, 1, 1));
+        aabb_model = make_aabb_mesh(aabb);
+        // array_add(*sc.models, aabb_model);
+    }
+
+    aabb := make_AABB(make_Vector3(0, -5, -10), make_Vector3(10, 10, 10));
+
+    sphere_a: Sphere;
+    sphere_a.radius = 1;
+
+    unit_sphere_model = make_sphere_mesh(sphere_a);
+    // array_add(*sc.models, unit_sphere_model);
+
+    sphere_a.center = make_Vector3(-1, 10.0, -10);
+
+    {
+        rb := New(Rigid_Body);
+        Rigid_Body_con(rb, 1.0, sphere_a);
+
+        print("rb: %\n", rb);
+
+        array_add(*bodies, rb);
+    }
+
+    {
+        rb := New(Rigid_Body);
+        Rigid_Body_con(rb, 100000.0, aabb);
+        rb.is_static = true;
+
+        print("rb1: %\n", rb);
+        array_add(*bodies, rb);
+    }
+
+    set_point_size(<<game.renderer, 5);
+    return sc;
+}
 
 main :: () {
     os_init_platform();
@@ -292,7 +314,7 @@ main :: () {
     renderer.camera.position.y = 5;
     renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
-    main_scene = create_test_scene(*game);
+    main_scene := create_test_scene(*game);
 
 
     while (true) {
@@ -331,9 +353,37 @@ main :: () {
         // }
 
         update_camera(*game, 1.0/60.0);
+        update_physics(*game, 1.0/100.0);
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         // update_editor(*game, 1.0);
-        render(*game);
+        glViewport(0, 0, xx game.window.width, xx game.window.height);
+        // draw_scene(game.renderer, main_scene);
+
+        #if DEVELOPER {
+            // render_editor(game);  
+            start_scene(game.renderer);
+            draw_debug_bodies(*game);
+            finish_scene(game.renderer);
+        }
+
+        // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
+        /*
+        Bitmap_Frame frame = {0};
+        frame.tex_coords.width = 14.0f / (float)tex->width;
+        frame.tex_coords.height = 14.0f / (float)tex->height;
+        frame.tex_coords.x = (16.0f * 3) / (float)tex->width;
+        frame.tex_coords.y = (16.0f * 4) / (float)tex->height;
+        Sprite sp = {0};
+        sp.current_frame = &frame;
+        sp.dimensions.x = x;
+        sp.dimensions.y = y;
+        sp.dimensions.width = 100.0;
+        sp.dimensions.height = 100.0;
+        sp.texture = tex;
+        */
+        // renderer->draw_sprite(&sp);
+        // renderer->draw_text(font, "Hello World!", 32, 32);
+        // render_html_dom(dom);
 
         swap_buffers(win);
         os_pump_input();
@@ -408,36 +458,6 @@ void render_html_dom(Html_Dom *dom) {
     }
 }
 */
-
-render :: (game: *Game) {
-    glViewport(0, 0, xx game.window.width, xx game.window.height);
-    draw_scene(game.renderer, main_scene);
-
-    #if DEVELOPER {
-        // render_editor(game);  
-    }
-
-    // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
-    /*
-    Bitmap_Frame frame = {0};
-    frame.tex_coords.width = 14.0f / (float)tex->width;
-    frame.tex_coords.height = 14.0f / (float)tex->height;
-    frame.tex_coords.x = (16.0f * 3) / (float)tex->width;
-    frame.tex_coords.y = (16.0f * 4) / (float)tex->height;
-    Sprite sp = {0};
-    sp.current_frame = &frame;
-    sp.dimensions.x = x;
-    sp.dimensions.y = y;
-    sp.dimensions.width = 100.0;
-    sp.dimensions.height = 100.0;
-    sp.texture = tex;
-    */
-    // renderer->draw_sprite(&sp);
-    // renderer->draw_text(font, "Hello World!", 32, 32);
-    // render_html_dom(dom);
-}
-
-
 
 ttf_buffer: [1<<20] u8;
 temp_bitmap: [512*512] u8;

@@ -582,7 +582,6 @@ matrix_identity :: () -> Matrix4 {
     return mat;
 }
 
-
 // 3x3 matrix
 
 Matrix3 :: struct {
@@ -646,12 +645,19 @@ matrix_orientation :: (degrees: float64, tx: float, ty: float, tz: float) -> Mat
     return result;
 }
 
-
 operator* :: (using mat: Matrix3, v: Vector3) -> Vector3 {
     result: Vector3 = ---;
     result.x = m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z;
     result.y = m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z;
     result.z = m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z;
+    return result;
+}
+
+operator* :: (v: Vector3, using mat: Matrix3) -> Vector3 {
+    result: Vector3 = ---;
+    result.x = m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z;
+    result.y = m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z;
+    result.z = m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z;
     return result;
 }
 
@@ -745,6 +751,7 @@ operator~ :: (v: Vector3) -> Matrix3 {
 
 // floating point stuff
 
+
 EPSILON :: 0.000001;
 
 max :: (min: $T, a: T, b: T) -> T {
@@ -757,7 +764,6 @@ max :: (min: $T, a: T, b: T) -> T {
 floats_are_equal :: inline (a: $T, b: T) -> bool {
     return fabs(a - b) <= EPSILON * max(cast(float64) 1.0, fabs(a), fabs(b));
 }
-
 
 #scope_file
 

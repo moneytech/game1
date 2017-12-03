@@ -2,6 +2,7 @@
 #import "Basic";
 #import "GL";
 #import "Compiler";
+#import "Window_Creation";
 
 #load "os_api.jai";
 
@@ -176,20 +177,22 @@ wglCreateContextAttribsARB: (hDC: HDC, hShareContext: HGLRC, attribList: *s32) -
 WINDOWED_STYLE : s32   : WS_VISIBLE | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_SIZEBOX;
 FULLSCREEN_STYLE : s32 : WS_VISIBLE | WS_POPUP;
 os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
-    if (!window_class_initted) {
-        init_window_class();
-    }
+    // if (!window_class_initted) {
+    //     init_window_class();
+    // }
 
-    rect: RECT;
-    rect.right = width;
-    rect.bottom = height;
-    AdjustWindowRect(*rect, WINDOWED_STYLE, 0);
+    // rect: RECT;
+    // rect.right = width;
+    // rect.bottom = height;
+    // AdjustWindowRect(*rect, WINDOWED_STYLE, 0);
 
-    hInstance := GetModuleHandleA(null);
-    c_title := to_c_string(title);
-    ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, rect.right-rect.left, rect.bottom-rect.top, 0, 0, hInstance, null);
-    free(c_title);
-    return ret;
+    // hInstance := GetModuleHandleA(null);
+    // c_title := to_c_string(title);
+    // ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, rect.right-rect.left, rect.bottom-rect.top, 0, 0, hInstance, null);
+    // free(c_title);
+    // return ret;
+
+    return create_window(width, height, title);
 }
 
 
