@@ -18,8 +18,6 @@ Rigid_Body :: struct {
     velocity: Vector3;
     force: Vector3;
 
-    support_func: (sh: *void, dir: Vector3) -> Vector3;
-
     shape_type: Type;
     shape: void;
 
@@ -35,21 +33,14 @@ Rigid_Body :: struct {
 
 Rigid_Body_con :: (using rb: *Rigid_Body, mass: float, sh: $Shape_Type) {
     shape_type = Shape_Type;
-    inverse_mass = 1.0 / mass;
+    
+    // infinite mass
+    if mass == 0 inverse_mass = 0;
+    else inverse_mass = 1.0 / mass;
+    
     inverse_inertia_tensor = transpose(moment_of_inertia(sh, <<rb));
     orientation = matrix_orientation(0, 0, 1, 0);
     <<(cast(*Shape_Type) *shape) = sh;
-
-    sup: (sh: Shape_Type, dir: Vector3) -> Vector3;
-
-    // yuck
-    #if Shape_Type == Sphere {
-        sup = sphere_gjk_support;
-    }
-    #if Shape_Type == AABB {
-        sup = aabb_gjk_support;
-    }
-    support_func = xx sup;
 
     world_inertia_tensor = orientation * inverse_inertia_tensor * transpose(orientation);
     angular_velocity = world_inertia_tensor * angular_momentum;
@@ -77,13 +68,24 @@ integrate :: (using rb: *Rigid_Body, dt: float) {
 
 }
 
+correct_position :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
+    PERCENT :: 0.025;
+    SLOP :: 0.05;
+    correction := max(0.0, cp.dist - SLOP) / (rb0.inverse_mass + rb1.inverse_mass) * PERCENT * cp.normal;
+    rb0.position += rb0.inverse_mass * correction;
+    rb1.position -= rb1.inverse_mass * correction;
+}
 
 impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
-    cr := clamp(rb0.elasticity + rb1.elasticity, 0.0, 1.0);
-    rv := rb0.velocity - rb1.velocity;
+    cr := clamp(rb0.elasticity * rb1.elasticity, 0.0, 1.0);
+    rv := rb1.velocity - rb0.velocity;
     n := cp.normal;
-    r_a := cp.point_on_a - rb0.position;
-    r_b := cp.point_on_b - rb1.position;
+    r_a := cp.point_on_a;
+    r_b := cp.point_on_b;
+
+    if !same_direction(rv, n) return;
+
+    correct_position(rb0, rb1, cp);
 
     d1 := (rb0.inverse_mass + rb1.inverse_mass);
     ia := cross(cross(r_a, n), r_a)  * rb0.inverse_inertia_tensor;
@@ -92,14 +94,15 @@ impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
 
     j := dot(-(1 + cr) * rv, n) / (d1);
 
-    rb0.velocity += (j * cp.normal) * rb0.inverse_mass;
+    // rb0.position
+    rb0.velocity -= (j * cp.normal) * rb0.inverse_mass;
     // rb0.angular_velocity -= cross(cp.point_on_a, (j * cp.normal)) * rb0.inverse_inertia_tensor;
 
     rb1.velocity += (j * cp.normal) * rb1.inverse_mass;
     // rb1.angular_velocity += cross(cp.point_on_b, (j * cp.normal)) * rb1.inverse_inertia_tensor;
 
-    print("RB0: %\n", (-j * cp.normal) * rb0.inverse_mass);
-    print("RB1: %\n", (j * cp.normal) * rb1.inverse_mass);
+    // print("RB0: %\n", (-j * cp.normal) * rb0.inverse_mass);
+    // print("RB1: %\n", (j * cp.normal) * rb1.inverse_mass);
     //assert(false);
 }
 
@@ -149,6 +152,218 @@ moment_of_inertia :: (b: AABB, body: Rigid_Body) -> Matrix3 {
     return m;
 }
 
+
+same_direction :: (a: Vector3, b: Vector3) -> bool {
+    return dot(a, b) > 0;
+}
+
+ORIGIN: Vector3;
+
+Contact_Point :: struct {
+    normal: Vector3;
+    dist: float;
+    point_on_a: Vector3;
+    point_on_b: Vector3;
+}
+
+// @Robustness handle the case where the sphere center is inside the AABB
+do_collide_sphere_aabb :: (sp: Sphere, aabb: AABB) -> bool, Contact_Point {
+    p: Vector3 = ---;
+    min := aabb.center - aabb.halfs;
+    max := aabb.center + aabb.halfs;
+    p.x = clamp(sp.center.x, min.x, max.x);
+    p.y = clamp(sp.center.y, min.y, max.y);
+    p.z = clamp(sp.center.z, min.z, max.z);
+
+    cp: Contact_Point;
+    cp.normal = normalize(sp.center - p);
+    cp.dist = length(sp.center - p);
+    cp.point_on_a = (cp.dist / sp.radius) * sp.radius * cp.normal;
+    cp.point_on_b = p - aabb.center; // @FixMe only true if the sphere center is outside the bounds of the AABB
+    return cp.dist < sp.radius, cp;
+}
+
+closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
+    invlen := 1.0 / length(b - a);
+    n := (b - a) * invlen;
+
+    u := dot((q - a), n) * invlen;
+    v := dot((b - q), n) * invlen;
+
+    if u <= 0 return b;
+    if v <= 0 return a;
+    else return u*a + v*b;
+}
+
+
+// based on Erin Catto's http://box2d.org/2014/02/computing-a-basis/
+compute_basis :: (a: Vector3) -> Vector3, Vector3 {
+    b: Vector3 = ---;
+    if fabs(a.x) > 0.57735 {
+        b.x =  a.y;
+        b.y = -a.x;
+        b.z =  0;
+    } else {
+        b.x =  0;
+        b.y =  a.z;
+        b.z = -a.y;
+    }
+
+    b = normalize(b);
+    c := cross(a, b);
+    return b, c;
+}
+
+// @Return point on triangle; barycentric coordinates
+// I'm pretty sure this doesn't clamp to the restraints of the triangle
+closest_point_triangle_to_point :: (v0: Vector3, v1: Vector3, v2: Vector3, p: Vector3) -> Vector3, float, float, float {
+    u := v1-v0;
+    v := v2-v0;
+
+    n := cross(u, v);
+    w := p - v0;
+
+    nl := dot(n, n);
+    y := dot(cross(u, w), n) / nl;
+    b := dot(cross(w, v), n) / nl;
+    a := 1 - y - b;
+    return v0*a + v1*b + v2*y, a, b, y;
+}
+
+// from Eberly's geometric tools https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
+// this can probably be simplified by just returing base, v1, v2 when the point q on the triangle plane is
+// in regions 2, 4, or 6; this should work fine for the time being. -josh 7 November 2017
+__closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3, float, float, float {
+    base_to_point := base - target_point;
+    e0 := v1 - base;
+    e1 := v2 - base;
+
+    a := dot(e0, e0);
+    b := dot(e0, e1);
+    c := dot(e1, e1);
+    d := dot(e0, base_to_point);
+    e := dot(e1, base_to_point);
+    f := dot(base_to_point, base_to_point);
+
+    s := b*e - c*d;
+    t := b*d - a*e;
+    det := a*c - b*b;
+
+    if (s+t) <= det {
+        if s < 0 {
+            if t < 0 {
+                t = 0;
+                
+                if -d >= a
+                    s = 1;
+                else
+                    s = -d/a;
+            } else {
+                s = 0;
+
+                if e >= 0
+                    t = 0;
+                else if -e >= c
+                    t = 1;
+                else
+                    t = -e/c;
+            }
+        } else if t < 0 {
+            t = 0;
+            if d >= 0
+                s = 0;
+            else if -d >= a
+                s = 1;
+            else
+                s = -d/a;
+        } else {
+            invdet := 1.0 / det;
+            s *= invdet;
+            t *= invdet;
+        }
+    } else {
+        if s < 0 {
+            t0 := b + d;
+            t1 := c + e;
+
+            if t1 > t0 {
+                n := t1 - t0;
+                den := a - 2*b + c;
+
+                if n >= den
+                    s = 1;
+                else
+                    s = n / den;
+
+                t = 1 - s;
+            } else {
+                s = 0;
+
+                if t1 <= 0
+                    t = 1;
+                if e >= 0
+                    t = 0;
+                else
+                    t = -e/c;
+            }
+        } else if t < 0 {
+            t0 := b + e;
+            t1 := a + d;
+
+            if t1 > t0 {
+                n := t1 - t0;
+                den := a - 2*b + c;
+
+                if n >= den
+                    t = 1;
+                else
+                    t = n / den;
+
+                s = 1 - t;
+            } else {
+                t = 0;
+
+                if t1 <= 0
+                    s = 1;
+                if d >= 0
+                    s = 0;
+                else
+                    s = -d/a;
+            }
+        } else {
+            n := (c + e) - (b + d);
+            if n <= 0
+                s = 0;
+            else {
+                den := a - 2*b + c;
+
+                if n >= den
+                    s = 1;
+                else
+                    s = n / den;
+            }
+
+            t = 1 - s;
+        }
+    }
+
+    return base + e0*s + e1*t, s, t, 1.0 - (s+t);
+}
+
+
+// old stuff
+/*
+
+Support_Point :: struct {
+    val: Vector3;
+    val_a: Vector3;
+    val_b: Vector3;
+}
+
+operator== :: (a: Support_Point, b: Support_Point) -> bool {
+    return a.val == b.val; // ignore val_a and val_b for now
+}
+
 aabb_gjk_support :: (a: AABB, dir: Vector3) -> Vector3 {
     n := normalize(dir);
 
@@ -177,20 +392,6 @@ gjk_support :: (a: Rigid_Body, b: Rigid_Body, dir: Vector3) -> Support_Point {
     return p;
 }
 
-same_direction :: (a: Vector3, b: Vector3) -> bool {
-    return dot(a, b) > 0;
-}
-
-Support_Point :: struct {
-    val: Vector3;
-    val_a: Vector3;
-    val_b: Vector3;
-}
-
-operator== :: (a: Support_Point, b: Support_Point) -> bool {
-    return a.val == b.val; // ignore val_a and val_b for now
-}
-
 Simplex :: struct {
     a: Support_Point;
     b: Support_Point;
@@ -204,18 +405,18 @@ add :: (using s: *Simplex, new_a: Support_Point) {
     case 0;
         a = new_a;
         count += 1;
-		return;
+        return;
     case 1;
         b = a;
         a = new_a;
         count += 1;
-		return;
+        return;
     case 2;
         c = b;
         b = a;
         a = new_a;
         count += 1;
-		return;
+        return;
     case 3;
         d = c;
         c = b;
@@ -274,7 +475,6 @@ do_triange_simplex :: (sim: *Simplex, a: Support_Point, b: Support_Point, c: Sup
         return -abc;
     }
 }
-
 
 do_simplex :: (sim: *Simplex, a: Support_Point) -> bool, Vector3 {
     ao := -a.val;
@@ -342,15 +542,6 @@ do_gjk :: (obja: Rigid_Body, objb: Rigid_Body) -> bool, Simplex {
     }
 
     return false, sim;
-}
-
-ORIGIN: Vector3;
-
-Contact_Point :: struct {
-    normal: Vector3;
-    dist: float;
-    point_on_a: Vector3;
-    point_on_b: Vector3;
 }
 
 Entry :: struct {
@@ -524,174 +715,8 @@ do_epa :: (sim: Simplex, obja: Rigid_Body, objb: Rigid_Body) -> Contact_Point {
     return cp;
 }
 
-closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
-    invlen := 1.0 / length(b - a);
-    n := (b - a) * invlen;
+*/
 
-    u := dot((q - a), n) * invlen;
-    v := dot((b - q), n) * invlen;
-
-    if u <= 0 return b;
-    if v <= 0 return a;
-    else return u*a + v*b;
-}
-
-
-// based on Erin Catto's http://box2d.org/2014/02/computing-a-basis/
-compute_basis :: (a: Vector3) -> Vector3, Vector3 {
-    b: Vector3 = ---;
-    if fabs(a.x) > 0.57735 {
-        b.x =  a.y;
-        b.y = -a.x;
-        b.z =  0;
-    } else {
-        b.x =  0;
-        b.y =  a.z;
-        b.z = -a.y;
-    }
-
-    b = normalize(b);
-    c := cross(a, b);
-    return b, c;
-}
-
-// @Return point on triangle; barycentric coordinates
-closest_point_triangle_to_point :: (v0: Vector3, v1: Vector3, v2: Vector3, p: Vector3) -> Vector3, float, float, float {
-    u := v1-v0;
-    v := v2-v0;
-
-    n := cross(u, v);
-    w := p - v0;
-
-    nl := dot(n, n);
-    y := dot(cross(u, w), n) / nl;
-    b := dot(cross(w, v), n) / nl;
-    a := 1 - y - b;
-    return v0*a + v1*b + v2*y, a, b, y;
-}
-
-// from Eberly's geometric tools https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
-// this can probably be simplified by just returing base, v1, v2 when the point q on the triangle plane is
-// in regions 2, 4, or 6; this should work fine for the time being. -josh 7 November 2017
-__closest_point_triangle_to_point :: (base: Vector3, v1: Vector3, v2: Vector3, target_point: Vector3) -> Vector3, float, float, float {
-    base_to_point := base - target_point;
-    e0 := v1 - base;
-    e1 := v2 - base;
-
-    a := dot(e0, e0);
-    b := dot(e0, e1);
-    c := dot(e1, e1);
-    d := dot(e0, base_to_point);
-    e := dot(e1, base_to_point);
-    f := dot(base_to_point, base_to_point);
-
-    s := b*e - c*d;
-    t := b*d - a*e;
-    det := a*c - b*b;
-
-    if (s+t) <= det {
-        if s < 0 {
-            if t < 0 {
-                t = 0;
-                
-                if -d >= a
-                    s = 1;
-                else
-                    s = -d/a;
-            } else {
-                s = 0;
-
-                if e >= 0
-                    t = 0;
-                else if -e >= c
-                    t = 1;
-                else
-                    t = -e/c;
-            }
-        } else if t < 0 {
-            t = 0;
-            if d >= 0
-                s = 0;
-            else if -d >= a
-                s = 1;
-            else
-                s = -d/a;
-        } else {
-            invdet := 1.0 / det;
-            s *= invdet;
-            t *= invdet;
-        }
-    } else {
-        if s < 0 {
-            t0 := b + d;
-            t1 := c + e;
-
-            if t1 > t0 {
-                n := t1 - t0;
-                den := a - 2*b + c;
-
-                if n >= den
-                    s = 1;
-                else
-                    s = n / den;
-
-                t = 1 - s;
-            } else {
-                s = 0;
-
-                if t1 <= 0
-                    t = 1;
-                if e >= 0
-                    t = 0;
-                else
-                    t = -e/c;
-            }
-        } else if t < 0 {
-            t0 := b + e;
-            t1 := a + d;
-
-            if t1 > t0 {
-                n := t1 - t0;
-                den := a - 2*b + c;
-
-                if n >= den
-                    t = 1;
-                else
-                    t = n / den;
-
-                s = 1 - t;
-            } else {
-                t = 0;
-
-                if t1 <= 0
-                    s = 1;
-                if d >= 0
-                    s = 0;
-                else
-                    s = -d/a;
-            }
-        } else {
-            n := (c + e) - (b + d);
-            if n <= 0
-                s = 0;
-            else {
-                den := a - 2*b + c;
-
-                if n >= den
-                    s = 1;
-                else
-                    s = n / den;
-            }
-
-            t = 1 - s;
-        }
-    }
-
-    return base + e0*s + e1*t, s, t, 1.0 - (s+t);
-}
-
-
-// old stuff
 /*
 
 Segment :: struct {

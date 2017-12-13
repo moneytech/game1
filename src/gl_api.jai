@@ -247,8 +247,6 @@ GL_3_0_API :: struct {
 
     glDebugMessageCallback: (callback: GLDEBUGPROC, userParam: *void) #foreign;
 
-    glDeleteTextures: (n: GLsizei, textures: *GLuint) #foreign;
-
     glVertexAttrib3f: (index: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) #foreign;
     // glGetnTexImage: (target: GLenum, level: GLint, format: GLenum, type: GLenum, bufSize: GLsizei, pixels: *void) #foreign;
 
@@ -267,6 +265,8 @@ glGetTexImage :: (target: GLenum, level: GLint, format: GLenum, type: GLenum, pi
 glPointSize :: (size: GLfloat) #foreign GL;
 glReadBuffer: (mode: GLenum) #foreign GL;
 glReadPixels: (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, data: *GLvoid) #foreign GL;
+
+glDeleteTextures :: (n: GLsizei, textures: *GLuint) #foreign GL;
 
 glTexSubImage2D :: (target: GLenum,  level: GLint, xoffset: GLint, yoffset: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, data: *GLvoid) #foreign GL;
 

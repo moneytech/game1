@@ -40,8 +40,6 @@ Frame_Buffer :: struct {
 
     depth_buffer_id: u32 = xx -1;
     id: u32 = xx -1;
-
-    #destructor delete_frame_buffer;
 }
 
 create_frame_buffer :: (using rdr: *GL_Renderer, width: u16, height: u16) -> Frame_Buffer {
@@ -192,7 +190,11 @@ reset_mesh_arrays :: (using m: *Mesh) {
 
 Model :: struct {
     meshes: [..] *Mesh;
+    draw_mode: bool = DRAW_MODE_SOLID;
 };
+
+DRAW_MODE_SOLID     :: false;
+DRAW_MODE_WIREFRAME :: true;
 
 BITMAP_FRAME_FLIP_VERTICLE   :: (1 << 0);
 BITMAP_FRAME_FLIP_HORIZONTAL :: (1 << 1);
@@ -1182,15 +1184,17 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
 
 draw_model :: (rdr: GL_Renderer, m: Model) {
     for m.meshes {
-        // draw_mesh(rdr, << it);
-        draw_mesh_wireframe(rdr, << it);
+        if m.draw_mode == {
+            case DRAW_MODE_SOLID; draw_mesh(rdr, << it);
+            case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(rdr, << it);
+        }
     }
 }
 
 draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
-    start_scene(rdr);
+    // start_scene(rdr);
     for sc.models draw_model(<<rdr, <<it);
-    finish_scene(rdr);
+    // finish_scene(rdr);
 }
 
 PI :: 3.14159;

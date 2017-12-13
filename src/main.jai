@@ -43,7 +43,8 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) ->
     m: Mesh;
 
     off_white := make_Color(0.1, 0.3, 0.1);
-    white := make_Color(1, 1, 1);
+    // white := make_Color(1, 1, 1);
+    white := make_Color(0.5, 0.5, 0.5);
 
     for y: y_start..hh-1 {
         is_white := false;
@@ -142,6 +143,7 @@ make_aabb_mesh :: (a: AABB) -> *Model {
 
 unit_sphere_model: *Model;
 aabb_model: *Model;
+checker_board: *Model;
 
 bodies: [..] *Rigid_Body;
 
@@ -151,20 +153,35 @@ do_collision_detection :: () {
     b0 := bodies[0];
     b1 := bodies[1];
 
-    intersects, simplex := do_gjk(<<b0, <<b1);
-    if intersects {
-        separate := do_epa(simplex, <<b0, <<b1);
+    /*
+    // intersects, simplex := do_gjk(<<b0, <<b1);
+    // if intersects {
+    //     separate := do_epa(simplex, <<b0, <<b1);
 
-        impulse_response(b0, b1, separate);
+    //     impulse_response(b0, b1, separate);
+    // }
+    */
+    
+    intersects: bool;
+    cp: Contact_Point;
+    if b0.shape_type == Sphere && b1.shape_type == AABB {
+        intersects, cp = do_collide_sphere_aabb(b0.sphere, b1.aabb);
+    }
+
+    if intersects {
+        impulse_response(b0, b1, cp);
     }
 }
+
+MAX_WALK_SPEED :: 1.36; // magnitude of fastest walk velocity allowed (length(xy veloctiy))
+MAX_RUN_SPEED :: 3.12928;
 
 update_physics :: (game: *Game, dt: float) {
     for bodies {
         // if it.is_static continue;
 
         if it.shape_type == Sphere {
-            gravity := make_Vector3(0, -9, 0);
+            gravity := make_Vector3(0, -9.81, 0);
             gravity *= (1.0 / it.inverse_mass);
             it.force += gravity;
         }
@@ -200,27 +217,32 @@ draw_debug_bodies :: (game: *Game) {
 
 create_test_scene :: (game: *Game) -> Scene {
     sc: Scene;
-    // test_model: Model;
-    // test_mesh: *Mesh = New(Mesh);
-    // <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 16, 16);
-    // array_add(*test_model.meshes, test_mesh);
-    // array_add(*sc.models, test_model);
+    {
+        test_model := New(Model);
+        test_mesh: *Mesh = New(Mesh);
+        <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 10, 10);
+        array_add(*test_model.meshes, test_mesh);
+        array_add(*sc.models, test_model);
+    }
 
     {
         aabb := make_AABB(make_Vector3(0, 0, 0), make_Vector3(1, 1, 1));
         aabb_model = make_aabb_mesh(aabb);
+        aabb_model.draw_mode = DRAW_MODE_WIREFRAME;
         // array_add(*sc.models, aabb_model);
     }
 
-    aabb := make_AABB(make_Vector3(0, -5, -10), make_Vector3(10, 10, 10));
+    aabb := make_AABB(make_Vector3(0, -5, 0), make_Vector3(10, 10, 10));
 
     sphere_a: Sphere;
     sphere_a.radius = 1;
 
     unit_sphere_model = make_sphere_mesh(sphere_a);
+    unit_sphere_model.draw_mode = DRAW_MODE_WIREFRAME;
     // array_add(*sc.models, unit_sphere_model);
 
-    sphere_a.center = make_Vector3(-1, 10.0, -10);
+    sphere_a.center = make_Vector3(0, 2.0, 0);
+    sphere_a.radius = 0.5;
 
     {
         rb := New(Rigid_Body);
@@ -233,7 +255,7 @@ create_test_scene :: (game: *Game) -> Scene {
 
     {
         rb := New(Rigid_Body);
-        Rigid_Body_con(rb, 100000.0, aabb);
+        Rigid_Body_con(rb, 0, aabb);
         rb.is_static = true;
 
         print("rb1: %\n", rb);
@@ -244,7 +266,12 @@ create_test_scene :: (game: *Game) -> Scene {
     return sc;
 }
 
+_logger :: (message: string, ident: string, mode: Log_Mode, data: *void) {
+    print("%: %\n", ident, message);
+}
+
 main :: () {
+    context.logger = _logger;
     os_init_platform();
 
     orig_wd: string;
@@ -316,6 +343,7 @@ main :: () {
 
     main_scene := create_test_scene(*game);
 
+    pressed := false;
 
     while (true) {
         exit := false;
@@ -332,13 +360,35 @@ main :: () {
         if (joysticks.count) {
             joy := joysticks[0];
 
-            game.renderer.camera.position.x += joy.left_thumb.x;
-            game.renderer.camera.position.z -= joy.left_thumb.y;
+            // game.renderer.camera.position.x += joy.left_thumb.x;
+            // game.renderer.camera.position.z -= joy.left_thumb.y;
+
+            // bodies[0].force.x = (joy.left_thumb.x * (1.0 / bodies[0].inverse_mass) * 100);
+            // bodies[0].force.z = -(joy.left_thumb.y * (1.0 / bodies[0].inverse_mass) * 100);
+
+            char_body := bodies[0];
+            x_speed := joy.left_thumb.x;
+            z_speed := -joy.left_thumb.y;
+            vel := make_Vector2(x_speed, z_speed);
+            vel = max(MAX_RUN_SPEED, length(vel)) * normalize(vel);
+
+            char_body.velocity.x = vel.x;
+            char_body.velocity.z = vel.y;
+            if joy.buttons & JOYSTICK_BUTTON_A && !pressed {
+                pressed = true;
+                // game.player_is_jumping = true;
+                assert(char_body.inverse_mass > 0);
+                char_body.force += make_Vector3(0, 500 * (1.0 / char_body.inverse_mass), 0);
+            }
+
+            if !(joy.buttons & JOYSTICK_BUTTON_A) && pressed {
+                pressed = false;
+            }
             if joy.buttons & JOYSTICK_BUTTON_RBUMPER {
-                game.renderer.camera.position.y += 1;
+                // game.renderer.camera.position.y += 1;
             }
             if joy.buttons & JOYSTICK_BUTTON_LBUMPER {
-                game.renderer.camera.position.y -= 1;
+                // game.renderer.camera.position.y -= 1;
             }
 
             if (joy.buttons & JOYSTICK_BUTTON_BACK) exit = true;
@@ -357,14 +407,15 @@ main :: () {
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         // update_editor(*game, 1.0);
         glViewport(0, 0, xx game.window.width, xx game.window.height);
-        // draw_scene(game.renderer, main_scene);
+
+        start_scene(game.renderer);
+        draw_scene(game.renderer, main_scene);
 
         #if DEVELOPER {
-            // render_editor(game);  
-            start_scene(game.renderer);
+            // render_editor(game);
             draw_debug_bodies(*game);
-            finish_scene(game.renderer);
         }
+        finish_scene(game.renderer);
 
         // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
         /*

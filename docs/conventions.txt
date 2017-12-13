@@ -1,0 +1,3 @@
+
+The scale of the game is in meters.
+By convention, objectis in the game move at meters per second, i.e., gravity is -9.81 m/s^2.

@@ -183,6 +183,16 @@ length :: (v: Vector2) -> float #c_callback {
     return sqrt(v.x*v.x + v.y*v.y);
 }
 
+
+normalize :: (v: Vector2) -> Vector2 {
+    out: Vector2 = ---;
+    len := length(v);
+    if (len == 0) return v;
+    out.x = v.x / len;
+    out.y = v.y / len;
+    return out;
+}
+
 Quaternion :: struct {
     w: float;
     x: float;

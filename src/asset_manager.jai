@@ -201,8 +201,6 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
     init(*st, src);
     tok: ML_Token;
 
-    print("");
-
     mat: *Material;
     ml_get_token(*st, *tok);
     while(tok.type != ML_TOKEN_END) {
