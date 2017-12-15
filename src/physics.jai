@@ -124,6 +124,22 @@ Sphere :: struct {
     radius: float;
 }
 
+
+// Y-axis-aligned capsule
+Capsule :: struct {
+    center: Vector3;
+    radius: float;
+    heigh: float;
+}
+
+make_Capsule :: (center: Vector3, radius: float, height: float) {
+    cap: Capsule = ---;
+    cap.center = center;
+    cap.radius = radius;
+    cap.height = height;
+    return cap;
+}
+
 moment_of_inertia :: (s: Sphere, body: Rigid_Body) -> Matrix3 {
     m: Matrix3;
     t := 2.0 * ((1.0 / body.inverse_mass) * s.radius * s.radius) / 5.0;
@@ -152,6 +168,31 @@ moment_of_inertia :: (b: AABB, body: Rigid_Body) -> Matrix3 {
     return m;
 }
 
+PI :: TAU / 2.0;
+
+moment_of_inertia :: (c: Capsule, body: Rigid_Body) -> Matrix3 {
+    H := c.height;
+    R := c.radius;
+
+    r2 := R*R;
+    r3 := r2*R;
+
+    h2 := H*H;
+    hr := H*R;
+
+    mcy := H * r2 * PI;
+    mhs := (2.0 * r3 * PI) / 3.0;
+    m := mcy + 2 * mhs;
+
+    p1 := mcy * (h2/12.0 +  r2/4.0) + (2 * mhs * ((2*r2/5.0) + (h2/2.0) + (3*hr/8.0)) );
+
+    m: Matrix3;
+    m.[0][0] = p1;
+    m.[1][1] = mcy*(r2/2.0) + 2*mhs*(2*r2/5.0);
+    m.[2][2] = p1;
+    return m;
+}
+
 
 same_direction :: (a: Vector3, b: Vector3) -> bool {
     return dot(a, b) > 0;
@@ -168,19 +209,40 @@ Contact_Point :: struct {
 
 // @Robustness handle the case where the sphere center is inside the AABB
 do_collide_sphere_aabb :: (sp: Sphere, aabb: AABB) -> bool, Contact_Point {
-    p: Vector3 = ---;
-    min := aabb.center - aabb.halfs;
-    max := aabb.center + aabb.halfs;
-    p.x = clamp(sp.center.x, min.x, max.x);
-    p.y = clamp(sp.center.y, min.y, max.y);
-    p.z = clamp(sp.center.z, min.z, max.z);
-
+    p := project_point_onto_aabb(sp.center, aabb);
     cp: Contact_Point;
     cp.normal = normalize(sp.center - p);
     cp.dist = length(sp.center - p);
     cp.point_on_a = (cp.dist / sp.radius) * sp.radius * cp.normal;
     cp.point_on_b = p - aabb.center; // @FixMe only true if the sphere center is outside the bounds of the AABB
     return cp.dist < sp.radius, cp;
+}
+
+do_collide_capsule_aabb :: (cap: Capsule, aabb: AABB) -> bool, Contact_Point {
+    ext := make_Vector3(0, cap.height/2.0, 0);
+    min := cap.center - ext;
+    max := cap.center + ext;
+    p0 := project_point_onto_aabb(min, aabb);
+    p1 := project_point_onto_aabb(max, aabb);
+
+    q0 := closest_point_line_to_point(min, max, p0);
+    q1 := closest_point_line_to_point(min, max, p1);
+
+    if floats_are_equal(length(q1 - p0), length(q1 - p0)) {
+        // the distances are the same so we must be parallel
+        // with the AABB face, so we just apply the contact towards
+        // the center of the two objects
+    }
+}
+
+project_point_onto_aabb :: (p: Vector3, aabb: AABB) -> Vector3 {
+    o: Vector3 = ---;
+    min := aabb.center - aabb.halfs;
+    max := aabb.center + aabb.halfs;
+    o.x = clamp(p.x, min.x, max.x);
+    o.y = clamp(p.y, min.y, max.y);
+    o.z = clamp(p.z, min.z, max.z);
+    return o;
 }
 
 closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
