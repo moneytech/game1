@@ -85,6 +85,16 @@ make_sphere_mesh :: (sp: Sphere) -> *Model {
     return out;
 }
 
+make_capsule_mesh :: (cap: Capsule) -> *Model {
+    out := create_capsule(cap.radius, 8, 8, 1.0);
+    out.meshes[0].material = New(Material);
+    out.meshes[0].material.diffuse = make_Color(1, 1, 1);
+    out.meshes[0].model_matrix = matrix_translate(cap.center);
+    out.meshes[0].normals.count = 0;
+    store_mesh_in_buffer(out.meshes[0]);
+    return out;
+}
+
 add_line :: (m: *Mesh, a: Vector3, b: Vector3, color: Color) {
     array_add(*m.vertices, a);
     array_add(*m.vertices, b);
@@ -142,16 +152,13 @@ make_aabb_mesh :: (a: AABB) -> *Model {
 }
 
 unit_sphere_model: *Model;
+unit_capsule_model: *Model;
 aabb_model: *Model;
 checker_board: *Model;
 
 bodies: [..] *Rigid_Body;
 
 do_collision_detection :: () {
-    assert(bodies.count == 2);
-
-    b0 := bodies[0];
-    b1 := bodies[1];
 
     /*
     // intersects, simplex := do_gjk(<<b0, <<b1);
@@ -162,15 +169,27 @@ do_collision_detection :: () {
     // }
     */
     
-    intersects: bool;
-    cp: Contact_Point;
-    if b0.shape_type == Sphere && b1.shape_type == AABB {
-        intersects, cp = do_collide_sphere_aabb(b0.sphere, b1.aabb);
-    }
+    for b0_index: 0..bodies.count-2 {
+        for b1_index: b0_index+1..bodies.count-1 {
+            b0 := bodies[b0_index];
+            b1 := bodies[b1_index];
 
-    if intersects {
-        impulse_response(b0, b1, cp);
+            intersects: bool;
+            cp: Contact_Point;
+            if b0.shape_type == Sphere && b1.shape_type == AABB {
+                intersects, cp = do_collide_sphere_aabb(b0.sphere, b1.aabb);
+            } else if b0.shape_type == Capsule && b1.shape_type == AABB {
+                intersects, cp = do_collide_capsule_aabb(b0.capsule, b1.aabb);
+            } else if b0.shape_type == AABB && b1.shape_type == AABB {
+                intersects, cp = do_collide_aabb_aabb(b0.aabb, b1.aabb);
+            }
+
+            if intersects {
+                impulse_response(b0, b1, cp);
+            }
+        }
     }
+    
 }
 
 MAX_WALK_SPEED :: 1.36; // magnitude of fastest walk velocity allowed (length(xy veloctiy))
@@ -180,11 +199,18 @@ update_physics :: (game: *Game, dt: float) {
     for bodies {
         // if it.is_static continue;
 
-        if it.shape_type == Sphere {
+        if it.inverse_mass != 0 {
             gravity := make_Vector3(0, -9.81, 0);
             gravity *= (1.0 / it.inverse_mass);
             it.force += gravity;
         }
+
+        if it.shape_type == AABB {
+            // @Hack exp decay
+            it.velocity.x *= 0.7;
+            it.velocity.z *= 0.7;
+        }
+        
         integrate(it, dt);
 
         it.force = make_Vector3(0, 0, 0);
@@ -196,13 +222,18 @@ update_physics :: (game: *Game, dt: float) {
 draw_debug_bodies :: (game: *Game) {
     for bodies {
         pos := it.position;
-        model_matrix := matrix_translate(pos.x, pos.y, pos.z) * to_mat4(it.orientation);
+        model_matrix := matrix_translate(pos.x, pos.y, pos.z);
         if it.shape_type == Sphere {
             model_matrix = model_matrix * matrix_scale(it.sphere.radius, it.sphere.radius, it.sphere.radius);
             unit_sphere_model.meshes[0].model_matrix = model_matrix;
             draw_model(<<game.renderer, <<unit_sphere_model);
 
             // print("body %: %\n", it.shape_type, <<it);
+        } else if it.shape_type == Capsule {
+            // @Incomplete this scale is technically not correct
+            model_matrix = model_matrix * matrix_scale(1, 1, 1);
+            unit_capsule_model.meshes[0].model_matrix = model_matrix;
+            draw_model(<<game.renderer, <<unit_capsule_model);
         } else if it.shape_type == AABB {
             model_matrix = model_matrix * matrix_scale(it.aabb.halfs.x*2, it.aabb.halfs.y*2, it.aabb.halfs.z*2);
             aabb_model.meshes[0].model_matrix = model_matrix;
@@ -220,7 +251,7 @@ create_test_scene :: (game: *Game) -> Scene {
     {
         test_model := New(Model);
         test_mesh: *Mesh = New(Mesh);
-        <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 10, 10);
+        <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 50, 50);
         array_add(*test_model.meshes, test_mesh);
         array_add(*sc.models, test_model);
     }
@@ -232,7 +263,7 @@ create_test_scene :: (game: *Game) -> Scene {
         // array_add(*sc.models, aabb_model);
     }
 
-    aabb := make_AABB(make_Vector3(0, -5, 0), make_Vector3(10, 10, 10));
+    aabb := make_AABB(make_Vector3(0, -5, 0), make_Vector3(50, 10, 50));
 
     sphere_a: Sphere;
     sphere_a.radius = 1;
@@ -241,14 +272,33 @@ create_test_scene :: (game: *Game) -> Scene {
     unit_sphere_model.draw_mode = DRAW_MODE_WIREFRAME;
     // array_add(*sc.models, unit_sphere_model);
 
-    sphere_a.center = make_Vector3(0, 2.0, 0);
-    sphere_a.radius = 0.5;
-
+    unit_capsule_model = make_capsule_mesh(make_Capsule(make_Vector3(0, 0, 0), 2, 1));
+    unit_capsule_model.draw_mode = DRAW_MODE_WIREFRAME;
     {
+        sphere_a.center = make_Vector3(0, 2.0, 0);
+        sphere_a.radius = 1.0;
         rb := New(Rigid_Body);
         Rigid_Body_con(rb, 1.0, sphere_a);
 
         print("rb: %\n", rb);
+
+        array_add(*bodies, rb);
+    }
+
+
+    // {
+    //     cap := make_Capsule(make_Vector3(0, 3, 0), 2, 1);
+    //     rb := New(Rigid_Body);
+    //     Rigid_Body_con(rb, 1.0, cap);
+
+    //     print("rb2: %\n", rb);
+    //     array_add(*bodies, rb);
+    // }
+
+    {
+        aabb2 := make_AABB(make_Vector3(3, 3, 0), make_Vector3(2, 2, 2));
+        rb := New(Rigid_Body);
+        Rigid_Body_con(rb, 1.0, aabb2);
 
         array_add(*bodies, rb);
     }
@@ -403,7 +453,7 @@ main :: () {
         // }
 
         update_camera(*game, 1.0/60.0);
-        update_physics(*game, 1.0/100.0);
+        update_physics(*game, 1.0/60.0);
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         // update_editor(*game, 1.0);
         glViewport(0, 0, xx game.window.width, xx game.window.height);

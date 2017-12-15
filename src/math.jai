@@ -761,6 +761,7 @@ operator~ :: (v: Vector3) -> Matrix3 {
 
 // floating point stuff
 
+PI :: TAU / 2.0;
 
 EPSILON :: 0.000001;
 
@@ -773,6 +774,10 @@ max :: (min: $T, a: T, b: T) -> T {
 
 floats_are_equal :: inline (a: $T, b: T) -> bool {
     return fabs(a - b) <= EPSILON * max(cast(float64) 1.0, fabs(a), fabs(b));
+}
+
+vectors_are_equal :: inline (a: Vector3, b: Vector3) -> bool {
+    return floats_are_equal(a.x, b.x) && floats_are_equal(a.y, b.y) && floats_are_equal(a.z, b.z);
 }
 
 #scope_file

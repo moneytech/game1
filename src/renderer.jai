@@ -1197,13 +1197,11 @@ draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
     // finish_scene(rdr);
 }
 
-PI :: 3.14159;
-
 get_sphere_vertex :: (theta: float, phi: float) -> Vector3 {
     v: Vector3 = ---;
-    v.x = sin(theta * PI * 2) * cos(phi * PI * 2);
+    v.x = sin(theta * PI * 2) * cos(phi * TAU);
     v.z = cos(theta * PI * 2);
-    v.y = sin(theta * PI * 2) * sin(phi * PI * 2);
+    v.y = sin(theta * PI * 2) * sin(phi * TAU);
     return v;
 }
 
@@ -1218,6 +1216,7 @@ create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, l
 
     xstep: float = 1.0 / cast(float) longitude_slices;
     ystep := (1.0 / cast(float) latitude_slices) / 2;
+    half_height := length / 2.0;
 
     for xa: 0..(longitude_slices/2)-1 {
         theta: float = cast(float) xa * xstep;
@@ -1229,10 +1228,10 @@ create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, l
             v2 := get_sphere_vertex(theta + xstep, phi + ystep);
             v3 := get_sphere_vertex(theta,         phi + ystep);
 
-            v0.y += length;
-            v1.y += length;
-            v2.y += length;
-            v3.y += length;
+            v0.y += half_height;
+            v1.y += half_height;
+            v2.y += half_height;
+            v3.y += half_height;
 
             array_add(*m.vertices, v0);
             array_add(*m.normals, normalize(v0));
@@ -1257,9 +1256,12 @@ create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, l
             v0 := get_sphere_vertex(theta,         0);
             v1 := get_sphere_vertex(theta + xstep, 0);
             v2 := v1;
-            v2.y += length;
             v3 := v0;
-            v3.y += length;
+
+            v0.y -= half_height;
+            v1.y -= half_height;
+            v2.y += half_height;
+            v3.y += half_height;
 
             array_add(*m.vertices, v0);
             array_add(*m.normals, normalize(v0));
@@ -1286,6 +1288,11 @@ create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, l
             v1 := get_sphere_vertex(theta + xstep, phi);
             v2 := get_sphere_vertex(theta + xstep, phi + ystep);
             v3 := get_sphere_vertex(theta,         phi + ystep);
+
+            v0.y -= half_height;
+            v1.y -= half_height;
+            v2.y -= half_height;
+            v3.y -= half_height;
 
             array_add(*m.vertices, v2);
             array_add(*m.normals, normalize(v2));

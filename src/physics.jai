@@ -28,6 +28,9 @@ Rigid_Body :: struct {
     sphere: Sphere;
 
     #place shape;
+    capsule: Capsule;
+
+    #place shape;
     aabb: AABB;
 }
 
@@ -69,8 +72,8 @@ integrate :: (using rb: *Rigid_Body, dt: float) {
 }
 
 correct_position :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
-    PERCENT :: 0.025;
-    SLOP :: 0.05;
+    PERCENT :: 0.2;
+    SLOP :: 0.001;
     correction := max(0.0, cp.dist - SLOP) / (rb0.inverse_mass + rb1.inverse_mass) * PERCENT * cp.normal;
     rb0.position += rb0.inverse_mass * correction;
     rb1.position -= rb1.inverse_mass * correction;
@@ -80,19 +83,19 @@ impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
     cr := clamp(rb0.elasticity * rb1.elasticity, 0.0, 1.0);
     rv := rb1.velocity - rb0.velocity;
     n := cp.normal;
-    r_a := cp.point_on_a;
-    r_b := cp.point_on_b;
-
-    if !same_direction(rv, n) return;
+    // r_a := cp.point_on_a;
+    // r_b := cp.point_on_b;
 
     correct_position(rb0, rb1, cp);
 
-    d1 := (rb0.inverse_mass + rb1.inverse_mass);
-    ia := cross(cross(r_a, n), r_a)  * rb0.inverse_inertia_tensor;
-    ib := cross(cross(r_b, n), r_b)  * rb1.inverse_inertia_tensor;
-    d2 := dot(ia + ib, n);
+    if !same_direction(rv, n) return;
 
-    j := dot(-(1 + cr) * rv, n) / (d1);
+    d1 := (rb0.inverse_mass + rb1.inverse_mass);
+    // ia := cross(cross(r_a, n), r_a)  * rb0.inverse_inertia_tensor;
+    // ib := cross(cross(r_b, n), r_b)  * rb1.inverse_inertia_tensor;
+    // d2 := dot(ia + ib, n);
+
+    j := -(1 + cr) * dot(rv, n) / (d1);
 
     // rb0.position
     rb0.velocity -= (j * cp.normal) * rb0.inverse_mass;
@@ -129,10 +132,10 @@ Sphere :: struct {
 Capsule :: struct {
     center: Vector3;
     radius: float;
-    heigh: float;
+    height: float;
 }
 
-make_Capsule :: (center: Vector3, radius: float, height: float) {
+make_Capsule :: (center: Vector3, radius: float, height: float) -> Capsule {
     cap: Capsule = ---;
     cap.center = center;
     cap.radius = radius;
@@ -168,8 +171,6 @@ moment_of_inertia :: (b: AABB, body: Rigid_Body) -> Matrix3 {
     return m;
 }
 
-PI :: TAU / 2.0;
-
 moment_of_inertia :: (c: Capsule, body: Rigid_Body) -> Matrix3 {
     H := c.height;
     R := c.radius;
@@ -186,11 +187,11 @@ moment_of_inertia :: (c: Capsule, body: Rigid_Body) -> Matrix3 {
 
     p1 := mcy * (h2/12.0 +  r2/4.0) + (2 * mhs * ((2*r2/5.0) + (h2/2.0) + (3*hr/8.0)) );
 
-    m: Matrix3;
-    m.[0][0] = p1;
-    m.[1][1] = mcy*(r2/2.0) + 2*mhs*(2*r2/5.0);
-    m.[2][2] = p1;
-    return m;
+    mat: Matrix3;
+    mat.m[0][0] = p1;
+    mat.m[1][1] = mcy*(r2/2.0) + 2*mhs*(2*r2/5.0);
+    mat.m[2][2] = p1;
+    return mat;
 }
 
 
@@ -212,12 +213,14 @@ do_collide_sphere_aabb :: (sp: Sphere, aabb: AABB) -> bool, Contact_Point {
     p := project_point_onto_aabb(sp.center, aabb);
     cp: Contact_Point;
     cp.normal = normalize(sp.center - p);
-    cp.dist = length(sp.center - p);
-    cp.point_on_a = (cp.dist / sp.radius) * sp.radius * cp.normal;
+    cp.point_on_a = sp.radius * -cp.normal;
     cp.point_on_b = p - aabb.center; // @FixMe only true if the sphere center is outside the bounds of the AABB
-    return cp.dist < sp.radius, cp;
+    cp.dist = length((sp.center + cp.point_on_a) - p);
+    return length(sp.center - p) < sp.radius, cp;
 }
 
+// @Incomplete the point_on_a is incorrect since the point is local the
+// to the point we choose to do the sphere test and not the capsule center!
 do_collide_capsule_aabb :: (cap: Capsule, aabb: AABB) -> bool, Contact_Point {
     ext := make_Vector3(0, cap.height/2.0, 0);
     min := cap.center - ext;
@@ -225,13 +228,83 @@ do_collide_capsule_aabb :: (cap: Capsule, aabb: AABB) -> bool, Contact_Point {
     p0 := project_point_onto_aabb(min, aabb);
     p1 := project_point_onto_aabb(max, aabb);
 
-    q0 := closest_point_line_to_point(min, max, p0);
-    q1 := closest_point_line_to_point(min, max, p1);
+    sp: Sphere;
+    sp.radius = cap.radius;
+    if vectors_are_equal(p0, p1) { // if they're the same point, we're on top or below the box
+        l1 := length(p0 - min);
+        l2 := length(p1 - max);
 
-    if floats_are_equal(length(q1 - p0), length(q1 - p0)) {
-        // the distances are the same so we must be parallel
-        // with the AABB face, so we just apply the contact towards
-        // the center of the two objects
+        sp.center = min;
+        if l2 < l1 {
+            sp.center = max;
+        }
+
+        success, cp := do_collide_sphere_aabb(sp, aabb);
+        return success, cp;
+    }
+
+    aabb_min := aabb.center + aabb.halfs;
+    aabb_max := aabb.center + aabb.halfs;
+
+    min_inside := aabb_min.y < min.y;
+    max_inside := aabb_max.y > max.y;
+
+    if min_inside && max_inside {
+        // if both extents of the cylinder are inside, the point of contact
+        // is square on with the center of the capsule
+        sp.center = cap.center;
+        success, cp := do_collide_sphere_aabb(sp, aabb);
+        return success, cp;
+    } else {
+        // wichever dumbell end is physically closer to the box
+        // @Cutnpaste from above
+        l1 := length(p0 - min);
+        l2 := length(p1 - max);
+
+        sp.center = min;
+        if l2 < l1 {
+            sp.center = max;
+        }
+
+        success, cp := do_collide_sphere_aabb(sp, aabb);
+        return success, cp;
+    }
+}
+
+do_collide_aabb_aabb :: (a: AABB, b: AABB) -> bool, Contact_Point {
+    a_min := a.center - a.halfs;
+    a_max := a.center + a.halfs;
+
+    b_min := b.center - b.halfs;
+    b_max := b.center + b.halfs;
+
+    cp: Contact_Point;
+
+    if a_min.x > b_max.x || a_max.x < b_min.x return false, cp;
+    if a_min.y > b_max.y || a_max.y < b_min.y return false, cp;
+    if a_min.z > b_max.z || a_max.z < b_min.z return false, cp;
+    
+    p0 := b_max - a_min;
+    p1 := a_max - b_min;
+
+    x := min(p0.x, p1.x);
+    y := min(p0.y, p1.y);
+    z := min(p0.z, p1.z);
+
+    // p2 := make_Vector3(x, y, z);
+    // @Incomplete point_on_a, point_on_b
+    if x < y && x < z {
+        cp.normal = normalize(make_Vector3(x, 0, 0));
+        cp.dist = cast(float32) fabs(x);
+        return true, cp;
+    } else if y < z {
+        cp.normal = normalize(make_Vector3(0, y, 0));
+        cp.dist = cast(float32) fabs(y);
+        return true, cp;
+    } else {
+        cp.normal = normalize(make_Vector3(0, 0, z));
+        cp.dist = cast(float32) fabs(z);
+        return true, cp;
     }
 }
 
