@@ -107,6 +107,30 @@ make_signpost :: (text: Text) -> *Signpost {
     return ret;
 }
 
+make_crate :: (game: *Game) -> *Actor {
+    actor := New(Actor);
+    actor.model = load_model(game.asset_man, "assets/crate.fbx");;
+    actor.body = New(Rigid_Body);
+
+    collider := make_AABB(make_Vector3(0, 0, 0), make_Vector3(2, 2, 2));
+    Rigid_Body_con(actor.body, 2.0, collider, actor);
+    return actor;
+}
+
+Holdable_Actor :: struct {
+    using actor: Actor;
+}
+
+make_barrel :: (game: *Game) -> *Holdable_Actor {
+    actor := New(Holdable_Actor);
+    actor.model = load_model(game.asset_man, "assets/barrel.fbx");;
+    actor.body = New(Rigid_Body);
+
+    collider := make_Capsule(make_Vector3(0, 0, 0), 0.5, 0.2);
+    Rigid_Body_con(actor.body, 2.0, collider, actor);
+    return actor;
+}
+
 Text :: enum u16 {
     NO_MESSAGE,
 
@@ -408,11 +432,29 @@ create_test_scene :: (game: *Game) -> Scene {
         array_add(*sc.actors, sign);
         array_add(*sc.models, sign.model);
 
-        aabb2 := make_AABB(make_Vector3(3, 3, 0), make_Vector3(2, 2, 2));
+        aabb2 := make_AABB(make_Vector3(2, 3, 0), make_Vector3(2, 2, 2));
         rb := New(Rigid_Body);
         Rigid_Body_con(rb, 1.0, aabb2, sign);
 
         array_add(*bodies, rb);
+    }
+
+    {
+        barrel := make_barrel(game);
+        barrel.body.position = make_Vector3(4, 3, 0);
+
+        array_add(*sc.actors, barrel);
+        array_add(*sc.models, barrel.model);
+        array_add(*bodies, barrel.body);
+    }
+
+    {
+        crate := make_crate(game);
+        crate.body.position = make_Vector3(6, 3, 0);
+
+        array_add(*sc.actors, crate);
+        array_add(*sc.models, crate.model);
+        array_add(*bodies, crate.body);
     }
 
     {
