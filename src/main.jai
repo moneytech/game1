@@ -17,6 +17,54 @@ Game :: struct {
 
     fov: float = 60;
     water_distort_offset: float;
+
+    joy: *Joystick;
+}
+
+Scene :: struct {
+    models: [..] *Model;
+    actors: [..] *Actor;
+    cameras: [..] Camera;
+    lights: [..] Light;
+
+    active_camera: Camera;
+}
+
+draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
+    for sc.actors {
+        if it.body && it.model {
+            orient := matrix_rotate(it.orientiation);
+            it.model.meshes[0].model_matrix = matrix_translate(it.body.position) * orient;
+        }
+    }
+    for sc.models draw_model(<<rdr, <<it);
+}
+
+update_scene :: (game: *Game, sc: *Scene, dt: float) {
+    for sc.actors {
+        if it.update_callback it.update_callback(game, it, dt);
+    }
+}
+
+Actor :: struct {
+    model: *Model;
+    body: *Rigid_Body;
+    orientiation: Quaternion; // orientiation around Y axis
+
+    update_callback: (game: *Game, actor: *Actor, dt: float);
+}
+
+update_player_controller :: (game: *Game, player: *Actor, dt: float) {
+    joy := game.joy;
+    vel_xz := make_Vector3(player.body.velocity.x, 0, player.body.velocity.z);
+    if length(vel_xz) {
+        starting_dir := make_Vector3(0, 0, 1);
+        target_dir := normalize(vel_xz);
+
+        axis := make_Vector3(0, 1, 0);
+        angle := atan2(target_dir.x, target_dir.z);
+        player.orientiation = set_angle_vector(xx angle, axis.x, axis.y, axis.z);
+    }
 }
 
 Game_Window :: struct {
@@ -272,28 +320,36 @@ create_test_scene :: (game: *Game) -> Scene {
     unit_sphere_model.draw_mode = DRAW_MODE_WIREFRAME;
     // array_add(*sc.models, unit_sphere_model);
 
-    unit_capsule_model = make_capsule_mesh(make_Capsule(make_Vector3(0, 0, 0), 2, 1));
+    unit_capsule_model = make_capsule_mesh(make_Capsule(make_Vector3(0, 3, 0), 0.75/2.0, 1.2 - 0.75));
     unit_capsule_model.draw_mode = DRAW_MODE_WIREFRAME;
-    {
-        sphere_a.center = make_Vector3(0, 2.0, 0);
-        sphere_a.radius = 1.0;
-        rb := New(Rigid_Body);
-        Rigid_Body_con(rb, 1.0, sphere_a);
-
-        print("rb: %\n", rb);
-
-        array_add(*bodies, rb);
-    }
-
-
     // {
-    //     cap := make_Capsule(make_Vector3(0, 3, 0), 2, 1);
+    //     sphere_a.center = make_Vector3(0, 2.0, 0);
+    //     sphere_a.radius = 1.0;
     //     rb := New(Rigid_Body);
-    //     Rigid_Body_con(rb, 1.0, cap);
+    //     Rigid_Body_con(rb, 1.0, sphere_a);
 
-    //     print("rb2: %\n", rb);
+    //     print("rb: %\n", rb);
+
     //     array_add(*bodies, rb);
     // }
+
+
+    {
+        cap := make_Capsule(make_Vector3(0, 3, 0), 0.75/2.0, 1.2 - 0.75);
+        rb := New(Rigid_Body);
+        Rigid_Body_con(rb, 1.0, cap);
+
+        print("rb2: %\n", rb);
+        array_add(*bodies, rb);
+
+        player_actor := New(Actor);
+        player_actor.body = rb;
+        player_actor.model = load_model(game.asset_man, "assets/player.fbx");
+        assert(player_actor.model != null);
+        array_add(*sc.actors, player_actor);
+        array_add(*sc.models, player_actor.model);
+        player_actor.update_callback = update_player_controller;
+    }
 
     {
         aabb2 := make_AABB(make_Vector3(3, 3, 0), make_Vector3(2, 2, 2));
@@ -336,8 +392,8 @@ main :: () {
         defer free(path);
         setcwd(final_path);
     }
-    // os_watch_dir("assets");
-    // os_watch_dir("assets/shaders");
+    os_watch_dir("assets");
+    os_watch_dir("assets/shaders");
 
     WINDOW_WIDTH :: 1280;
     WINDOW_HEIGHT :: 720;
@@ -409,6 +465,7 @@ main :: () {
 
         if (joysticks.count) {
             joy := joysticks[0];
+            game.joy = *joysticks[0];
 
             // game.renderer.camera.position.x += joy.left_thumb.x;
             // game.renderer.camera.position.z -= joy.left_thumb.y;
@@ -442,6 +499,8 @@ main :: () {
             }
 
             if (joy.buttons & JOYSTICK_BUTTON_BACK) exit = true;
+        } else {
+            game.joy = null;
         }
 
         if (exit) break;
@@ -454,6 +513,7 @@ main :: () {
 
         update_camera(*game, 1.0/60.0);
         update_physics(*game, 1.0/60.0);
+        update_scene(*game, *main_scene, 1.0/60.0);
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         // update_editor(*game, 1.0);
         glViewport(0, 0, xx game.window.width, xx game.window.height);

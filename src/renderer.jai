@@ -253,13 +253,6 @@ Camera :: struct {
 };
 
 #run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
-Scene :: struct {
-    models: [..] *Model;
-    cameras: [..] Camera;
-    lights: [..] Light;
-
-    active_camera: Camera;
-}
 
 GL_Renderer :: struct {
     game: *Game;
@@ -932,6 +925,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     }
 
     if (tex_size && (diffuse_tex || normal_tex || spec_tex)) {
+        assert(false);
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size));
     }
@@ -1189,12 +1183,6 @@ draw_model :: (rdr: GL_Renderer, m: Model) {
             case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(rdr, << it);
         }
     }
-}
-
-draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
-    // start_scene(rdr);
-    for sc.models draw_model(<<rdr, <<it);
-    // finish_scene(rdr);
 }
 
 get_sphere_vertex :: (theta: float, phi: float) -> Vector3 {

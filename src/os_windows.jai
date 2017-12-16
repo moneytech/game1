@@ -174,25 +174,53 @@ __XInputSetState: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #foreign;
 wglChoosePixelFormatARB: (hDC: HDC, piAttribIList: *s32, pfAttribFList: *float, nMaxFormats: u32, piFormats: *s32, nNumFormats: *u32) -> BOOL #foreign;
 wglCreateContextAttribsARB: (hDC: HDC, hShareContext: HGLRC, attribList: *s32) -> HGLRC #foreign;
 
+window_class_initted := false;
+WINDOW_CLASS_NAME :: "Jai Default Window Class\0";
+
+init_window_class :: () {
+    wc: WNDCLASSEXA;
+
+    wc.cbSize = size_of(WNDCLASSEXA);
+    wc.style                = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+    wc.lpfnWndProc          = xx MyWindowProc;
+    wc.cbClsExtra           = 0;
+    wc.cbWndExtra           = 0;
+    wc.hInstance            = 0;   // @Robustness: If we want to run on win98 we need the app hinstance here...
+    wc.hIcon                = LoadIconA(0, "APPICON\0".data);
+    wc.hCursor              = LoadCursorA(0, cast(*u8) IDC_ARROW);
+    wc.hbrBackground        = cast(HBRUSH) GetStockObject(WHITE_BRUSH);
+    
+    wc.lpszMenuName         = null;
+    wc.lpszClassName        = WINDOW_CLASS_NAME.data;
+
+    // Register the window class
+    if RegisterClassExA(*wc) == 0 {
+        logprint("opengl", "Failure in init_window_class(): RegisterClassExA returned 0.\n");
+        return;
+    }
+
+    window_class_initted = true;
+}
+
 WINDOWED_STYLE : s32   : WS_VISIBLE | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_SIZEBOX;
 FULLSCREEN_STYLE : s32 : WS_VISIBLE | WS_POPUP;
 os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
-    // if (!window_class_initted) {
-    //     init_window_class();
-    // }
+    if (!window_class_initted) {
+        init_window_class();
+    }
 
-    // rect: RECT;
-    // rect.right = width;
-    // rect.bottom = height;
-    // AdjustWindowRect(*rect, WINDOWED_STYLE, 0);
+    rect: RECT;
+    rect.right = width;
+    rect.bottom = height;
+    AdjustWindowRect(*rect, WINDOWED_STYLE, 0);
 
-    // hInstance := GetModuleHandleA(null);
-    // c_title := to_c_string(title);
-    // ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, rect.right-rect.left, rect.bottom-rect.top, 0, 0, hInstance, null);
-    // free(c_title);
-    // return ret;
+    hInstance := GetModuleHandleA(null);
+    c_title := to_c_string(title);
+    ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, rect.right-rect.left, rect.bottom-rect.top, 0, 0, hInstance, null);
+    free(c_title);
+    return ret;
 
-    return create_window(width, height, title);
+    // return create_window(width, height, title);
 }
 
 

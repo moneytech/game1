@@ -599,7 +599,8 @@ Model_load_fbx :: (path: string) -> *Model {
     for properties70.nodes {
         if it.properties.count {
             if it.properties[0].string_data == "UnitScaleFactor" {
-                // @TODO
+                scale_factor = xx it.properties[4].primitive.f64;
+                print("scale factor: %, %\n", path, scale_factor);
             }
         }
     }
@@ -611,10 +612,7 @@ Model_load_fbx :: (path: string) -> *Model {
     vdata := (<<geom)["Vertices"].properties[0].data;
     idata := (<<geom)["PolygonVertexIndex"].properties[0].data;
     layer_normal := (<<geom)["LayerElementNormal"];
-    layer_uv := (<<geom)["LayerElementUV"];
     ndata := (<<layer_normal)["Normals"].properties[0].data;
-    uvdata := (<<layer_uv)["UV"].properties[0].data;
-    uvindex := (<<layer_uv)["UVIndex"].properties[0].data
 
     array_reserve(*mesh.vertices, vdata.count / 3);
     array_reserve(*mesh.normals, ndata.count / 3);
@@ -626,13 +624,11 @@ Model_load_fbx :: (path: string) -> *Model {
         array_add(*indices, cast(u32) in);
     }
 
-    CENTIMETERS_TO_METERS :: 1.0 / 100.0;
-
     assert(indices.count % 3 == 0);
 
     for indices {
         vec := make_Vector3(cast(float) vdata[it * 3].f64, cast(float) vdata[it * 3 + 1].f64, cast(float) vdata[it * 3 + 2].f64);
-        array_add(*mesh.vertices, vec * CENTIMETERS_TO_METERS);
+        array_add(*mesh.vertices, vec * scale_factor);
     }
 
     for 0..(ndata.count/3)-1 {
@@ -645,10 +641,15 @@ Model_load_fbx :: (path: string) -> *Model {
     //     array_add(*mesh.tex_coords, uv);
     // }
 
-    for uvindex {
-        // @Note UVs are indexed as 3 dimensional vectors though we only support 2
-        uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
-        array_add(*mesh.tex_coords, uv);
+    layer_uv := (<<geom)["LayerElementUV"];
+    if layer_uv {
+        uvdata := (<<layer_uv)["UV"].properties[0].data;
+        uvindex := (<<layer_uv)["UVIndex"].properties[0].data
+        for uvindex {
+            // @Note UVs are indexed as 3 dimensional vectors though we only support 2
+            uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
+            array_add(*mesh.tex_coords, uv);
+        }
     }
 
     // @Temporary material
@@ -657,7 +658,7 @@ Model_load_fbx :: (path: string) -> *Model {
     mat.diffuse = make_Color(0.8, 0.8, 0.8);
 
     vid := (<<objs)["Video"];
-    if vid != null {
+    if vid {
         data := (<<vid)["Content"].properties[0].raw_data;
         mat.textures[TEXTURE_DIFFUSE_INDEX] = load_image_from_memory("", data);
     }
