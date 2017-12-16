@@ -21,6 +21,14 @@ Material_Lib :: struct {
 }
 // Material_Lib :: Hash_Map(#type (*Material));
 
+load_text_strings :: (using asset_man: *Asset_Manager, filepath: string = "") -> [..] string {
+    // @Incomplete this is just a @Hack so we have something to get going
+    strings: [..] string;
+    array_resize(*strings, cast(u16) Text.LAST_MESSAGE);
+    strings[Text.NO_MESSAGE] = "No message set!";
+    return strings;
+}
+
 load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
     width, height, comp: s32;
     // @Leak
@@ -109,9 +117,14 @@ load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
         maybe_calc_tangent_normals(it);
         store_mesh_in_buffer(it);
     }
-    if (get_slot(*models, filepath)) {
-        // @TODO free old model
+
+    old_model := get_slot(*models, filepath);
+    if old_model {
+        <<old_model = <<mod;
+        Delete(mod);
+        return mod;
     }
+
     set_slot(*models, filepath, mod);
     return mod;
 }

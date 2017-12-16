@@ -6,19 +6,28 @@
 #load "asset_manager.jai";
 #load "editor.jai";
 #load "FBX.jai";
-#load "physics.jai";
+
 miniz :: #foreign_library "miniz";
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
+
+// solidify Rigid_Body type
+// Rigid_Body :: #type Rigid_Body_Poly(Actor);
+#load "physics.jai";
 
 Game :: struct {
     renderer: *GL_Renderer;
     asset_man: *Asset_Manager;
     window: *Game_Window;
+    joy: *Joystick;
+    current_scene: *Scene;
+    text_strings: [..] string;
 
     fov: float = 60;
     water_distort_offset: float;
 
-    joy: *Joystick;
+    water_reflect_frame_buffer: Frame_Buffer;
+    water_refract_frame_buffer: Frame_Buffer;
+    water_dudv_texture: *Texture;
 }
 
 Scene :: struct {
@@ -52,19 +61,62 @@ Actor :: struct {
     orientiation: Quaternion; // orientiation around Y axis
 
     update_callback: (game: *Game, actor: *Actor, dt: float);
+    picked_by_player: (game: *Game, actor: *Actor, player: *Actor, dt: float);
 }
 
 update_player_controller :: (game: *Game, player: *Actor, dt: float) {
     joy := game.joy;
     vel_xz := make_Vector3(player.body.velocity.x, 0, player.body.velocity.z);
     if length(vel_xz) {
-        starting_dir := make_Vector3(0, 0, 1);
         target_dir := normalize(vel_xz);
 
         axis := make_Vector3(0, 1, 0);
         angle := atan2(target_dir.x, target_dir.z);
         player.orientiation = set_angle_vector(xx angle, axis.x, axis.y, axis.z);
     }
+
+    dir := player.orientiation * make_Vector3(0, 0, 1);
+
+    bods: [] *Rigid_Body = bodies;
+    obj := do_raycast(make_Ray(player.body.position, dir), bods);
+    if obj && obj.user_data {
+        if obj.user_data.picked_by_player
+            obj.user_data.picked_by_player(game, obj.user_data, player, dt);
+    }
+}
+
+Signpost :: struct {
+    using actor: Actor;
+    text: Text;
+
+    #constructor con_signpost;
+}
+
+con_signpost :: (s: *Signpost) {
+    s.picked_by_player = signpost_picked_by_player;
+}
+
+signpost_picked_by_player :: (game: *Game, actor: *Actor, player: *Actor, dt: float) {
+    me := cast(*Signpost) actor;
+    issue_text(game, game.text_strings[me.text]);
+}
+
+make_signpost :: (text: Text) -> *Signpost {
+    ret := New(Signpost);
+    ret.text = text;
+    return ret;
+}
+
+Text :: enum u16 {
+    NO_MESSAGE,
+
+    LAST_MESSAGE
+}
+
+issue_text :: (game: *Game, message: string) {
+    sc := game.current_scene;
+
+
 }
 
 Game_Window :: struct {
@@ -335,26 +387,30 @@ create_test_scene :: (game: *Game) -> Scene {
 
 
     {
-        cap := make_Capsule(make_Vector3(0, 3, 0), 0.75/2.0, 1.2 - 0.75);
-        rb := New(Rigid_Body);
-        Rigid_Body_con(rb, 1.0, cap);
-
-        print("rb2: %\n", rb);
-        array_add(*bodies, rb);
-
         player_actor := New(Actor);
-        player_actor.body = rb;
         player_actor.model = load_model(game.asset_man, "assets/player.fbx");
         assert(player_actor.model != null);
         array_add(*sc.actors, player_actor);
         array_add(*sc.models, player_actor.model);
         player_actor.update_callback = update_player_controller;
+
+        cap := make_Capsule(make_Vector3(0, 3, 0), 0.75/2.0, 1.2 - 0.75);
+        rb := New(Rigid_Body);
+        Rigid_Body_con(rb, 1.0, cap, player_actor);
+
+        print("rb2: %\n", rb);
+        array_add(*bodies, rb);
     }
 
     {
+        sign := make_signpost(Text.NO_MESSAGE);
+        sign.model = load_model(game.asset_man, "assets/signpost.fbx");
+        array_add(*sc.actors, sign);
+        array_add(*sc.models, sign.model);
+
         aabb2 := make_AABB(make_Vector3(3, 3, 0), make_Vector3(2, 2, 2));
         rb := New(Rigid_Body);
-        Rigid_Body_con(rb, 1.0, aabb2);
+        Rigid_Body_con(rb, 1.0, aabb2, sign);
 
         array_add(*bodies, rb);
     }
@@ -374,6 +430,22 @@ create_test_scene :: (game: *Game) -> Scene {
 
 _logger :: (message: string, ident: string, mode: Log_Mode, data: *void) {
     print("%: %\n", ident, message);
+}
+
+draw_geometry :: (using game: *Game, water := false) {
+    start_scene(game.renderer);
+    draw_scene(game.renderer, <<game.current_scene);
+
+    #if DEVELOPER {
+        // render_editor(game);
+        draw_debug_bodies(game);
+    }
+
+    if water {
+        draw_water(<<renderer, water_reflect_frame_buffer.color_texture, water_refract_frame_buffer.color_texture, water_dudv_texture, WATER_HEIGHT);
+    }
+    finish_scene(game.renderer);
+    set_clip_plane(renderer, false);
 }
 
 main :: () {
@@ -420,6 +492,11 @@ main :: () {
     init(*rdr, game.window.width, game.window.height);
     renderer = *rdr;
 
+    game.water_reflect_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
+    game.water_refract_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
+
+    game.water_dudv_texture = load_image(game.asset_man, "assets/water_dudv.png");
+
     rdr.render_to_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
     rdr.render_light_using_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
     rdr.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
@@ -427,6 +504,7 @@ main :: () {
     rdr.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
     rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     rdr.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
+    game.text_strings = load_text_strings(asset_man);
 
     init_editor(*game);
 
@@ -447,7 +525,8 @@ main :: () {
     renderer.camera.position.y = 5;
     renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
-    main_scene := create_test_scene(*game);
+    _scene := create_test_scene(*game);
+    game.current_scene = *_scene;
 
     pressed := false;
 
@@ -513,19 +592,32 @@ main :: () {
 
         update_camera(*game, 1.0/60.0);
         update_physics(*game, 1.0/60.0);
-        update_scene(*game, *main_scene, 1.0/60.0);
+        update_scene(*game, game.current_scene, 1.0/60.0);
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
         // update_editor(*game, 1.0);
         glViewport(0, 0, xx game.window.width, xx game.window.height);
 
-        start_scene(game.renderer);
-        draw_scene(game.renderer, main_scene);
+        old_camera := game.renderer.camera;
+        new_camera := old_camera;
+        new_camera.position.y -= 2 * (new_camera.position.y - WATER_HEIGHT);
+        phi := get_euler_angles(new_camera.rotation);
+        new_camera.rotation = new_camera.rotation * set_angle_vector(xx (-phi * 2), 1, 0, 0);
+        game.renderer.camera = new_camera;
 
-        #if DEVELOPER {
-            // render_editor(game);
-            draw_debug_bodies(*game);
-        }
-        finish_scene(game.renderer);
+        use_frame_buffer(renderer, *game.water_reflect_frame_buffer);
+        set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
+        draw_geometry(*game);
+        use_frame_buffer(renderer, null);
+
+
+        game.renderer.camera = old_camera;
+        use_frame_buffer(renderer, *game.water_refract_frame_buffer);
+        set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
+        draw_geometry(*game);
+        use_frame_buffer(renderer, null);
+
+        set_clip_plane(renderer, false);
+        draw_geometry(*game, true);
 
         // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
         /*

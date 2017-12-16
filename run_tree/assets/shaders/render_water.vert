@@ -14,7 +14,7 @@ void main() {
     vec4 world_pos = model * vec4(in_pos.x, -1.0, in_pos.y, 1.0);
     frag_pos = world_pos.xyz;
 
-    clip_space = projection * view * model * vec4(in_pos.x, -1.0, in_pos.y, 1);
+    clip_space = projection * view * model * vec4(in_pos.x, 0.05, in_pos.y, 1);
     gl_Position = clip_space;
     dudv_tex_coords = in_tex_coords;
 }

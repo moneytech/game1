@@ -508,7 +508,7 @@ clear_screen :: (r: float, g: float, b: float, a: float) {
     glClearColor(r, g, b, a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
     // glDepthFunc(GL_LEQUAL);
@@ -988,7 +988,8 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
     glEnable(GL_DEPTH_TEST);
     glUseProgram(render_water.id);
 
-    model_matrix := matrix_translate(0, water_height, 0);
+    // model_matrix := matrix_translate(0, water_height, 0);
+    model_matrix: Matrix4;
 
     update_matrices(rdr, model_matrix, render_water);
 
@@ -1018,10 +1019,10 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
 
     // @TODO specify water height through uniform or vertex attrib
 
-    x := 0.0;
-    y := 0.0; // z
-    width := 128;
-    height := 128;
+    x := -16.0;
+    y := -4.0; // z
+    width := 8;
+    height := 8;
     xw := x+width;
     yh := y+height;
 

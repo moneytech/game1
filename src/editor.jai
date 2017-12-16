@@ -31,10 +31,6 @@ update_camera :: (game: *Game, dt: float) {
 
 #scope_file
 
-water_reflect_frame_buffer: Frame_Buffer;
-water_refract_frame_buffer: Frame_Buffer;
-water_dudv_texture: *Texture;
-
 selected_points_mesh: *Mesh;
 selected_points_indices: [..] u32;
 picking_position_buf: [] Vector2;
@@ -108,11 +104,6 @@ init_editor :: (game: *Game) {
     picking_position_buf.data = alloc(picking_position_buf.count*size_of(Vector2));
 
     tool_brush_add_sub_vector = make_Vector3(0.0, 0.2, 0.0);
-
-    water_reflect_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
-    water_refract_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
-
-    water_dudv_texture = load_image(game.asset_man, "assets/water_dudv.png");
 
     // terrain_map, __terrain = new_terrain_map(128, 128);
     terrain_map, __terrain = load_heightmap(game.asset_man, "assets/heightmap.png");
@@ -268,9 +259,9 @@ update_editor :: (game: *Game, dt: float) {
     }
 }
 
-WATER_HEIGHT :: -1.0;
+WATER_HEIGHT :: 0.05;
 
-render_editor_scene :: (game: *Game, water := false) {
+render_editor_scene :: (using game: *Game, water := false) {
     start_scene(renderer);
     clear_screen(0.5, 0.5, 0.5, 1.0);
     // renderer->draw_cube(0, 0, -2, 1);
@@ -289,7 +280,7 @@ render_editor_scene :: (game: *Game, water := false) {
     set_clip_plane(renderer, false);
 }
 
-render_editor :: (game: *Game) {
+render_editor :: (using game: *Game) {
 
     old_camera := game.renderer.camera;
     new_camera := old_camera;

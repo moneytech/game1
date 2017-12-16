@@ -18,6 +18,9 @@ Rigid_Body :: struct {
     velocity: Vector3;
     force: Vector3;
 
+    // @Incomplete do the polymorphic thing
+    user_data: *Actor;
+
     shape_type: Type;
     shape: void;
 
@@ -34,7 +37,7 @@ Rigid_Body :: struct {
     aabb: AABB;
 }
 
-Rigid_Body_con :: (using rb: *Rigid_Body, mass: float, sh: $Shape_Type) {
+Rigid_Body_con :: (using rb: *Rigid_Body, mass: float, sh: $Shape_Type, data: *Actor = null) {
     shape_type = Shape_Type;
     
     // infinite mass
@@ -47,6 +50,9 @@ Rigid_Body_con :: (using rb: *Rigid_Body, mass: float, sh: $Shape_Type) {
 
     world_inertia_tensor = orientation * inverse_inertia_tensor * transpose(orientation);
     angular_velocity = world_inertia_tensor * angular_momentum;
+
+    user_data = data;
+    if user_data user_data.body = rb;
 }
 
 integrate :: (using rb: *Rigid_Body, dt: float) {
@@ -68,7 +74,6 @@ integrate :: (using rb: *Rigid_Body, dt: float) {
         world_inertia_tensor += orientation * inverse_inertia_tensor * transpose(orientation);
         angular_velocity += world_inertia_tensor * angular_momentum;
     }
-
 }
 
 correct_position :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
@@ -194,6 +199,76 @@ moment_of_inertia :: (c: Capsule, body: Rigid_Body) -> Matrix3 {
     return mat;
 }
 
+Ray :: struct {
+    origin: Vector3;
+    inv_dir: Vector3;
+    dir: Vector3;
+}
+
+make_Ray :: (origin: Vector3, _dir: Vector3) -> Ray {
+    r: Ray = ---;
+    r.origin = origin;
+    dir := normalize(_dir);
+    // print("dir: %\n", dir);
+    r.inv_dir = make_Vector3(1.0 / dir.x, 1.0 / dir.y, 1.0 / dir.z);
+    // print("inv_dir: %\n", r.inv_dir);
+    r.dir = dir;
+    return r;
+}
+
+do_raycast :: (r: Ray, bodies: [] *Rigid_Body) -> *Rigid_Body, float {
+    closest_dist: float = FLOAT32_MAX;
+    closest_body: *Rigid_Body;
+
+    for bodies {
+        if it.shape_type == AABB {
+            if do_ray_aabb_test(r, it.aabb) {
+                dist := length(r.origin - it.aabb.center);
+                if dist < closest_dist {
+                    closest_dist = dist;
+                    closest_body = it;
+                }
+            }
+        }
+    }
+
+    return closest_body, closest_dist;
+}
+
+do_ray_aabb_test :: (r: Ray, aabb: AABB) -> bool {
+    b_min := aabb.center - aabb.halfs;
+    b_max := aabb.center + aabb.halfs;
+
+    o := r.origin;
+    inv := r.inv_dir;
+
+    tx1 := (b_min.x - o.x) * inv.x;
+    tx2 := (b_max.x - o.x) * inv.x;
+
+    tmin := min(tx1, tx2);
+    tmax := max(tx1, tx2);
+
+    {
+        ty1 := (b_min.y - o.y) * inv.y;
+        ty2 := (b_max.y - o.y) * inv.y;
+
+        tmin = max(tmin, min(ty1, ty2));
+        tmax = min(tmax, max(ty1, ty2));
+    }
+
+    {
+        tz1 := (b_min.z - o.z) * inv.z;
+        tz2 := (b_max.z - o.z) * inv.z;
+
+        tmin = max(tmin, min(tz1, tz2));
+        tmax = min(tmax, max(tz1, tz2));
+    }
+    return tmax > max(tmin, 0.0);
+}
+
+do_ray_sphere_test :: (r: Ray, sp: Sphere) -> bool {
+
+}
 
 same_direction :: (a: Vector3, b: Vector3) -> bool {
     return dot(a, b) > 0;
