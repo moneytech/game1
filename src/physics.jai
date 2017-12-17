@@ -56,7 +56,7 @@ Rigid_Body_con :: (using rb: *Rigid_Body, mass: float, sh: $Shape_Type, data: *A
 }
 
 integrate :: (using rb: *Rigid_Body, dt: float) {
-
+    if rb.is_static return;
     {
         acceleration := force * inverse_mass * dt;
         position += (0.5 * acceleration * dt) + velocity * dt;
@@ -85,6 +85,9 @@ correct_position :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
 }
 
 impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
+    d1 := (rb0.inverse_mass + rb1.inverse_mass);
+    if d1 == 0 return; // two infinite mass objects!
+
     cr := clamp(rb0.elasticity * rb1.elasticity, 0.0, 1.0);
     rv := rb1.velocity - rb0.velocity;
     n := cp.normal;
@@ -94,8 +97,6 @@ impulse_response :: (rb0: *Rigid_Body, rb1: *Rigid_Body, cp: Contact_Point) {
     correct_position(rb0, rb1, cp);
 
     if !same_direction(rv, n) return;
-
-    d1 := (rb0.inverse_mass + rb1.inverse_mass);
     // ia := cross(cross(r_a, n), r_a)  * rb0.inverse_inertia_tensor;
     // ib := cross(cross(r_b, n), r_b)  * rb1.inverse_inertia_tensor;
     // d2 := dot(ia + ib, n);

@@ -43,10 +43,10 @@ draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
     for sc.actors {
         if it.body && it.model {
             orient := matrix_rotate(it.orientiation);
-            it.model.meshes[0].model_matrix = matrix_translate(it.body.position) * orient;
+            it.model.model_matrix = matrix_translate(it.body.position) * orient;
         }
     }
-    for sc.models draw_model(<<rdr, <<it);
+    for sc.models draw_model(rdr, <<it);
 }
 
 update_scene :: (game: *Game, sc: *Scene, dt: float) {
@@ -151,34 +151,43 @@ Game_Window :: struct {
     glc: OS_GL_Context;
 }
 
-create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) -> Mesh {
-    UP := make_Vector3(0, 1, 0);
-    pn := normalize(plane_normal);
-    axis := cross(UP, pn);
-    angle := dot(UP, pn);
-
-    rotation := set_angle_vector(angle, axis.x, axis.y, axis.z);
-
+create_checker_board_mesh :: (rotation: Quaternion, width: s16, height: s16) -> *Mesh {
+    pn := make_Vector3(0, 1, 0);
     hw := width/2;
     hh := height/2;
     x_start := -hw;
     y_start := -hh;
 
-    m: Mesh;
+    m := New(Mesh);
 
     off_white := make_Color(0.1, 0.3, 0.1);
     // white := make_Color(1, 1, 1);
     white := make_Color(0.5, 0.5, 0.5);
 
-    for y: y_start..hh-1 {
+    subh := 1;
+    subw := 1;
+    ext_h := 0.0;
+    ext_w := 0.0;
+
+    if width & 1 == 1 {
+        subw = 0;
+        ext_w = 0.5;
+    }
+
+    if height & 1 == 1 {
+        subh = 0;
+        ext_h = 0.5;
+    }
+
+    for y: y_start..hh-subh {
         is_white := false;
         if y % 2 != 0 is_white = true;
 
-        for x: x_start..hw-1 {
-            v0 := rotation * make_Vector3(xx x, 0, xx y);
-            v1 := rotation * make_Vector3(xx x+1, 0, xx y);
-            v2 := rotation * make_Vector3(xx x+1, 0, xx y+1);
-            v3 := rotation * make_Vector3(xx x, 0, xx y+1);
+        for x: x_start..hw-subw {
+            v0 := rotation * make_Vector3(xx x - ext_w, 0, xx y - ext_h);
+            v1 := rotation * make_Vector3(xx x+1 - ext_w, 0, xx y - ext_h);
+            v2 := rotation * make_Vector3(xx x+1 - ext_w, 0, xx y+1 - ext_h);
+            v3 := rotation * make_Vector3(xx x - ext_w, 0, xx y+1 - ext_h);
 
             add_quad(*m.vertices, v0, v1, v2, v3);
             add_quad(*m.normals, pn, pn, pn, pn);
@@ -195,8 +204,32 @@ create_checker_board_mesh :: (plane_normal: Vector3, width: s16, height: s16) ->
     mat := New(Material);
     mat.diffuse = make_Color(1, 1, 1);
     m.material = mat;
-    store_mesh_in_buffer(*m);
+    store_mesh_in_buffer(m);
     return m;
+}
+
+create_checker_board_box :: (width: s16, height: s16, depth: s16) -> *Model {
+    up := create_checker_board_mesh(set_angle_vector(0, 1, 0, 0), width, depth);
+    up.model_matrix = matrix_translate(0, cast(float) height / 2, 0);
+    down := create_checker_board_mesh(set_angle_vector(PI, 1, 0, 0), width, depth);
+    down.model_matrix = matrix_translate(0, cast(float) -height / 2, 0);
+    left := create_checker_board_mesh(set_angle_vector(PI / 2, 0, 0, 1), height, depth);
+    left.model_matrix = matrix_translate(cast(float) -width / 2, 0, 0);
+    right := create_checker_board_mesh(set_angle_vector(-PI / 2, 0, 0, 1), height, depth);
+    right.model_matrix = matrix_translate(cast(float) width / 2, 0, 0);
+    front := create_checker_board_mesh(set_angle_vector(-PI / 2, 1, 0, 0), width, height);
+    front.model_matrix = matrix_translate(0, 0, cast(float) -depth / 2);
+    back := create_checker_board_mesh(set_angle_vector(PI / 2, 1, 0, 0), width, height);
+    back.model_matrix = matrix_translate(0, 0, cast(float) depth / 2);
+
+    mod := New(Model);
+    array_add(*mod.meshes, up);
+    array_add(*mod.meshes, down);
+    array_add(*mod.meshes, left);
+    array_add(*mod.meshes, right);
+    array_add(*mod.meshes, front);
+    array_add(*mod.meshes, back);
+    return mod;
 }
 
 make_sphere_mesh :: (sp: Sphere) -> *Model {
@@ -350,18 +383,18 @@ draw_debug_bodies :: (game: *Game) {
         if it.shape_type == Sphere {
             model_matrix = model_matrix * matrix_scale(it.sphere.radius, it.sphere.radius, it.sphere.radius);
             unit_sphere_model.meshes[0].model_matrix = model_matrix;
-            draw_model(<<game.renderer, <<unit_sphere_model);
+            draw_model(game.renderer, <<unit_sphere_model);
 
             // print("body %: %\n", it.shape_type, <<it);
         } else if it.shape_type == Capsule {
             // @Incomplete this scale is technically not correct
             model_matrix = model_matrix * matrix_scale(1, 1, 1);
             unit_capsule_model.meshes[0].model_matrix = model_matrix;
-            draw_model(<<game.renderer, <<unit_capsule_model);
+            draw_model(game.renderer, <<unit_capsule_model);
         } else if it.shape_type == AABB {
             model_matrix = model_matrix * matrix_scale(it.aabb.halfs.x*2, it.aabb.halfs.y*2, it.aabb.halfs.z*2);
             aabb_model.meshes[0].model_matrix = model_matrix;
-            draw_model(<<game.renderer, <<aabb_model);
+            draw_model(game.renderer, <<aabb_model);
         } else {
             assert(false);
         }
@@ -374,8 +407,7 @@ create_test_scene :: (game: *Game) -> Scene {
     sc: Scene;
     {
         test_model := New(Model);
-        test_mesh: *Mesh = New(Mesh);
-        <<test_mesh = create_checker_board_mesh(make_Vector3(0, 1, 0), 50, 50);
+        test_mesh := create_checker_board_mesh(set_angle_vector(0, 1, 0, 0), 50, 50);
         array_add(*test_model.meshes, test_mesh);
         array_add(*sc.models, test_model);
     }
@@ -455,6 +487,20 @@ create_test_scene :: (game: *Game) -> Scene {
         array_add(*sc.actors, crate);
         array_add(*sc.models, crate.model);
         array_add(*bodies, crate.body);
+    }
+
+    {
+        box := New(Actor);
+        box.model = create_checker_board_box(50, 4, 5);
+        array_add(*sc.actors, box);
+        array_add(*sc.models, box.model);
+
+        aabb2 := make_AABB(make_Vector3(0, 2, -10), make_Vector3(50, 4, 5));
+        rb := New(Rigid_Body);
+        rb.is_static = true;
+        Rigid_Body_con(rb, 0, aabb2, box);
+
+        array_add(*bodies, rb);
     }
 
     {

@@ -190,8 +190,15 @@ reset_mesh_arrays :: (using m: *Mesh) {
 
 Model :: struct {
     meshes: [..] *Mesh;
+    model_matrix: Matrix4;
     draw_mode: bool = DRAW_MODE_SOLID;
+
+    #constructor init_model;
 };
+
+init_model :: (m: *Model) {
+    m.model_matrix = matrix_identity();
+}
 
 DRAW_MODE_SOLID     :: false;
 DRAW_MODE_WIREFRAME :: true;
@@ -288,6 +295,7 @@ GL_Renderer :: struct {
     camera: Camera;
     projection_matrix: Matrix4;
     view_matrix: Matrix4;
+    model_matrix_stack: [..] Matrix4;
 }
 
 
@@ -305,9 +313,23 @@ debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, l
     }
 }
 
+push_model_matrix :: (using rdr: *GL_Renderer, mat: Matrix4) {
+    array_add(*model_matrix_stack, mat);
+}
+
+pop_model_matrix :: (using rdr: *GL_Renderer) -> Matrix4 {
+    return pop(*model_matrix_stack);
+}
+
+current_model_matrix :: (using rdr: GL_Renderer) -> Matrix4 {
+    return model_matrix_stack[model_matrix_stack.count-1];
+}
+
 init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
     print("rdr: %\n", rdr);
     glDebugMessageCallback(debug_callback, rdr);
+    
+    push_model_matrix(rdr, matrix_identity());
     // glBegin(GL_TRIANGLES);
     // glEnd();
 
@@ -846,7 +868,7 @@ update_matrices :: (using rdr: GL_Renderer, model_matrix: Matrix4, sh: *Shader) 
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
 
-    t := model_matrix;
+    t := current_model_matrix(rdr) * model_matrix;
     glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
 }
 
@@ -1019,7 +1041,7 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
 
     // @TODO specify water height through uniform or vertex attrib
 
-    x := -16.0;
+    x := -9.0;
     y := -4.0; // z
     width := 8;
     height := 8;
@@ -1177,13 +1199,15 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, xx m.indices.count * size_of(u16), m.indices.data, GL_STATIC_DRAW);
 }
 
-draw_model :: (rdr: GL_Renderer, m: Model) {
+draw_model :: (rdr: *GL_Renderer, m: Model) {
+    push_model_matrix(rdr, m.model_matrix);
     for m.meshes {
         if m.draw_mode == {
-            case DRAW_MODE_SOLID; draw_mesh(rdr, << it);
-            case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(rdr, << it);
+            case DRAW_MODE_SOLID; draw_mesh(<<rdr, << it);
+            case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(<<rdr, << it);
         }
     }
+    pop_model_matrix(rdr);
 }
 
 get_sphere_vertex :: (theta: float, phi: float) -> Vector3 {
