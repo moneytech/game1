@@ -109,6 +109,9 @@ load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
         mod = model_loader_parse_obj(game, obj_source, filepath);
     } else if ext == ".fbx" {
         mod = Model_load_fbx(filepath);
+    } else if ext == ".dae" {
+        obj_source := read_entire_file(filepath);
+        mod = Model_load_dae(obj_source, filepath);
     }
 
     if mod == null return null;
@@ -155,7 +158,6 @@ load_shader_pair :: (using asset_man: *Asset_Manager, vpath: string, fpath: stri
     return sh;
 }
 
-
 maybe_calc_tangent_normals :: (using m: *Mesh) {
     if (!material.textures[TEXTURE_NORMAL_INDEX]) return;
 
@@ -188,10 +190,6 @@ path_of :: (filepath: string) -> string {
     p := find_and_truncate_character_from_right(filepath, #char "/");
     return p;
 }
-
-#scope_file
-using ML_Token_Type;
-#scope_export
 
 ml_get_signed_float :: (st: *ML_State, tok: *ML_Token) -> float {
     neg := false;
@@ -678,3 +676,20 @@ Model_load_fbx :: (path: string) -> *Model {
 
     return model;
 }
+
+Model_load_dae :: (src: string, path: string) -> *Model {
+    lib := New(Material_Lib);
+
+    root := xml_parse(src, path);
+
+    // the goal here is to descend the XML tree for the things we care about and then
+    // transform the XML branches into more useful Collada trees, maybe!
+
+    
+    return null;
+}
+
+#scope_file
+#load "xml_parser.jai";
+
+using ML_Token_Type;

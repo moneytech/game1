@@ -47,13 +47,13 @@ make_Vector3 :: (x: float, y: float, z: float) -> Vector3 {
     return v;
 }
 
-make_Vector3 :: (i: Vector4) -> Vector3 {
-    v: Vector3 = ---;
-    v.x = i.x;
-    v.y = i.y;
-    v.z = i.z;
-    return v;
-}
+// make_Vector3 :: (i: Vector4) -> Vector3 {
+//     v: Vector3 = ---;
+//     v.x = i.x;
+//     v.y = i.y;
+//     v.z = i.z;
+//     return v;
+// }
 
 operator== :: (a: Vector3, b: Vector3) -> bool #c_callback {
     return a.x == b.x && a.y == b.y && a.z == b.z;

@@ -406,6 +406,16 @@ draw_debug_bodies :: (game: *Game) {
 create_test_scene :: (game: *Game) -> Scene {
     sc: Scene;
     {
+        up := load_image(game.asset_man, "assets/clouds1/clouds1_up.bmp");
+        down := load_image(game.asset_man, "assets/clouds1/clouds1_down.bmp");
+        left := load_image(game.asset_man, "assets/clouds1/clouds1_east.bmp");
+        right := load_image(game.asset_man, "assets/clouds1/clouds1_west.bmp");
+        back := load_image(game.asset_man, "assets/clouds1/clouds1_south.bmp");
+        front := load_image(game.asset_man, "assets/clouds1/clouds1_north.bmp");
+        array_add(*sc.models, create_skybox_model(up, down, left, right, front, back));
+    }
+
+    {
         test_model := New(Model);
         test_mesh := create_checker_board_mesh(set_angle_vector(0, 1, 0, 0), 50, 50);
         array_add(*test_model.meshes, test_mesh);
@@ -516,6 +526,57 @@ create_test_scene :: (game: *Game) -> Scene {
     return sc;
 }
 
+create_textured_rect_mesh :: (v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3, tex: *Texture) -> *Mesh {
+    m := New(Mesh);
+    
+    V2 :: make_Vector2;
+    t0 := V2(0, 0);
+    t1 := V2(1, 0);
+    t2 := V2(1, 1);
+    t3 := V2(0, 1);
+
+    add_quad(*m.vertices, v0, v1, v2, v3);
+    add_quad(*m.tex_coords, t0, t1, t2, t3);
+
+    mat := New(Material);
+    mat.diffuse = make_Color(1, 1, 1);
+    m.material = mat;
+    mat.textures[TEXTURE_DIFFUSE_INDEX] = tex;
+    store_mesh_in_buffer(m);
+    return m;
+}
+
+create_skybox_model :: (up: *Texture, down: *Texture, left: *Texture, right: *Texture, front: *Texture, back: *Texture) -> *Model {
+    set_texture_wrap(up, true);
+    set_texture_wrap(down, true);
+    set_texture_wrap(left, true);
+    set_texture_wrap(right, true);
+    set_texture_wrap(front, true);
+    set_texture_wrap(back, true);
+
+    mod := New(Model);
+
+    V3 :: make_Vector3;
+    v0 := V3(-1, -1, -1);
+    v1 := V3(-1,  1, -1);
+    v2 := V3(-1,  1,  1);
+    v3 := V3(-1, -1,  1);
+    v4 := V3( 1, -1, -1);
+    v5 := V3( 1,  1, -1);
+    v6 := V3( 1,  1,  1);
+    v7 := V3( 1, -1,  1);
+
+    array_add(*mod.meshes, create_textured_rect_mesh(v5, v1, v2, v6, up));
+    array_add(*mod.meshes, create_textured_rect_mesh(v7, v3, v0, v4, down));
+    array_add(*mod.meshes, create_textured_rect_mesh(v2, v1, v0, v3, left));
+    array_add(*mod.meshes, create_textured_rect_mesh(v5, v6, v7, v4, right));
+    array_add(*mod.meshes, create_textured_rect_mesh(v6, v2, v3, v7, front));
+    array_add(*mod.meshes, create_textured_rect_mesh(v1, v5, v4, v0, back));
+
+    mod.model_matrix = matrix_scale(10000, 10000, 10000);
+    return mod;
+}
+
 _logger :: (message: string, ident: string, mode: Log_Mode, data: *void) {
     print("%: %\n", ident, message);
 }
@@ -592,6 +653,7 @@ main :: () {
     rdr.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
     rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     rdr.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
+    load_model(asset_man, "../../untitled.dae");
     game.text_strings = load_text_strings(asset_man);
 
     init_editor(*game);
@@ -681,7 +743,7 @@ main :: () {
         update_camera(*game, 1.0/60.0);
         update_physics(*game, 1.0/60.0);
         update_scene(*game, game.current_scene, 1.0/60.0);
-        renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 1000.0);
+        renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
         // update_editor(*game, 1.0);
         glViewport(0, 0, xx game.window.width, xx game.window.height);
 

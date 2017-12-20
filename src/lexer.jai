@@ -22,9 +22,11 @@ ML_Token_Type :: enum s32 {
 	ML_TOKEN_IDENTIFIER,
 
 	// HTML tokens
-	ML_TOKEN_HTML_COMMENT, // <!
+	ML_TOKEN_HTML_COMMENT, 	// <!
     ML_TOKEN_HTML_LT_SLASH, // </
     ML_TOKEN_HTML_SLASH_GT, // />
+    ML_TOKEN_HTML_LT_QM,    // <?
+    ML_TOKEN_HTML_QM_GT,    // ?>
 }
 
 ML_Token :: struct {
@@ -146,10 +148,26 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 	            st.current = current;
 	            return;
 	        }
+	        if (current[1] == #char "?") {
+	            ml__token(st, tok, ML_TOKEN_HTML_LT_QM);
+	            current += 2;
+	            st.character_number += 2;
+	            st.current = current;
+	            return;
+	        }
 		}
 	    if (<<current == #char "/" && (current+1) < end) {
 	        if (current[1] == #char ">") {
 	            ml__token(st, tok, ML_TOKEN_HTML_SLASH_GT);
+	            current += 2;
+	            st.character_number += 2;
+	            st.current = current;
+	            return;
+	        }
+	    }
+        if (<<current == #char "?" && (current+1) < end) {
+	        if (current[1] == #char ">") {
+	            ml__token(st, tok, ML_TOKEN_HTML_QM_GT);
 	            current += 2;
 	            st.character_number += 2;
 	            st.current = current;
@@ -168,14 +186,15 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 			current += 1;
 		}
 
-		length: s64 = (current - beg) - 1;
+		length: s64 = (current - beg);
 
 		tok._string.count = 0;
 
 		if (length) {
+			// print("length: %\n", length);
 			tok._string.data = xx alloc(length);
 
-			for 0..length {
+			for 0..length-1 {
 				p := beg + it;
 
 				if (<<p == #char "\\") {
@@ -293,9 +312,12 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 		}
 		len: s64 = current - beg;
 
-		temp := cast(*u8) alloc(len+1);
+		temp: *u8 = alloc(len+1);
+		assert(len != 0);
 		memcpy(temp, beg, len);
 		temp[len] = 0;
+		
+		// print("TEMP: %\n", temp);
 
 		if (base >= 0) {
 			tok.integer = strtoull(temp, null, base);

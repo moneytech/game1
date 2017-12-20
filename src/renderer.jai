@@ -438,6 +438,13 @@ create_texture :: (tex: *Texture, width: u16, height: u16, data: *void, type := 
     tex.id = texId;
 }
 
+set_texture_wrap :: (tex: *Texture, clamp_to_edge: bool) {
+    glBindTexture(GL_TEXTURE_2D, tex.id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 update_texture :: (tex: *Texture, data: *void) {
     interal_format: GLenum;
     format: GLenum;
@@ -947,7 +954,6 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     }
 
     if (tex_size && (diffuse_tex || normal_tex || spec_tex)) {
-        assert(false);
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size));
     }
