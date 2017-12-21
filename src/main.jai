@@ -929,14 +929,14 @@ void print_token(ML_Token *tok) {
 */
 
 
-Hash_Map :: struct (Value_Type: Type) {
+Hash_Map :: struct (Value_Type: Type, table_size := 1024) {
     Hash_Entry :: struct {
         key: string;
         next: *Hash_Entry;
         value: Value_Type;
     }
 
-    table: [4096] Hash_Entry;
+    table: [table_size] Hash_Entry;
 }
 
 hash_key :: (str: string) -> u32 {
@@ -952,8 +952,8 @@ hash_key :: (str: string) -> u32 {
     return hash;
 }
 
-contains_key :: (using map: *Hash_Map($T), str: string) -> bool {
-    slot := hash_key(str) & (4096-1);
+contains_key :: (using map: *Hash_Map, str: string) -> bool {
+    slot := hash_key(str) & (table_size-1);
     e := *table[slot];
 
     while e != null {
@@ -967,8 +967,8 @@ contains_key :: (using map: *Hash_Map($T), str: string) -> bool {
     return e.key.count != 0;
 }
 
-get_slot :: (using map: *Hash_Map($T), str: string) -> T {
-    slot := hash_key(str) & (4096-1);
+get_slot :: (using map: *Hash_Map, str: string) -> map.Value_Type {
+    slot := hash_key(str) & (table_size-1);
     e := *table[slot];
 
     while e != null {
@@ -980,7 +980,7 @@ get_slot :: (using map: *Hash_Map($T), str: string) -> T {
         if (str == e.key) break;
 
         if (!e.next) {
-            e.next = New(#type Hash_Map(T).Hash_Entry);
+            e.next = New(map.Hash_Entry);
             e = e.next;
             e.key = copy_string(str);
             e.next = null;
@@ -994,8 +994,8 @@ get_slot :: (using map: *Hash_Map($T), str: string) -> T {
     return e.value;
 }
 
-set_slot :: (using map: *Hash_Map($T), str: string, val: T) {
-    slot := hash_key(str) & (4096-1);
+set_slot :: (using map: *Hash_Map, str: string, val: map.Value_Type) {
+    slot := hash_key(str) & (table_size-1);
     e := *table[slot];
 
     while e != null {
@@ -1007,7 +1007,7 @@ set_slot :: (using map: *Hash_Map($T), str: string, val: T) {
         if (str == e.key) break;
 
         if (!e.next) {
-            e.next = New(#type Hash_Map(T).Hash_Entry);
+            e.next = New(map.Hash_Entry);
             e = e.next;
             e.key = copy_string(str);
             e.next = null;

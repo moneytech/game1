@@ -197,7 +197,7 @@ Model :: struct {
 };
 
 init_model :: (m: *Model) {
-    m.model_matrix = matrix_identity();
+    // m.model_matrix = matrix_identity();
 }
 
 DRAW_MODE_SOLID     :: false;

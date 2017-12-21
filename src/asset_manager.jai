@@ -678,18 +678,19 @@ Model_load_fbx :: (path: string) -> *Model {
 }
 
 Model_load_dae :: (src: string, path: string) -> *Model {
-    lib := New(Material_Lib);
-
-    root := xml_parse(src, path);
-
     // the goal here is to descend the XML tree for the things we care about and then
     // transform the XML branches into more useful Collada trees, maybe!
 
-    
+    collada := collada_parse(src, path);
+
+    for collada.library_effects {
+        print("%\n", <<it);
+    }
+
     return null;
 }
 
 #scope_file
-#load "xml_parser.jai";
+#load "dae_parser.jai";
 
 using ML_Token_Type;

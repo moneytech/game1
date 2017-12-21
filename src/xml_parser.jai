@@ -1,20 +1,22 @@
+// Simple desecnt parser without Schemas!
 
 Xml :: struct {
     line_number: u32;
     character_number: u32;
     filename: string;
+    type: Type;
 }
 
 Xml_Property :: struct {
-    using xml: Xml;
+    using __xml: Xml;
     name: string;
     content: string;
 }
 
 Xml_Node :: struct {
-    using xml: Xml;
+    using __xml: Xml;
     node_type: string;
-    content: [..] ML_Token; // bare content that isn't a node!
+    content: [..] ML_Token; // content that should be parsed by spec of a schema
     properties: [..] *Xml_Property;
     children: [..] *Xml_Node;
 }
@@ -23,7 +25,35 @@ Xml_Node :: struct {
     filename: string;
     current_token: s64 = -1;
     tokens: [..] ML_Token;
+    node_hooks: Hash_Map(XML_NODE_HOOK);
+    user_data: *void;
 }
+
+XML_NODE_HOOK :: #type (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node;
+
+// ------------------------------------------------------------------
+// expected data type API
+
+xml_parse_float :: (p: *Xml_Parser) -> float64 {
+    tok := next_token(p);
+    neg := false;
+    if tok.type == cast(ML_Token_Type) #char "-" {
+        neg = true;
+        tok = next_token(p);
+    }
+
+    val: float64;
+    if tok.type == {
+        case ML_TOKEN_FLOAT; val = tok._float;
+        case ML_TOKEN_INTEGER; val = cast(float64) tok.integer;
+        case; assert(false);
+    }
+    if neg val = -val;
+    return val;
+}
+
+// ------------------------------------------------------------------
+
 
 xml_parse_property :: (p: *Xml_Parser) -> *Xml_Property {
     prop := XML_NEW(p, Xml_Property);
@@ -41,46 +71,76 @@ xml_parse_property :: (p: *Xml_Parser) -> *Xml_Property {
     return prop;
 }
 
-xml_parse_node :: (p: *Xml_Parser) -> *Xml_Node {
-    node := XML_NEW(p, Xml_Node);
+xml_get_property :: (props: [] *Xml_Property, target: string) -> *Xml_Property {
+    for props {
+        if it.name == target return it;
+    }
+
+    return null;
+}
+
+xml_parse_child_loop :: (p: *Xml_Parser, node: *Xml_Node = null) -> [..] *Xml_Node {
+    children: [..] *Xml_Node;
+    tok := peek_token(p);
+    while tok.type != ML_TOKEN_HTML_LT_SLASH && tok.type != ML_TOKEN_END {
+        if tok.type == cast(ML_Token_Type) #char "<" {
+            child := xml_parse_node(p, node);
+            if child array_add(*children, child);
+        } else {
+            if node {
+                array_add(*node.content, <<tok);
+                tok = next_token(p);
+            }
+        }
+
+        tok = peek_token(p);
+    }
+    return children;
+}
+
+xml_parse_node :: (p: *Xml_Parser, parent: *Xml_Node) -> *Xml_Node {
     expect_and_eat(p, #char "<");
 
     expect(p, ML_TOKEN_IDENTIFIER);
     tok := next_token(p);
 
-    print("TOK: %\n", tok._string);
-    node.node_type = copy_string(tok._string);
+    node_type := copy_string(tok._string);
+
+    properties: [..] *Xml_Property;
 
     tok = peek_token(p);
     while tok.type != cast(ML_Token_Type) #char ">" && tok.type != ML_TOKEN_HTML_SLASH_GT && tok.type != ML_TOKEN_END {
         prop := xml_parse_property(p);
-        array_add(*node.properties, prop);
+        array_add(*properties, prop);
         tok = peek_token(p);
     }
 
-    if tok.type == ML_TOKEN_HTML_SLASH_GT return node;
+    if tok.type == ML_TOKEN_HTML_SLASH_GT {
+        node := XML_NEW(p, Xml_Node);
+        node.node_type = node_type;
+        node.properties = properties;
+        expect_and_eat(p, ML_TOKEN_HTML_SLASH_GT);
+        return node;
+    }
     expect_and_eat(p, #char ">");
 
-    tok = peek_token(p);
-    while tok.type != ML_TOKEN_HTML_LT_SLASH && tok.type != ML_TOKEN_END {
-        if tok.type == cast(ML_Token_Type) #char "<" {
-            child := xml_parse_node(p);
-            array_add(*node.children, child);
-        } else {
-            // bare token ?
-            array_add(*node.content, <<tok);
-			tok = next_token(p);
-        }
-
-        tok = peek_token(p);
+    node: *Xml_Node;
+    if contains_key(*p.node_hooks, node_type) {
+        hook := get_slot(*p.node_hooks, node_type);
+        node = hook(p, parent, properties);
+    } else {
+        node = XML_NEW(p, Xml_Node);
+        node.properties = properties;
+        node.children = xml_parse_child_loop(p, node);
     }
+    if node node.node_type = node_type;
 
     expect_and_eat(p, ML_TOKEN_HTML_LT_SLASH);
     expect(p, ML_TOKEN_IDENTIFIER);
     tok = peek_token(p);
     type := tok._string;
 
-    if type != node.node_type {
+    if type != node_type {
         logprint("Xml_Parser", "Expected end-tag to node of type '%' but got '%'\n", node.node_type, type);
     }
     tok = next_token(p);
@@ -101,13 +161,27 @@ xml_parse_header_node :: (p: *Xml_Parser) -> *Xml_Node {
     return null;
 }
 
-xml_parse :: (src: string, filename: string) -> *Xml_Node {
+xml_parse :: (p: *Xml_Parser) -> *Xml_Node {
+
+    root := XML_NEW(p, Xml_Node);
+    while peek_token(p).type != ML_TOKEN_END {
+        if peek_token(p).type == ML_TOKEN_HTML_LT_QM {
+            child := xml_parse_header_node(p);
+            // do nothing
+        } else {
+            child := xml_parse_node(p, root);
+            if child array_add(*root.children, child);
+        }
+    }
+    return root;
+}
+
+xml_init_parser :: (parser: *Xml_Parser, src: string, filename: string) {
     st: ML_State;
     st.flags = ML_DOTS_IN_IDENTIFIERS | ML_ENABLE_HTML;
     init(*st, src);
     tok: ML_Token;
 
-    parser: Xml_Parser;
     parser.filename = filename;
 
     ml_get_token(*st, *tok);
@@ -116,24 +190,13 @@ xml_parse :: (src: string, filename: string) -> *Xml_Node {
         ml_get_token(*st, *tok);
     }
     array_add(*parser.tokens, tok);
-
-    root := XML_NEW(*parser, Xml_Node);
-    while peek_token(*parser).type != ML_TOKEN_END {
-        if peek_token(*parser).type == ML_TOKEN_HTML_LT_QM {
-            child := xml_parse_header_node(*parser);
-            // do nothing
-        } else {
-            child := xml_parse_node(*parser);
-            array_add(*root.children, child);
-        }
-    }
-    return root;
 }
 
+xml_register_hook ::(p: *Xml_Parser, node_type: string, hook: XML_NODE_HOOK) {
+    set_slot(*p.node_hooks, node_type, hook);
+}
 
-#scope_file
-
-using ML_Token_Type;
+xml_peek_token :: peek_token;
 
 XML_NEW :: (p: *Xml_Parser, $type: Type) -> *type {
     tok := peek_token(p);
@@ -142,8 +205,13 @@ XML_NEW :: (p: *Xml_Parser, $type: Type) -> *type {
     this.line_number = tok.line_number;
     this.character_number = tok.character_number;
     this.filename = p.filename;
+    this.type = type;
     return this;
 }
+
+#scope_file
+
+using ML_Token_Type;
 
 expect_and_eat :: (p: *Xml_Parser, ty: ML_Token_Type) {
     tok := next_token(p);
