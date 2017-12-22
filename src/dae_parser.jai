@@ -30,6 +30,12 @@ Float :: struct {
     value: float;
 }
 
+Float_Array :: struct {
+    using xml_: Xml_Node;
+    id: string;
+    array: [] float;
+}
+
 using ML_Token_Type;
 
 #scope_export
@@ -41,8 +47,19 @@ collada_parse_float :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml
     return fl;
 }
 
+collada_parse_float_array :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node {
+    fl := XML_NEW(p, Float_Array);
+    fl.id = xml_get_property(properties, "id").content;
+    array_data: [..] float;
+    while xml_peek_token(p).type != ML_TOKEN_HTML_LT_SLASH {
+        val := xml_parse_float(p);
+        array_add(*array_data, cast(float32) val);
+    }
+    fl.array = array_data;
+    return fl;
+} 
+
 collada_parse_color :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node {
-    print("COLOR\n");
     color := XML_NEW(p, Color);
     color.sid = xml_get_property(properties, "sid").content;
     color.color[0] = cast(float32) xml_parse_float(p);
@@ -54,7 +71,6 @@ collada_parse_color :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml
 }
 
 collada_parse_effect :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node {
-    print("EFFECT\n");
     effect := XML_NEW(p, Effect);
     effect.id = xml_get_property(properties, "id").content;
 
@@ -87,16 +103,11 @@ collada_parse_effect :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xm
 }
 
 collada_parse_library_effects :: (p: *Xml_Parser, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node {
-    print("LIB\n");
     collada := cast(*Collada) p.user_data;
     children := xml_parse_child_loop(p);
     for children {
         assert(it.type == Effect);
         array_add(*collada.library_effects, cast(*Effect) it);
-    }
-
-    for collada.library_effects {
-        print("effect %\n", it);
     }
     return null;
 }
