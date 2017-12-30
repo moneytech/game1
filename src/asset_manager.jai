@@ -49,7 +49,7 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
         return tex;
     }
 
-    print("ERROR:%s\n", point_at_c_string(stbi_failure_reason()));
+    print("ERROR: can't open '%' because '%s'\n", filepath, point_at_c_string(stbi_failure_reason()));
     return null;
 }
 
@@ -111,7 +111,7 @@ load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
         mod = Model_load_fbx(filepath);
     } else if ext == ".dae" {
         obj_source := read_entire_file(filepath);
-        mod = Model_load_dae(obj_source, filepath);
+        mod = Model_load_dae(asset_man, obj_source, filepath);
     }
 
     if mod == null return null;
@@ -655,12 +655,21 @@ Model_load_fbx :: (path: string) -> *Model {
     layer_uv := (<<geom)["LayerElementUV"];
     if layer_uv {
         uvdata := (<<layer_uv)["UV"].properties[0].data;
-        uvindex := (<<layer_uv)["UVIndex"].properties[0].data
-        for uvindex {
-            // @Note UVs are indexed as 3 dimensional vectors though we only support 2
-            uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
-            array_add(*mesh.tex_coords, uv);
-        }
+
+		if (<<layer_uv)["UVIndex"] {
+			uvindex := (<<layer_uv)["UVIndex"].properties[0].data
+			for uvindex {
+				// @Note UVs are indexed as 3 dimensional vectors though we only support 2
+				uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
+				array_add(*mesh.tex_coords, uv);
+			}
+		} else {
+			for 0..uvdata.count-2 {
+				uv := make_Vector2(cast(float32) uvdata[it].f64, 1.0 - cast(float) uvdata[it+1].f64);
+				array_add(*mesh.tex_coords, uv);
+				it += 1;
+			}
+		}
     }
 
     // @Temporary material
@@ -677,15 +686,188 @@ Model_load_fbx :: (path: string) -> *Model {
     return model;
 }
 
-Model_load_dae :: (src: string, path: string) -> *Model {
+Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Model {
     // the goal here is to descend the XML tree for the things we care about and then
     // transform the XML branches into more useful Collada trees, maybe!
 
     collada := collada_parse(src, path);
 
-    for collada.library_effects {
-        print("%\n", <<it);
+    V3 :: make_Vector3;
+    V2 :: make_Vector2;
+
+    for scene: collada.library_visual_scenes {
+        for node: scene.children {
+            for node_child: node.children {
+                if node_child.node_type == "instance_geometry" {
+                    target := xml_get_property(node_child, "url").content;
+                    target.data += 1;
+                    target.count -= 1;
+
+                    print("target: %\n", target);
+
+                    geom: type_of(collada.library_geometries[0]);
+                    for geo: collada.library_geometries {
+                        if xml_get_property(geo, "id").content == target {
+                            geom = geo;
+                            break;
+                        }
+                    }
+
+                    material_instance := node_child.children[0].children[0].children[0]; // hack
+                    assert(material_instance.node_type == "instance_material");
+                    target = xml_get_property(material_instance, "target").content;
+                    target.data += 1;
+                    target.count -= 1;
+
+                    for m: collada.library_materials {
+                        if xml_get_property(m, "id").content == target {
+                            material_instance = m;
+                            break;
+                        }
+                    }
+
+                    material: type_of(collada.library_materials[0]) = xx material_instance;
+
+                    // MAX_TEXTURES_PER_MESH  :: 4;
+                    // TEXTURE_DIFFUSE_INDEX  :: 0;
+                    // TEXTURE_NORMAL_INDEX   :: 1;
+                    // TEXTURE_SPECULAR_INDEX :: 2;
+
+                    // Material :: struct {
+                    //     textures: [MAX_TEXTURES_PER_MESH] *Texture;
+                    //     specular_exp: float;
+                    //     ambient: Color;
+                    //     diffuse: Color;
+                    //     specular: Color;
+                    //     emissive: Color;
+                    //     transparency: float;
+                    // };
+
+                    // Effect :: struct {
+                    //     using xml: Xml_Node;
+                    //     id: string;
+                    //     emission: [4] float;
+                    //     ambient: [4] float;
+                    //     diffuse: [4] float;
+                    //     specular: [4] float;
+                    //     shininess: float;
+                    //     index_of_refraction: float;
+
+                    //     textures: [..] *Texture;
+                    //     surfaces: [..] *Xml_Node; // Read: newparam
+                    //     sampler2Ds: [..] *Xml_Node; // Read: sampler2D 
+                    // }
+
+                    // Material :: struct {
+                    //     using xml: Xml_Node;
+                    //     id: string;
+                    //     name: string;
+
+                    //     instance: *Effect;
+
+                    //     // these are resolved for user convinience
+                    //     bump_index :: 0;
+                    //     textures: [1] *Image;
+                    // }
+
+                    in := material.instance;
+
+                    mat := New(Material);
+                    mat.specular_exp = in.shininess;
+                    mat.ambient = make_Color(in.ambient[0], in.ambient[1], in.ambient[2]);
+                    mat.diffuse = make_Color(in.diffuse[0], in.diffuse[1], in.diffuse[2]);
+                    mat.specular = make_Color(in.specular[0], in.specular[1], in.specular[2]);
+                    mat.emissive = make_Color(in.emission[0], in.emission[1], in.emission[2]);
+
+                    if material.textures[material.bump_index] mat.textures[TEXTURE_NORMAL_INDEX] = load_image(asset_man, concatenate(path_of(path), "/", material.textures[material.bump_index].filepath));
+
+                    assert(material.textures[material.bump_index] != null);
+                    assert(mat.textures[TEXTURE_NORMAL_INDEX] != null);
+                    {
+                        model := New(Model);
+                        for mesh: geom.meshes {
+                            me := New(Mesh);
+
+                            if mesh.position_index > -1 {
+                                vdata := mesh.vertex_data[mesh.position_index];
+                                for vdata {
+                                    array_add(*me.vertices, V3(it, vdata[it_index+1], vdata[it_index+2]));
+                                    it_index += 2;
+                                }
+                            }
+
+                            if mesh.normal_index > -1 {
+                                ndata := mesh.vertex_data[mesh.normal_index];
+                                for ndata {
+                                    array_add(*me.normals, V3(it, ndata[it_index+1], ndata[it_index+2]));
+                                    it_index += 2;
+                                }
+                            }
+
+                            if mesh.texcoords_index > -1 {
+                                tdata := mesh.vertex_data[mesh.texcoords_index];
+                                for tdata {
+                                    array_add(*me.tex_coords, V2(it, tdata[it_index+1]));
+                                    it_index += 1;
+                                }
+                            }
+
+                            array_add(*model.meshes, me);
+                            me.material = mat;
+                        }
+
+                        for model.meshes {
+                            store_mesh_in_buffer(it);
+                        }
+                        return model;
+                    }
+                }
+            }
+        }
     }
+
+    // for geom: collada.library_geometries {
+    //     model := New(Model);
+    //     for mesh: geom.meshes {
+    //         me := New(Mesh);
+
+    //         if mesh.position_index > -1 {
+    //             vdata := mesh.vertex_data[mesh.position_index];
+    //             for vdata {
+    //                 array_add(*me.vertices, V3(it, vdata[it_index+1], vdata[it_index+2]));
+    // 				it_index += 2;
+    //             }
+    //         }
+
+    //         if mesh.normal_index > -1 {
+    //             ndata := mesh.vertex_data[mesh.normal_index];
+    //             for ndata {
+    //                 array_add(*me.normals, V3(it, ndata[it_index+1], ndata[it_index+2]));
+    //                 it_index += 2;
+    //             }
+    //         }
+
+    //         if mesh.texcoords_index > -1 {
+    //             tdata := mesh.vertex_data[mesh.texcoords_index];
+    //             for tdata {
+    //                 array_add(*me.tex_coords, V2(it, tdata[it_index+1]));
+    //                 it_index += 1;
+    //             }
+    //         }
+
+    //         array_add(*model.meshes, me);
+    //         mat := New(Material);
+    //         me.material = mat;
+    //         mat.diffuse = make_Color(0.8, 0.8, 0.8);
+    //     }
+
+    //     for model.meshes {
+    //         store_mesh_in_buffer(it);
+    //     }
+    //     return model;
+    // }
+
+    // assert(false);
 
     return null;
 }

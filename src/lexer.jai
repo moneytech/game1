@@ -41,6 +41,7 @@ ML_Token :: struct {
 
 	line_number: u32;
 	character_number: u32;
+	offset: *u8;
 }
 
 ML_Error_Type :: enum {
@@ -102,6 +103,7 @@ ml__token :: (st: *ML_State, tok: *ML_Token, type: ML_Token_Type) {
 	tok.type = type;
 	tok.line_number = st.line_number;
 	tok.character_number = st.character_number;
+	tok.offset = st.current;
 }
 
 ml_peek_token :: (st: *ML_State, tok: *ML_Token) {
@@ -118,6 +120,99 @@ ml__ident_dots :: (st: *ML_State, c: s32) -> bool {
 }
 
 #scope_export
+
+ml_get_string_from :: (start: *ML_Token, end: *ML_Token) -> string {
+	out: string;
+	out.data = start.offset;
+	out.count = end.offset - start.offset;
+	return out;
+}
+
+ml_get_string :: (st: *ML_State, tok: *ML_Token, delim: ML_Token_Type) {
+	tok.type = ML_TOKEN_UNINITIALIZED;
+
+	current := st.current;
+	end := st.end;
+	char_num := st.character_number;
+
+	if (current >= end) {
+		ml__token(st, tok, ML_TOKEN_END);
+		return;
+	}
+
+	ml__token(st, tok, ML_TOKEN_STRING);
+	current += 1;
+	st.character_number += 1;
+	beg := current;
+
+	while (current < end && cast(ML_Token_Type) (<<current) != delim) {
+		current += 1;
+	}
+
+	length: s64 = (current - beg);
+
+	tok._string.count = 0;
+
+	if (length) {
+		tok._string.data = xx alloc(length);
+
+		for 0..length-1 {
+			p := beg + it;
+
+			if (<<p == #char "\\") {
+				if (it + 1 < length) {
+					out: u8 = 0;
+					it += 1;
+					if <<(p+1) == {
+						case #char "t";
+							out = #char "\t";
+						case #char "r";
+							out = #char "\r";
+						case #char "n";
+							out = #char "\n";
+						case #char "f";
+							out = #char "\f";
+						case #char "\\";
+							out = #char "\\";
+						case #char "'";
+							out = #char "'";
+						case #char "\"";
+							out = #char "\"";
+						case;
+							// MACH_LEXER_REPORT_ERROR(ML_ERROR_INVALID_ESCAPE_SEQUENCE, "Invalid escape sequence in string", st->line_number, st->character_number);
+							out = #char "\\"; // output what the user typed
+							it -= 1;
+					}
+					tok._string.data[tok._string.count] = out;
+					tok._string.count += 1;
+				}
+			} else {
+				tok._string.data[tok._string.count] = <<p;
+				tok._string.count += 1;
+			}
+
+			if (<<p == #char "\n") {
+				// MACH_LEXER_REPORT_ERROR(ML_ERROR_NEWLINE_IN_STRING, "Newline in string", st->line_number, st->character_number);
+				st.line_number += 1;
+				st.character_number = 0;
+			} else {
+				st.character_number += 1;
+			}
+		}
+	} else {
+		tok._string.data = null;
+	}
+
+
+	if (current >= end) {
+		// MACH_LEXER_REPORT_ERROR(ML_ERROR_INCOMPLETE_STRING, "No string terminator found before end-of-file", tok->line_number, tok->character_number);
+	} else {
+		current += 1;
+		st.character_number += 1;
+	}
+
+	st.current = current;
+}
 
 ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 	ml__eat_whitespace(st);
@@ -177,79 +272,7 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 	}
 
 	if (<<current == #char "\"") {
-		ml__token(st, tok, ML_TOKEN_STRING);
-		current += 1;
-		st.character_number += 1;
-		beg := current;
-
-		while (current < end && <<current != #char "\"") {
-			current += 1;
-		}
-
-		length: s64 = (current - beg);
-
-		tok._string.count = 0;
-
-		if (length) {
-			// print("length: %\n", length);
-			tok._string.data = xx alloc(length);
-
-			for 0..length-1 {
-				p := beg + it;
-
-				if (<<p == #char "\\") {
-					if (it + 1 < length) {
-						out: u8 = 0;
-						it += 1;
-						if <<(p+1) == {
-							case #char "t";
-								out = #char "\t";
-							case #char "r";
-								out = #char "\r";
-							case #char "n";
-								out = #char "\n";
-							case #char "f";
-								out = #char "\f";
-							case #char "\\";
-								out = #char "\\";
-							case #char "'";
-								out = #char "'";
-							case #char "\"";
-								out = #char "\"";
-							case;
-								// MACH_LEXER_REPORT_ERROR(ML_ERROR_INVALID_ESCAPE_SEQUENCE, "Invalid escape sequence in string", st->line_number, st->character_number);
-								out = #char "\\"; // output what the user typed
-								it -= 1;
-						}
-						tok._string.data[tok._string.count] = out;
-						tok._string.count += 1;
-					}
-				} else {
-					tok._string.data[tok._string.count] = <<p;
-					tok._string.count += 1;
-				}
-
-				if (<<p == #char "\n") {
-					// MACH_LEXER_REPORT_ERROR(ML_ERROR_NEWLINE_IN_STRING, "Newline in string", st->line_number, st->character_number);
-					st.line_number += 1;
-					st.character_number = 0;
-				} else {
-					st.character_number += 1;
-				}
-			}
-		} else {
-			tok._string.data = null;
-		}
-
-
-		if (current >= end) {
-			// MACH_LEXER_REPORT_ERROR(ML_ERROR_INCOMPLETE_STRING, "No string terminator found before end-of-file", tok->line_number, tok->character_number);
-		} else {
-			current += 1;
-			st.character_number += 1;
-		}
-
-		st.current = current;
+		ml_get_string(st, tok, xx #char "\"");
 		return;
 	}
 
@@ -292,13 +315,22 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 		}
 
 		if (base == 10) {
-			while (current < end && (ml__isnumber(<<current) || <<current == #char ".")) {
+			allow_e := false;
+			while (current < end && (ml__isnumber(<<current) || <<current == #char "." || (allow_e && <<current == #char "e"))) {
 				if (<<current == #char ".") {
 					if (base != -1) {
 						base = -1;
 						tok.type = ML_TOKEN_FLOAT;
+						allow_e = true;
 					}
 					else break; // extra dot in float
+				} else if <<current == #char "e" {
+					if current < end && (current+1) < end {
+						if <<(current+1) == #char "-" {
+							current += 1;
+						}
+					}
+					allow_e = false;
 				}
 				current += 1;
 			}
@@ -317,7 +349,7 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
 		memcpy(temp, beg, len);
 		temp[len] = 0;
 		
-		// print("TEMP: %\n", temp);
+		// print("TEMP: %\n", to_string(temp));
 
 		if (base >= 0) {
 			tok.integer = strtoull(temp, null, base);

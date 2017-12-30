@@ -29,6 +29,7 @@ void main() {
 
     if (use_normal_map) {
         vec3 out_normal = texture(normal_map, tex_coords).rgb;
+        //vec3 out_normal = vec3(0, 1, 0);
         out_normal = normalize(out_normal * 2.0 - 1.0);
         out_normal = normalize(TBN * out_normal);
         g_normal = out_normal;

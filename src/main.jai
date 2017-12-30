@@ -109,7 +109,7 @@ make_signpost :: (text: Text) -> *Signpost {
 
 make_crate :: (game: *Game) -> *Actor {
     actor := New(Actor);
-    actor.model = load_model(game.asset_man, "assets/crate.fbx");;
+    actor.model = load_model(game.asset_man, "assets/crate.dae");
     actor.body = New(Rigid_Body);
 
     collider := make_AABB(make_Vector3(0, 0, 0), make_Vector3(2, 2, 2));
@@ -581,9 +581,13 @@ _logger :: (message: string, ident: string, mode: Log_Mode, data: *void) {
     print("%: %\n", ident, message);
 }
 
+
+// dae_model: *Model;
 draw_geometry :: (using game: *Game, water := false) {
     start_scene(game.renderer);
     draw_scene(game.renderer, <<game.current_scene);
+    // dae_model.model_matrix = matrix_translate(0, 10, 0);
+    // draw_model(game.renderer, <<dae_model);
 
     #if DEVELOPER {
         // render_editor(game);
@@ -653,7 +657,7 @@ main :: () {
     rdr.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
     rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     rdr.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
-    load_model(asset_man, "../../untitled.dae");
+    // dae_model = load_model(asset_man, "assets/untitled.dae");
     game.text_strings = load_text_strings(asset_man);
 
     init_editor(*game);
@@ -680,7 +684,7 @@ main :: () {
 
     pressed := false;
 
-    while (true) {
+    while true {
         exit := false;
 
         for events_this_frame {
@@ -964,6 +968,7 @@ contains_key :: (using map: *Hash_Map, str: string) -> bool {
         e = e.next;
     }
 
+	if !e return false;
     return e.key.count != 0;
 }
 
