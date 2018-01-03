@@ -132,9 +132,9 @@ make_barrel :: (game: *Game) -> *Holdable_Actor {
 }
 
 Text :: enum u16 {
-    NO_MESSAGE,
+    NO_MESSAGE;
 
-    LAST_MESSAGE
+    LAST_MESSAGE;
 }
 
 issue_text :: (game: *Game, message: string) {

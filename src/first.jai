@@ -84,12 +84,12 @@ demo :: () {
 // C compilation code
 
 C_Output_Type :: enum {
-    NO_OUTPUT,
-    COPY_FILE,
-    EXECUTABLE,
-    OBJECT,
-    STATIC_LIBRARY,
-    DYNAMIC_LIBRARY,
+    NO_OUTPUT;
+    COPY_FILE;
+    EXECUTABLE;
+    OBJECT;
+    STATIC_LIBRARY;
+    DYNAMIC_LIBRARY;
 }
 
 C_Target :: struct {

@@ -39,12 +39,12 @@ __terrain: *Mesh;
 terrain_map: Height_Map;
 
 Tool_Mode :: enum u16 {
-    VERTEX_PICK,
-    BRUSH_ADD,
-    BRUSH_SUBTRACT,
-    BRUSH_SPHERE_ADD,
-    BRUSH_SPHERE_SUBTRACT,
-    BRUSH_TEXTURE_PAINT,
+    VERTEX_PICK;
+    BRUSH_ADD;
+    BRUSH_SUBTRACT;
+    BRUSH_SPHERE_ADD;
+    BRUSH_SPHERE_SUBTRACT;
+    BRUSH_TEXTURE_PAINT;
 }
 
 terrain_texture: Texture;

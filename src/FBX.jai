@@ -6,21 +6,21 @@
 FBX_Node_Property :: struct {
 
     FBX_Primitive_Type :: enum u8 {
-        TYPE_INT16 : #char "Y",
-        TYPE_BOOL  : #char "C",
-        TYPE_INT32 : #char "I",
-        TYPE_FLOAT : #char "F",
-        TYPE_DOUBLE: #char "D",
-        TYPE_INT64 : #char "L",
+        TYPE_INT16 :: #char "Y";
+        TYPE_BOOL  :: #char "C";
+        TYPE_INT32 :: #char "I";
+        TYPE_FLOAT :: #char "F";
+        TYPE_DOUBLE:: #char "D";
+        TYPE_INT64 :: #char "L";
 
-        TYPE_FLOAT_ARRAY : #char "f",
-        TYPE_DOUBLE_ARRAY: #char "d",
-        TYPE_INT64_ARRAY : #char "l",
-        TYPE_INT32_ARRAY : #char "i",
-        TYPE_BOOL_ARRAY  : #char "b",
+        TYPE_FLOAT_ARRAY :: #char "f";
+        TYPE_DOUBLE_ARRAY:: #char "d";
+        TYPE_INT64_ARRAY :: #char "l";
+        TYPE_INT32_ARRAY :: #char "i";
+        TYPE_BOOL_ARRAY  :: #char "b";
 
-        TYPE_STRING      : #char "S",
-        TYPE_RAW_DATA    : #char "R",
+        TYPE_STRING      :: #char "S";
+        TYPE_RAW_DATA    :: #char "R";
     };
 
     type: FBX_Primitive_Type;

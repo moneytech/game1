@@ -94,8 +94,8 @@ using ML_Token_Type;
 #scope_export
 
 Collada_Texture_Type :: enum u16 {
-    NONE : 0,
-    BUMP,
+    NONE :: 0;
+    BUMP;
 }
 
 collada_parse_source :: (p: *Xml_Parser, node_type: string, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node {

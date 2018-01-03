@@ -16,8 +16,8 @@ Rectangle :: struct {
 
 Texture :: struct {
     Texture_Type :: enum #complete {
-        RGBA,
-        DEPTH
+        RGBA;
+        DEPTH;
     }
     using Texture_Type;
 
@@ -148,9 +148,9 @@ Material :: struct {
 };
 
 Primitive_Type :: enum u32 #complete {
-    TRIANGLES,
-    POINTS,
-    LINES
+    TRIANGLES;
+    POINTS;
+    LINES;
 }
 
 Mesh :: struct {
@@ -231,8 +231,8 @@ Sprite :: struct {
 
 
 Light_Type :: enum {
-    DIRECTIONAL,
-    RADIAL
+    DIRECTIONAL;
+    RADIAL;
 };
 
 Light :: struct {
