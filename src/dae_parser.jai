@@ -70,10 +70,10 @@ Int_Array :: struct {
 
 Geometry :: struct {
     using xml: Xml_Node;
-    meshes: [..] *Collada_Mesh;
+    meshes: [..] *Mesh;
 }
 
-Collada_Mesh :: struct {
+Mesh :: struct {
     using xml: Xml_Node;
     position_index: int = -1;
     normal_index: int = -1;
@@ -293,7 +293,7 @@ collada_parse_int_array :: (p: *Xml_Parser, node_type: string, parent: *Xml_Node
 }
 
 collada_parse_mesh :: (p: *Xml_Parser, node_type: string, parent: *Xml_Node, properties: [..] *Xml_Property) -> *Xml_Node {
-    mesh := XML_NEW(p, Collada_Mesh, node_type);
+    mesh := XML_NEW(p, Mesh, node_type);
     children := xml_parse_child_loop(p, mesh);
 
     polylist: *Xml_Node;
@@ -389,8 +389,8 @@ collada_parse_geometry :: (p: *Xml_Parser, node_type: string, parent: *Xml_Node,
     geom := XML_NEW(p, Geometry, node_type);
     children := xml_parse_child_loop(p, geom);
     for children {
-        assert(it.type == Collada_Mesh);
-        mesh := cast(*Collada_Mesh) it;
+        assert(it.type == Mesh);
+        mesh := cast(*Mesh) it;
         array_add(*geom.meshes, mesh);
     }
     if children.data free(children.data);
