@@ -1,6 +1,4 @@
 
-#load "gl_api.jai";
-
 JOYSTICK_BUTTON_A       :: (1 << 0);
 JOYSTICK_BUTTON_B       :: (1 << 1);
 JOYSTICK_BUTTON_X       :: (1 << 2);
