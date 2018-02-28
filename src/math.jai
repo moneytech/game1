@@ -1,12 +1,39 @@
 
+cos  :: (theta: float64) -> float64 #foreign crt;
+sin  :: (theta: float64) -> float64 #foreign crt;
+tan  :: (theta: float64) -> float64 #foreign crt;
+atan2 :: (y: float64, x: float64) -> float64 #foreign crt;
+atan :: (y: float64) -> float64 #foreign crt;
+acos :: (theta: float64) -> float64 #foreign crt;
+asin :: (theta: float64) -> float64 #foreign crt;
+sqrt :: (theta: float64) -> float64 #foreign crt;
+pow  :: (x: float64, power: float64) -> float64 #foreign crt;
+abs :: (x: float64) -> float64 #foreign crt "fabs";
+ceil :: (x: float64) -> float64 #foreign crt;
+floor :: (x: float64) -> float64 #foreign crt;
+fmod :: (x: float64, divisor: float64) -> float64 #foreign crt;
+
+// Float32 versions.
+cos  :: (theta: float) -> float #foreign crt "cosf";
+sin  :: (theta: float) -> float #foreign crt "sinf";
+tan  :: (theta: float) -> float #foreign crt "tanf";
+atan2 :: (y: float, x: float) -> float #foreign crt "atan2f";
+atan :: (y: float) -> float #foreign crt "atanf";
+acos :: (theta: float) -> float #foreign crt "acosf";
+asin :: (theta: float) -> float #foreign crt "asinf";
+sqrt :: (theta: float) -> float #foreign crt "sqrtf";
+pow  :: (x: float, power: float) -> float #foreign crt "powf";
+ceil :: (x: float) -> float #foreign crt "ceilf";                   // x64 & arm only.
+floor :: (x: float) -> float #foreign crt "floorf";                 // x64 & arm only.
+fmod :: (x: float, divisor: float) -> float #foreign crt;           // x64 & arm only.
+
+crt :: #foreign_system_library "msvcrt";
+
+TAU : float : 6.283147;
+TAU64 : float64 : 6.28318530717958647;
+
 
 // vector math
-
-clamp :: (val: float, min: float, max: float) -> float #c_callback {
-    if (val > max) return max;
-    if (val < min) return min;
-    return val;
-}
 
 Vector4 :: struct {
     x: float;
@@ -783,7 +810,7 @@ max :: (min: $T, a: T, b: T) -> T {
 }
 
 floats_are_equal :: inline (a: $T, b: T) -> bool {
-    return fabs(a - b) <= EPSILON * max(cast(float64) 1.0, fabs(a), fabs(b));
+    return abs(a - b) <= EPSILON * max(cast(float64) 1.0, abs(a), abs(b));
 }
 
 vectors_are_equal :: inline (a: Vector3, b: Vector3) -> bool {

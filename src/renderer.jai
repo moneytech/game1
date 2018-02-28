@@ -4,7 +4,8 @@
 #import "GL";
 
 #scope_file
-using gl_30_api;
+using gl;
+
 #scope_export
 
 Rectangle :: struct {
@@ -301,15 +302,14 @@ GL_Renderer :: struct {
 
 debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
     #if OS_WINDOWS {
-        print("source: %\n", source);
-        print("type: %\n", type);
-        print("id: %\n", id);
-        print("severity: %\n", severity);
-        print("length: %\n", length);
-        print("message: %\n", message);
-        print("userParam: %\n", userParam);
-        print("DEBUG:%\n", point_at_c_string(message));
-        assert(false);
+        // print("source: %\n", source);
+        // print("type: %\n", type);
+        // print("id: %\n", id);
+        // print("severity: %\n", severity);
+        // print("length: %\n", length);
+        // print("message: %\n", message);
+        // print("userParam: %\n", userParam);
+        if (type == GL_DEBUG_TYPE_ERROR) print("GL Error:%\n", point_at_c_string(message));
     }
 }
 
@@ -482,7 +482,7 @@ compile_shader :: (type: GLenum, source: string) -> u32 {
 
     status: GLint;
     glGetShaderiv(v, GL_COMPILE_STATUS, *status);
-    if (status == GL_FALSE) {
+    if (status == xx GL_FALSE) {
         len: GLint;
         glGetShaderiv(v, GL_INFO_LOG_LENGTH, *len);
         buf := cast(*u8) alloc(len);
@@ -513,7 +513,7 @@ compile_shader_source :: (out: *Shader, vertex: string, pixel: string) {
 
     status: GLint;
     glGetProgramiv(program, GL_LINK_STATUS, *status);
-    if (status == GL_FALSE) {
+    if (status == xx GL_FALSE) {
         len: GLint;
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, *len);
         buf := cast(*u8) alloc(len);
@@ -703,7 +703,7 @@ create_font :: (font: *Font, bwidth: s16, bheight: s16, data: *void) {
     font.bheight = bheight;
     glGenTextures(1, *font.id);
     glBindTexture(GL_TEXTURE_2D, font.id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, bwidth, bheight, 0, GL_RED, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, cast(u32) bwidth, cast(u32) bheight, 0, GL_RED, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 

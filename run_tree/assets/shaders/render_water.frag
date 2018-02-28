@@ -21,10 +21,10 @@ void main() {
 
     vec2 tex_coords = (clip_space.xy / clip_space.w) * 0.5 + 0.5;
     vec2 t2 = tex_coords;
-    t2.y = -t2.y;
+    // t2.y = -t2.y;
 
-    vec2 d1 = (texture(dudv_texture, vec2(dudv_tex_coords.x + distort_offset, dudv_tex_coords.y)).rg * 2.0 - 1.0) * 0.02;
-    vec2 d2 = (texture(dudv_texture, vec2(-dudv_tex_coords.x + distort_offset, dudv_tex_coords.y + distort_offset)).rg * 2.0 - 1.0) * 0.02;
+    vec2 d1 = (texture(dudv_texture, vec2(dudv_tex_coords.x + distort_offset, dudv_tex_coords.y)).rg * 2.0 - 1.0) * 0.006;
+    vec2 d2 = (texture(dudv_texture, vec2(-dudv_tex_coords.x + distort_offset, dudv_tex_coords.y + distort_offset)).rg * 2.0 - 1.0) * 0.006;
     // vec2 d2 = vec2(0, 0);
     vec2 distort = d1 + d2; 
 
@@ -33,7 +33,8 @@ void main() {
 
     tex_coords = clamp(tex_coords, 0.001, 0.999);
     t2.x = clamp(t2.x, 0.001, 0.999);
-    t2.y = clamp(t2.y, -0.001, -0.999);
+    t2.y = clamp(t2.y, 0.001, 0.999);
+    t2.y = -t2.y;
 
     vec3 view = normalize(camera_position - frag_pos);
     float refract = dot(view, vec3(0, 1, 0));

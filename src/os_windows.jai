@@ -174,64 +174,30 @@ __XInputSetState: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #foreign;
 wglChoosePixelFormatARB: (hDC: HDC, piAttribIList: *s32, pfAttribFList: *float, nMaxFormats: u32, piFormats: *s32, nNumFormats: *u32) -> BOOL #foreign;
 wglCreateContextAttribsARB: (hDC: HDC, hShareContext: HGLRC, attribList: *s32) -> HGLRC #foreign;
 
-window_class_initted := false;
-WINDOW_CLASS_NAME :: "Jai Default Window Class\0";
-
-init_window_class :: () {
-    wc: WNDCLASSEXA;
-
-    wc.cbSize = size_of(WNDCLASSEXA);
-    wc.style                = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wc.lpfnWndProc          = xx MyWindowProc;
-    wc.cbClsExtra           = 0;
-    wc.cbWndExtra           = 0;
-    wc.hInstance            = 0;   // @Robustness: If we want to run on win98 we need the app hinstance here...
-    wc.hIcon                = LoadIconA(0, "APPICON\0".data);
-    wc.hCursor              = LoadCursorA(0, cast(*u8) IDC_ARROW);
-    wc.hbrBackground        = cast(HBRUSH) GetStockObject(WHITE_BRUSH);
-    
-    wc.lpszMenuName         = null;
-    wc.lpszClassName        = WINDOW_CLASS_NAME.data;
-
-    // Register the window class
-    if RegisterClassExA(*wc) == 0 {
-        logprint("opengl", "Failure in init_window_class(): RegisterClassExA returned 0.\n");
-        return;
-    }
-
-    window_class_initted = true;
-}
-
-WINDOWED_STYLE : s32   : WS_VISIBLE | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_SIZEBOX;
-FULLSCREEN_STYLE : s32 : WS_VISIBLE | WS_POPUP;
 os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
-    if (!window_class_initted) {
-        init_window_class();
-    }
-
-    rect: RECT;
-    rect.right = width;
-    rect.bottom = height;
-    AdjustWindowRect(*rect, WINDOWED_STYLE, 0);
-
-    hInstance := GetModuleHandleA(null);
-    c_title := to_c_string(title);
-    ret := CreateWindowExA(0, WINDOW_CLASS_NAME.data, c_title, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, rect.right-rect.left, rect.bottom-rect.top, 0, 0, hInstance, null);
-    free(c_title);
-    return ret;
-
-    // return create_window(width, height, title);
+    return create_window(width, height, title);
 }
-
 
 os_create_gl_context :: (win: OS_Window) -> OS_GL_Context {
     hdc := GetDC(win);
+     _GL_TRUE :: 1;
+    WGL_CONTEXT_DEBUG_BIT_ARB :: 0x00000001;
+    WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB :: 0x00000002;
+    WGL_CONTEXT_MAJOR_VERSION_ARB :: 0x2091;
+    WGL_CONTEXT_MINOR_VERSION_ARB :: 0x2092;
+    WGL_CONTEXT_LAYER_PLANE_ARB :: 0x2093;
+    WGL_CONTEXT_FLAGS_ARB :: 0x2094;
+    WGL_CONTEXT_PROFILE_MASK_ARB :: 0x9126;
+    WGL_CONTEXT_CORE_PROFILE_BIT_ARB :: 0x00000001;
+    WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x00000002;
+    
 
     if (wglChoosePixelFormatARB) {
+
         int_attribs := {:s32:
-            WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
-            WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
-            WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
+            WGL_DRAW_TO_WINDOW_ARB, _GL_TRUE,
+            WGL_SUPPORT_OPENGL_ARB, _GL_TRUE,
+            WGL_DOUBLE_BUFFER_ARB, _GL_TRUE,
             WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
             WGL_COLOR_BITS_ARB, 32,
             WGL_DEPTH_BITS_ARB, 24,
@@ -287,7 +253,7 @@ os_create_gl_context :: (win: OS_Window) -> OS_GL_Context {
                     0,
             };
         }
-        return wglCreateContextAttribsARB(hdc, 0, attribs.data);
+        return wglCreateContextAttribsARB(hdc, null, attribs.data);
     } else {
        return wglCreateContext(hdc);
     }
@@ -369,7 +335,7 @@ os_make_current :: (win: OS_Window, ctx: OS_GL_Context) {
     wglMakeCurrent(GetDC(win), ctx);
 }
 
-gl_lib: HMODULE;
+gl_handle: HMODULE;
 
 os_init_platform :: () {
     xinput := LoadLibraryA("xinput1_3.dll");
@@ -381,8 +347,8 @@ os_init_platform :: () {
         __XInputSetState = xx XInputSetStateStub;
     }
 
-    gl_lib = LoadLibraryA("opengl32.dll");
-    assert(gl_lib != 0);
+    gl_handle = LoadLibraryA("opengl32.dll");
+    assert(gl_handle != null);
 
     dummy := os_create_window(50, 50, "");
     ShowWindow(dummy, SW_HIDE);
@@ -392,9 +358,9 @@ os_init_platform :: () {
     wglChoosePixelFormatARB = xx os_load_gl_func("wglChoosePixelFormatARB");
     wglCreateContextAttribsARB = xx os_load_gl_func("wglCreateContextAttribsARB");
 
-    init_gl_extensions(*gl_30_api);
+    gl_load(*gl);
 
-    wglMakeCurrent(0, 0);
+    wglMakeCurrent(null, null);
     wglDeleteContext(glc);
     os_close_window(dummy);
 }
@@ -405,7 +371,7 @@ os_load_gl_func :: (name: string) -> *void {
 
     p := wglGetProcAddress(c_name);
     if(p == cast(*void)0 || (p == cast(*void)0x1) || (p == cast(*void)0x2) || (p == cast(*void)0x3) || (p == cast(*void)-1) ) {
-        p = GetProcAddress(gl_lib, c_name);
+        p = GetProcAddress(gl_handle, c_name);
         if (!p) print("Couldnt load func %\n", name);
     }
     return p;
@@ -443,7 +409,7 @@ os_watch_dir :: (path: string)  {
         return;
     }
 
-    dir.overlapped.hEvent = CreateEventA(null, 0, 0, null);
+    dir.overlapped.hEvent = CreateEventW(null, 0, 0, null);
     dir.overlapped.Offset = 0;
 
     if (dir.overlapped.hEvent == INVALID_HANDLE_VALUE) {

@@ -371,15 +371,15 @@ do_collide_aabb_aabb :: (a: AABB, b: AABB) -> bool, Contact_Point {
     // @Incomplete point_on_a, point_on_b
     if x < y && x < z {
         cp.normal = normalize(make_Vector3(x, 0, 0));
-        cp.dist = cast(float32) fabs(x);
+        cp.dist = cast(float32) abs(x);
         return true, cp;
     } else if y < z {
         cp.normal = normalize(make_Vector3(0, y, 0));
-        cp.dist = cast(float32) fabs(y);
+        cp.dist = cast(float32) abs(y);
         return true, cp;
     } else {
         cp.normal = normalize(make_Vector3(0, 0, z));
-        cp.dist = cast(float32) fabs(z);
+        cp.dist = cast(float32) abs(z);
         return true, cp;
     }
 }
@@ -410,7 +410,7 @@ closest_point_line_to_point :: (a: Vector3, b: Vector3, q: Vector3) -> Vector3 {
 // based on Erin Catto's http://box2d.org/2014/02/computing-a-basis/
 compute_basis :: (a: Vector3) -> Vector3, Vector3 {
     b: Vector3 = ---;
-    if fabs(a.x) > 0.57735 {
+    if abs(a.x) > 0.57735 {
         b.x =  a.y;
         b.y = -a.x;
         b.z =  0;

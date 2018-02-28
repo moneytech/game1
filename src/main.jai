@@ -14,6 +14,18 @@ uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreig
 // Rigid_Body :: #type Rigid_Body_Poly(Actor);
 #load "physics.jai";
 
+substring :: (s: string, index: s64, bytes: s64) -> string, bool {
+    result: string;
+    if s.count < index + bytes  return result, false;
+
+    result.count = bytes;
+    result.data = s.data + index;
+
+    // print("substring index %, bytes %, result.count %\n", index, bytes, result.count);
+
+    return result, true;
+}
+
 Game :: struct {
     renderer: *GL_Renderer;
     asset_man: *Asset_Manager;
@@ -607,14 +619,12 @@ main :: () {
 
     orig_wd: string;
     if running_at_compile_time() {
-        orig_wd.data = alloc(512);
-        orig_wd.count = get_current_directory(orig_wd.data, 512);
+        orig_wd = get_current_directory(); // @Leak ?
         opts := get_build_options();
         setcwd(opts.output_path);
     } else {
         path := get_path_of_running_executable();
         final_path := find_and_truncate_character_from_right(path, #char "/");
-        defer free(path);
         setcwd(final_path);
     }
     os_watch_dir("assets");
@@ -749,7 +759,7 @@ main :: () {
         update_scene(*game, game.current_scene, 1.0/60.0);
         renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
         // update_editor(*game, 1.0);
-        glViewport(0, 0, xx game.window.width, xx game.window.height);
+        gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
 
         old_camera := game.renderer.camera;
         new_camera := old_camera;
