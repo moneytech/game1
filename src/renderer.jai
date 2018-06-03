@@ -105,7 +105,7 @@ Font :: struct {
     cdata: [96] stbtt_bakedchar; // ASCII 32..126 is 95 glyphs
 };
 
-font_get_length :: (using font: *Font, str: string) -> float {
+font_get_length :: (using font: Font, str: string) -> float {
     x: float = 0;
     y: float = 0;
     for 0..str.count-1 {
@@ -711,6 +711,7 @@ Temp_Vertex_Array :: struct {
     vertex: Vector2;
     tex_coords: Vector2;
 }
+
 make_TVA :: (x: float, y: float, tx: float, ty: float) -> Temp_Vertex_Array {
     tva: Temp_Vertex_Array = ---;
     tva.vertex.x = x;
@@ -720,7 +721,12 @@ make_TVA :: (x: float, y: float, tx: float, ty: float) -> Temp_Vertex_Array {
     return tva;
 }
 
-draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: string, str_args: .. Any) -> x {
+draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: string, str_args: .. Any) -> float {
+    white := make_Color(1, 1, 1);
+    return draw_text(rdr, font, x, y, text, ..str_args, color = white);
+}
+
+draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: string, str_args: .. Any, color: Color) -> float {
     glUseProgram(rdr.render_text.id);
     update_matrices(rdr, matrix_identity(), render_text);
 
@@ -733,6 +739,7 @@ draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: stri
     glUniform1i(tex, 0);
 
     arr: [..] Temp_Vertex_Array;
+    arr.allocator = __temporary_allocator;
 
     builder: String_Builder;
     print_to_builder(*builder, text, ..str_args);
@@ -759,7 +766,7 @@ draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: stri
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-    glVertexAttrib3f(2, 1.0, 1.0, 1.0);
+    glVertexAttrib3f(2, color.r, color.g, color.b);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(Temp_Vertex_Array), null);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, size_of(Temp_Vertex_Array), cast(*void) size_of(Vector2));
@@ -1055,6 +1062,7 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
     yh := y+height;
 
     arr: [..] Temp_Vertex_Array;
+    arr.allocator = __temporary_allocator;
     v0 := make_TVA(x, y, 0, 0);
     v1 := make_TVA(xw, y, 1, 0);
     v2 := make_TVA(xw, yh, 1, 1);

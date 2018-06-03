@@ -515,7 +515,7 @@ matrix_rotate :: (degrees: float64, tx: float, ty: float, tz: float) -> Matrix4 
     y /= length;
     z /= length;
 
-    angle := degrees * (3.14159265359 / 180.0);
+    angle := degrees * DEGREES_TO_RADIANS;
     c := cast(float) cos(angle);
     omc := 1.0 - c;
     s := cast(float) sin(angle);
@@ -534,6 +534,13 @@ matrix_rotate :: (degrees: float64, tx: float, ty: float, tz: float) -> Matrix4 
     return result;
 }
 
+RADIANS_TO_DEGREES :: 180 / 3.14159265359;
+DEGREES_TO_RADIANS :: 3.14159265359 / 180;
+
+#run {
+    print("RAD :%\n", RADIANS_TO_DEGREES);
+};
+
 matrix_rotate :: (q: Quaternion) -> Matrix4 {
     rta := sqrt(1 - q.w*q.w);
     if (rta == 0) {
@@ -543,7 +550,7 @@ matrix_rotate :: (q: Quaternion) -> Matrix4 {
     x := q.x / rta;
     y := q.y / rta;
     z := q.z / rta;
-    return matrix_rotate(theta * (180.0 /3.14159265359), x, y, z);
+    return matrix_rotate((cast(float64) theta) * RADIANS_TO_DEGREES, x, y, z);
 }
 
 matrix_translate :: (x: float, y: float, z: float) -> Matrix4 {
@@ -663,7 +670,7 @@ matrix_orientation :: (degrees: float64, tx: float, ty: float, tz: float) -> Mat
     y /= length;
     z /= length;
 
-    angle := degrees * (3.14159265359 / 180.0);
+    angle := degrees * DEGREES_TO_RADIANS;
     c := cast(float) cos(angle);
     omc := 1.0 - c;
     s := cast(float) sin(angle);

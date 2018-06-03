@@ -43,15 +43,15 @@ FILE_NOTIF_FUNC :: #type (notif: *File_Notification, data: *void);
 strtod :: (start: *u8, endptr: **u8) -> float64 #foreign crt;
 
 #if OS_WINDOWS {
-	strtoull :: (start: *u8, endptr: **u8, base: s32) -> u64 #foreign crt "_strtoui64";
+    strtoull :: (start: *u8, endptr: **u8, base: s32) -> u64 #foreign crt "_strtoui64";
 
-	#scope_file
-	crt :: #foreign_system_library "msvcrt";
+    #scope_file
+    crt :: #foreign_system_library "msvcrt";
 } else {
-	strtoull :: (start: *u8, endptr: **u8, base: s32) -> u64 #foreign crt;
+    strtoull :: (start: *u8, endptr: **u8, base: s32) -> u64 #foreign crt;
 
-	#scope_file
-	crt :: #foreign_system_library "c";
+    #scope_file
+    crt :: #foreign_system_library "c";
 }
 
 find_and_truncate_character_from_right :: (s: string, c: int) -> string {

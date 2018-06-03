@@ -6,6 +6,7 @@
 #load "asset_manager.jai";
 #load "editor.jai";
 #load "FBX.jai";
+#load "imgui.jai";
 
 miniz :: #foreign_library "miniz";
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
@@ -640,8 +641,10 @@ main :: () {
     rdr: GL_Renderer;
     game: Game;
     window: Game_Window;
-    window.width = WINDOW_WIDTH;
-    window.height = WINDOW_HEIGHT;
+
+    _width, _height := os_get_window_dimensions(win);
+    window.width = xx _width;
+    window.height = xx _height;
     window.handle = win;
     window.glc = ctx;
 
@@ -693,18 +696,33 @@ main :: () {
     game.current_scene = *_scene;
 
     pressed := false;
+    imgui: Imgui;
+    imgui.renderer = renderer;
 
     while true {
         exit := false;
+
+        imgui.mouse_went_down = false;
+        imgui.mouse_went_up = false;
 
         for events_this_frame {
             if (it.type == Event_Type.QUIT) {
                 exit = true;
             } else if (it.type == Event_Type.KEYBOARD) {
-
+                if it.key_code == Key_Code.MOUSE_BUTTON_LEFT {
+                    if it.key_pressed imgui.mouse_went_down = true;
+                    else imgui.mouse_went_up = true;
+                }
             }
         }
 
+        {
+            x, y, success := get_mouse_pointer_position(false);
+            if success {
+                imgui.mouse_x = xx x;
+                imgui.mouse_y = xx y;
+            }
+        }
 
         if (joysticks.count) {
             joy := joysticks[0];
@@ -782,6 +800,9 @@ main :: () {
 
         set_clip_plane(renderer, false);
         draw_geometry(*game, true);
+
+        renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+        do_label(*imgui, 1, <<font, 0.0, 0.0, "Hello World");
 
         // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
         /*

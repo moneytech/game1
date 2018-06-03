@@ -11,8 +11,6 @@ User32   :: #foreign_system_library "user32";
 Kernel32 :: #foreign_system_library "kernel32";
 crt :: #foreign_system_library "msvcrt";
 
-strstr :: (a: *u8, b: *u8) -> *u8 #foreign crt;
-BOOL :: s32;
 GetOverlappedResult :: (hFile: HANDLE, lpOverlapped: *OVERLAPPED, lpNumberOfBytesTrasferred: *s32, bWait: BOOL) -> BOOL #foreign Kernel32;
 LoadLibraryA :: (lpFileName: *u8) -> HMODULE #foreign Kernel32;
 LoadLibraryA :: (name: string) -> HMODULE {
@@ -34,7 +32,6 @@ DestroyWindow :: (hWnd: HWND) -> BOOL #foreign User32;
 CreateFileA :: (lpFileName: *u8, dwDesiredAccess: s32, dwShareMode: s32, sec: *void, dwCreationDisposition: s32, dwFlags: s32, hTemplate: *void) -> HANDLE #foreign Kernel32;
 GetModuleHandleA :: (lpModuleName: *u8) -> HMODULE #foreign Kernel32;
 GetModuleFileNameA :: (hModule: HMODULE, lpFileName: *u8, nSize: s32) -> s32 #foreign Kernel32;
-ReadDirectoryChangesW :: (hd: HANDLE, lpBuf: *void, nbuflen: s32, bwatchsub: BOOL, notiffilt: s32, bytes_ret: *s32, over: *OVERLAPPED, complete: *void) -> BOOL #foreign Kernel32;
 
 FILE_NOTIFY_CHANGE_FILE_NAME   :: 0x0000001;
 FILE_NOTIFY_CHANGE_DIR_NAME    :: 0x0000002;
@@ -55,19 +52,6 @@ WGL_TYPE_RGBA_ARB             :: 0x202B;
 WGL_COLOR_BITS_ARB            :: 0x2014;
 WGL_DEPTH_BITS_ARB            :: 0x2022;
 WGL_STENCIL_BITS_ARB          :: 0x2023;
-
-OVERLAPPED :: struct {
-    Internal: u64;
-    InternalHigh: u64;
-
-    Offset: s32;
-    OffsetHigh: s32;
-    #place Offset;
-
-    Pointer: *void;
-
-    hEvent: HANDLE;
-}
 
 FILE_NOTIFY_INFORMATION :: struct {
     NextEntryOffset: s32;
@@ -171,11 +155,14 @@ XInputSetStateStub :: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #c_ca
 __XInputGetState: (dwUserIndex: s32, pState: *XINPUT_STATE) -> s32 #foreign;
 __XInputSetState: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #foreign;
 
-wglChoosePixelFormatARB: (hDC: HDC, piAttribIList: *s32, pfAttribFList: *float, nMaxFormats: u32, piFormats: *s32, nNumFormats: *u32) -> BOOL #foreign;
-wglCreateContextAttribsARB: (hDC: HDC, hShareContext: HGLRC, attribList: *s32) -> HGLRC #foreign;
-
 os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
     return create_window(width, height, title);
+}
+
+os_get_window_dimensions :: (win: OS_Window) -> s32, s32 {
+    r: RECT;
+    GetClientRect(win, *r);
+    return r.right-r.left, r.bottom-r.top;
 }
 
 os_create_gl_context :: (win: OS_Window) -> OS_GL_Context {
@@ -263,23 +250,14 @@ os_close_window :: (win: OS_Window) {
     DestroyWindow(win);
 }
 
-wglSwapIntervalStub :: (interval: s16) -> s16 #c_callback {
-    assert(false);
+wglSwapInterval_Stub :: (interval: s16) -> BOOL {
+    if wglSwapIntervalEXT return wglSwapIntervalEXT(interval);
     return 0;
 }
 
 os_set_vsync :: (on: bool) {
-    // @Cleanup we should query these at startup
-    wglSwapIntervalEXT : (interval: s16) -> s16 #foreign = xx wglSwapIntervalStub;
-    wglGetExtensionsStringEXT: () -> *u8 #foreign = xx os_load_gl_func("wglGetExtensionsStringEXT");
-
-    if (strstr(wglGetExtensionsStringEXT(), to_c_string("EXT_swap_control"))) {
-        wglSwapIntervalEXT = xx os_load_gl_func("wglSwapIntervalEXT");
-        assert(wglSwapIntervalEXT != null);
-    }
-
-    if (on) wglSwapIntervalEXT(1);
-    else wglSwapIntervalEXT(0);
+    if (on) wglSwapInterval_Stub(1);
+    else wglSwapInterval_Stub(0);
 }
 
  os_pump_input :: () {
@@ -357,6 +335,11 @@ os_init_platform :: () {
 
     wglChoosePixelFormatARB = xx os_load_gl_func("wglChoosePixelFormatARB");
     wglCreateContextAttribsARB = xx os_load_gl_func("wglCreateContextAttribsARB");
+    wglGetExtensionsStringEXT = xx os_load_gl_func("wglGetExtensionsStringEXT");
+
+    if to_string(wglGetExtensionsStringEXT()) == "EXT_swap_control" {
+        wglSwapIntervalEXT = xx os_load_gl_func("wglSwapIntervalEXT");
+    }
 
     gl_load(*gl);
 

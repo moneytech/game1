@@ -656,20 +656,20 @@ Model_load_fbx :: (path: string) -> *Model {
     if layer_uv {
         uvdata := (<<layer_uv)["UV"].properties[0].data;
 
-		if (<<layer_uv)["UVIndex"] {
-			uvindex := (<<layer_uv)["UVIndex"].properties[0].data
-			for uvindex {
-				// @Note UVs are indexed as 3 dimensional vectors though we only support 2
-				uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
-				array_add(*mesh.tex_coords, uv);
-			}
-		} else {
-			for 0..uvdata.count-2 {
-				uv := make_Vector2(cast(float32) uvdata[it].f64, 1.0 - cast(float) uvdata[it+1].f64);
-				array_add(*mesh.tex_coords, uv);
-				it += 1;
-			}
-		}
+        if (<<layer_uv)["UVIndex"] {
+            uvindex := (<<layer_uv)["UVIndex"].properties[0].data;
+            for uvindex {
+                // @Note UVs are indexed as 3 dimensional vectors though we only support 2
+                uv := make_Vector2(cast(float) uvdata[it.int32 * 2].f64, 1.0 - cast(float) uvdata[it.int32 * 2 + 1].f64);
+                array_add(*mesh.tex_coords, uv);
+            }
+        } else {
+            for 0..uvdata.count-2 {
+                uv := make_Vector2(cast(float32) uvdata[it].f64, 1.0 - cast(float) uvdata[it+1].f64);
+                array_add(*mesh.tex_coords, uv);
+                it += 1;
+            }
+        }
     }
 
     // @Temporary material
@@ -835,7 +835,7 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
     //             vdata := mesh.vertex_data[mesh.position_index];
     //             for vdata {
     //                 array_add(*me.vertices, V3(it, vdata[it_index+1], vdata[it_index+2]));
-    // 				it_index += 2;
+    //              it_index += 2;
     //             }
     //         }
 
