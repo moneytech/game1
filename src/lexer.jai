@@ -80,8 +80,10 @@ ml__isalphanumeric :: (c: u8) -> bool {
 	return  ml__isalpha(c) || ml__isnumber(c);
 }
 
+FORM_FEED :: 0x0C;
+
 ml__is_whitespace :: (c: u8) -> bool {
-	return (c == #char " ") || (c == #char "\t") || (c == #char "\r") || (c == #char "\n") || (c == #char "\f");
+	return (c == #char " ") || (c == #char "\t") || (c == #char "\r") || (c == #char "\n") || (c == FORM_FEED);
 }
 
 ml__eat_whitespace :: (st: *ML_State) {
@@ -171,7 +173,7 @@ ml_get_string :: (st: *ML_State, tok: *ML_Token, delim: ML_Token_Type) {
 						case #char "n";
 							out = #char "\n";
 						case #char "f";
-							out = #char "\f";
+							out = FORM_FEED;
 						case #char "\\";
 							out = #char "\\";
 						case #char "'";
