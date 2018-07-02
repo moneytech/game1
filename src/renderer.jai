@@ -263,8 +263,6 @@ Camera :: struct {
 #run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
 
 GL_Renderer :: struct {
-    game: *Game;
-
     lights: [..] Light;
 
     VertexArrayID: u32;
@@ -285,6 +283,7 @@ GL_Renderer :: struct {
 
     enable_clip_plane: bool;
     clip_plane: Vector4;
+    water_distort_offset: float;
 
     #if DEVELOPER {
         picking_framebuffer: u32;
@@ -789,7 +788,7 @@ start_scene :: (using rdr: *GL_Renderer) {
     glUseProgram(render_to_gbuffer.id);
 
     pos := camera.position;
-    view_matrix = matrix_rotate(inverse(game.renderer.camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
+    view_matrix = matrix_rotate(inverse(camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
 }
 
 finish_scene :: (using rdr: *GL_Renderer) {
@@ -1046,11 +1045,12 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
     glUniform1i(reflect_id, 0);
     glUniform1i(refract_id, 1);
     glUniform1i(dudv_id, 2);
-    glUniform1f(offset_id, game.water_distort_offset);
+    glUniform1f(offset_id, water_distort_offset);
 
+    // @FixMe water distortion is time sensitive! the water will move unpredicatably with the speed of the machine!
     DISTORT_OFFSET_STEP :: 0.0005;
-    game.water_distort_offset += DISTORT_OFFSET_STEP;
-    if game.water_distort_offset > 1.0 game.water_distort_offset = 0.0;
+    water_distort_offset += DISTORT_OFFSET_STEP;
+    if water_distort_offset > 1.0 water_distort_offset = 0.0;
 
     // @TODO specify water height through uniform or vertex attrib
 
@@ -1138,7 +1138,7 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         pos := camera.position;
-        view_matrix = matrix_rotate(inverse(game.renderer.camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
+        view_matrix = matrix_rotate(inverse(camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
         glUseProgram(picking_shader.id);
     }
 

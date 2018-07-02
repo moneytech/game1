@@ -36,7 +36,6 @@ Game :: struct {
     text_strings: [..] string;
 
     fov: float = 60;
-    water_distort_offset: float;
 
     water_reflect_frame_buffer: Frame_Buffer;
     water_refract_frame_buffer: Frame_Buffer;
@@ -654,7 +653,7 @@ main :: () {
     asset_man.game = *game;
     game.asset_man = asset_man;
 
-    rdr.game = *game;
+    // @TODO update framebuffer sizes when window gets resized
     init(*rdr, game.window.width, game.window.height);
     renderer = *rdr;
 

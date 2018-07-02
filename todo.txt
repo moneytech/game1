@@ -1,0 +1,6 @@
+
+// @TODO update framebuffer sizes when window gets resized
+
+// @FixMe water distortion is time sensitive! the water will move unpredicatably with the speed of the machine!
+
+// @TODO specify water height through uniform or vertex attrib
