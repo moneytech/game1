@@ -187,8 +187,7 @@ maybe_calc_tangent_normals :: (using m: *Mesh) {
 }
 
 path_of :: (filepath: string) -> string {
-    p := find_and_truncate_character_from_right(filepath, #char "/");
-    return p;
+    return strip_path_filename(filepath);
 }
 
 ml_get_signed_float :: (st: *ML_State, tok: *ML_Token) -> float {

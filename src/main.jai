@@ -7,6 +7,7 @@
 #load "editor.jai";
 #load "FBX.jai";
 #load "imgui.jai";
+#load "os_api.jai";
 
 miniz :: #foreign_library "miniz";
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
@@ -624,7 +625,7 @@ main :: () {
         setcwd(opts.output_path);
     } else {
         path := get_path_of_running_executable();
-        final_path := find_and_truncate_character_from_right(path, #char "/");
+        final_path := strip_path_filename(path);
         setcwd(final_path);
     }
     os_watch_dir("assets");

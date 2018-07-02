@@ -54,14 +54,8 @@ strtod :: (start: *u8, endptr: **u8) -> float64 #foreign crt;
     crt :: #foreign_system_library "c";
 }
 
-find_and_truncate_character_from_right :: (s: string, c: int) -> string {
-    cursor := s.count - 1;
-    while cursor >= 0 {
-        if s[cursor] == c  return substring(s, 0, cursor); // @TODO -1 ?
-        cursor -= 1;
-    }
-
-    return "";
+#if OS_WINDOWS {
+    #load "os_windows.jai";
+} else #if OS_LINUX {
+    #load "os_linux.jai";
 }
-
-

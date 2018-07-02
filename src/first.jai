@@ -56,12 +56,6 @@ build_debug :: () -> Workspace, Build_Options {
     w, options := build_workspace("renderer");
     add_build_file("main.jai", w);
 
-    #if OS_WINDOWS {
-        add_build_file("os_windows.jai", w);
-    } else {
-        add_build_file("os_linux.jai", w);
-    }
-
     add_build_string("DEBUG :: true;", w);
     add_build_string("DEVELOPER :: true;", w);
     return w, options;
@@ -74,7 +68,7 @@ demo :: () {
     add_build_string("#run main();", w);
 }
 
-#run build_debug();
+// #run build_debug();
 // #run demo();
 // #run {
 //     setup_build();
