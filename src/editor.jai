@@ -123,6 +123,7 @@ update_editor :: (game: *Game, dt: float) {
 
     update_camera(game, dt);
 
+    renderer := game.renderer;
     start_picking(renderer);
     draw_picking_mesh(<<renderer, <<__terrain, renderer.picking_shader);
     finish_picking(renderer);

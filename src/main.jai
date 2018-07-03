@@ -2,9 +2,7 @@
 #import "Compiler";
 
 #load "editor.jai";
-
-miniz :: #foreign_library "miniz";
-uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
+#load "mesh_utils.jai";
 
 update_player_controller :: (game: *Game, player: *Actor, dt: float) {
     joy := game.joy;
@@ -83,163 +81,6 @@ issue_text :: (game: *Game, message: string) {
     sc := game.current_scene;
 
 
-}
-
-create_checker_board_mesh :: (rotation: Quaternion, width: s16, height: s16) -> *Mesh {
-    pn := make_Vector3(0, 1, 0);
-    hw := width/2;
-    hh := height/2;
-    x_start := -hw;
-    y_start := -hh;
-
-    m := New(Mesh);
-
-    off_white := make_Color(0.1, 0.3, 0.1);
-    // white := make_Color(1, 1, 1);
-    white := make_Color(0.5, 0.5, 0.5);
-
-    subh := 1;
-    subw := 1;
-    ext_h := 0.0;
-    ext_w := 0.0;
-
-    if width & 1 == 1 {
-        subw = 0;
-        ext_w = 0.5;
-    }
-
-    if height & 1 == 1 {
-        subh = 0;
-        ext_h = 0.5;
-    }
-
-    for y: y_start..hh-subh {
-        is_white := false;
-        if y % 2 != 0 is_white = true;
-
-        for x: x_start..hw-subw {
-            v0 := rotation * make_Vector3(xx x - ext_w, 0, xx y - ext_h);
-            v1 := rotation * make_Vector3(xx x+1 - ext_w, 0, xx y - ext_h);
-            v2 := rotation * make_Vector3(xx x+1 - ext_w, 0, xx y+1 - ext_h);
-            v3 := rotation * make_Vector3(xx x - ext_w, 0, xx y+1 - ext_h);
-
-            add_quad(*m.vertices, v0, v1, v2, v3);
-            add_quad(*m.normals, pn, pn, pn, pn);
-
-            if is_white {
-                add_quad(*m.colors, white, white, white, white);
-            } else {
-                add_quad(*m.colors, off_white, off_white, off_white, off_white);
-            }
-            is_white = !is_white;
-        }
-    }
-
-    mat := New(Material);
-    mat.diffuse = make_Color(1, 1, 1);
-    m.material = mat;
-    store_mesh_in_buffer(m);
-    return m;
-}
-
-create_checker_board_box :: (width: s16, height: s16, depth: s16) -> *Model {
-    up := create_checker_board_mesh(set_angle_vector(0, 1, 0, 0), width, depth);
-    up.model_matrix = matrix_translate(0, cast(float) height / 2, 0);
-    down := create_checker_board_mesh(set_angle_vector(PI, 1, 0, 0), width, depth);
-    down.model_matrix = matrix_translate(0, cast(float) -height / 2, 0);
-    left := create_checker_board_mesh(set_angle_vector(PI / 2, 0, 0, 1), height, depth);
-    left.model_matrix = matrix_translate(cast(float) -width / 2, 0, 0);
-    right := create_checker_board_mesh(set_angle_vector(-PI / 2, 0, 0, 1), height, depth);
-    right.model_matrix = matrix_translate(cast(float) width / 2, 0, 0);
-    front := create_checker_board_mesh(set_angle_vector(-PI / 2, 1, 0, 0), width, height);
-    front.model_matrix = matrix_translate(0, 0, cast(float) -depth / 2);
-    back := create_checker_board_mesh(set_angle_vector(PI / 2, 1, 0, 0), width, height);
-    back.model_matrix = matrix_translate(0, 0, cast(float) depth / 2);
-
-    mod := New(Model);
-    array_add(*mod.meshes, up);
-    array_add(*mod.meshes, down);
-    array_add(*mod.meshes, left);
-    array_add(*mod.meshes, right);
-    array_add(*mod.meshes, front);
-    array_add(*mod.meshes, back);
-    return mod;
-}
-
-make_sphere_mesh :: (sp: Sphere) -> *Model {
-    out := create_sphere(sp.radius, 8, 8);
-    out.meshes[0].material = New(Material);
-    out.meshes[0].material.diffuse = make_Color(1, 1, 1);
-    out.meshes[0].model_matrix = matrix_translate(sp.center);
-    out.meshes[0].normals.count = 0;
-    store_mesh_in_buffer(out.meshes[0]);
-    return out;
-}
-
-make_capsule_mesh :: (cap: Capsule) -> *Model {
-    out := create_capsule(cap.radius, 8, 8, 1.0);
-    out.meshes[0].material = New(Material);
-    out.meshes[0].material.diffuse = make_Color(1, 1, 1);
-    out.meshes[0].model_matrix = matrix_translate(cap.center);
-    out.meshes[0].normals.count = 0;
-    store_mesh_in_buffer(out.meshes[0]);
-    return out;
-}
-
-add_line :: (m: *Mesh, a: Vector3, b: Vector3, color: Color) {
-    array_add(*m.vertices, a);
-    array_add(*m.vertices, b);
-
-    array_add(*m.colors, color);
-    array_add(*m.colors, color);
-}
-
-make_aabb_mesh :: (a: AABB) -> *Model {
-    out := New(Model);
-
-    m := New(Mesh);
-    m.material = New(Material);
-    m.material.diffuse = make_Color(1, 1, 1);
-
-    m.primitive_type = Primitive_Type.LINES;
-
-    p0 := a.center - a.halfs;
-    p1 := a.center + a.halfs;
-    p2 := make_Vector3(p1.x, p0.y, p0.z);
-    p3 := make_Vector3(p1.x, p1.y, p0.z);
-    p4 := make_Vector3(p0.x, p1.y, p0.z);
-
-    p5 := make_Vector3(p0.x, p0.y, p1.z);
-    p6 := make_Vector3(p1.x, p0.y, p1.z);
-    p7 := make_Vector3(p0.x, p1.y, p1.z);
-
-    white := make_Color(1, 1, 1);
-    red := make_Color(1, 0, 0);
-    green := make_Color(0, 1, 0);
-    blue := make_Color(0, 0, 1);
-
-    add_line(m, p0, p2, white);
-    add_line(m, p0, p4, white);
-    add_line(m, p2, p3, white);
-    add_line(m, p3, p4, white);
-
-    add_line(m, p1, p7, white);
-    add_line(m, p1, p6, white);
-    add_line(m, p6, p5, white);
-    add_line(m, p5, p7, white);
-
-    add_line(m, p0, p5, white);
-    add_line(m, p2, p6, white);
-    add_line(m, p3, p1, white);
-    add_line(m, p4, p7, white);
-
-    add_line(m, a.center, a.center + make_Vector3(1, 0, 0) * a.halfs.x, red);
-    add_line(m, a.center, a.center + make_Vector3(0, 1, 0) * a.halfs.y, green);
-    add_line(m, a.center, a.center + make_Vector3(0, 0, 1) * a.halfs.z, blue);
-
-    array_add(*out.meshes, m);
-    store_mesh_in_buffer(m);
-    return out;
 }
 
 unit_sphere_model: *Model;
@@ -537,69 +378,10 @@ draw_geometry :: (using game: *Game, water := false) {
 
 main :: () {
     context.logger = _logger;
-    os_init_platform();
+    orig_wd := getcwd();
+    game := init_game("game1");
 
-    orig_wd: string;
-    if running_at_compile_time() {
-        orig_wd = get_current_directory(); // @Leak ?
-        opts := get_build_options();
-        setcwd(opts.output_path);
-    } else {
-        path := get_path_of_running_executable();
-        final_path := strip_path_filename(path);
-        setcwd(final_path);
-    }
-    os_watch_dir("assets");
-    os_watch_dir("assets/shaders");
-
-    WINDOW_WIDTH :: 1280;
-    WINDOW_HEIGHT :: 720;
-    win := os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "game1");
-    ctx := os_create_gl_context(win);
-    os_make_current(win, ctx);
-    os_set_vsync(true);
-
-    rdr: GL_Renderer;
-    game: Game;
-    window: Game_Window;
-
-    _width, _height := os_get_window_dimensions(win);
-    window.width = xx _width;
-    window.height = xx _height;
-    window.handle = win;
-    window.glc = ctx;
-
-    game.window = *window;
-    game.renderer = *rdr;
-    asset_man := New(Asset_Manager);
-    asset_man.game = *game;
-    game.asset_man = asset_man;
-
-    // @TODO update framebuffer sizes when window gets resized
-    init(*rdr, game.window.width, game.window.height);
-    renderer = *rdr;
-
-    game.water_reflect_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
-    game.water_refract_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
-
-    game.water_dudv_texture = load_image(game.asset_man, "assets/water_dudv.png");
-
-    rdr.render_to_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
-    rdr.render_light_using_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
-    rdr.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
-    rdr.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
-    rdr.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
-    rdr.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
-    rdr.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
-    // dae_model = load_model(asset_man, "assets/untitled.dae");
-    game.text_strings = load_text_strings(asset_man);
-
-    init_editor(*game);
-
-    fnt: Font;
-    my_stbtt_initfont(*fnt);
-    create_font(*fnt, 512, 512, temp_bitmap.data);
-    font = *fnt;
+    init_editor(game);
 
     // key := load_model(asset_man, "assets/keyOGA.obj");
     // __model = load_model(asset_man, "assets/well.coveredopen.obj");
@@ -609,16 +391,14 @@ main :: () {
     // __model.meshes[0].material = key.meshes[0].material;
     // key.meshes[0].material.textures[0] = null;
 
-    renderer.camera.position.z = 30;
-    renderer.camera.position.y = 5;
-    renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
-
-    _scene := create_test_scene(*game);
+    _scene := create_test_scene(game);
     game.current_scene = *_scene;
+
+    renderer := game.renderer;
 
     pressed := false;
     imgui: Imgui;
-    imgui.renderer = renderer;
+    imgui.renderer = game.renderer;
 
     while true {
         exit := false;
@@ -693,10 +473,10 @@ main :: () {
         //     file_update_callback(&it, &game);
         // }
 
-        update_camera(*game, 1.0/60.0);
-        update_physics(*game, 1.0/60.0);
-        update_scene(*game, game.current_scene, 1.0/60.0);
-        renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
+        update_camera(game, 1.0/60.0);
+        update_physics(game, 1.0/60.0);
+        update_scene(game, game.current_scene, 1.0/60.0);
+        game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
         // update_editor(*game, 1.0);
         gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
 
@@ -709,20 +489,20 @@ main :: () {
 
         use_frame_buffer(renderer, *game.water_reflect_frame_buffer);
         set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
-        draw_geometry(*game);
+        draw_geometry(game);
         use_frame_buffer(renderer, null);
 
 
         game.renderer.camera = old_camera;
         use_frame_buffer(renderer, *game.water_refract_frame_buffer);
         set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
-        draw_geometry(*game);
+        draw_geometry(game);
         use_frame_buffer(renderer, null);
 
         set_clip_plane(renderer, false);
-        draw_geometry(*game, true);
+        draw_geometry(game, true);
 
-        renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+        game.renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
         do_label(*imgui, 1, <<font, 0.0, 0.0, "Hello World");
 
         // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
@@ -744,7 +524,7 @@ main :: () {
         // renderer->draw_text(font, "Hello World!", 32, 32);
         // render_html_dom(dom);
 
-        swap_buffers(win);
+        swap_buffers(game.window.handle);
         os_pump_input();
 
         // @Note we have to wait long enough for whatever program is
@@ -753,20 +533,14 @@ main :: () {
         os_pump_file_notifications(file_update_callback, *game);
     }
 
-    os_close_window(win);
+    os_close_window(game.window.handle);
 
     if running_at_compile_time() {
         setcwd(orig_wd);
     }
 }
 
-
-x, y: float;
-
-tex: *Texture;
-renderer: *GL_Renderer;
 font: *Font;
-__model: *Model;
 
 /*
 struct Html_Phase {
