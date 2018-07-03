@@ -4,6 +4,25 @@
 #import "File";
 #import "File_Utilities";
 
+copy_engine_assets_to :: (path: string) {
+    engine_path := concatenate(#filepath, "../run_tree/assets");
+    paths: [2] string;
+    paths[0] = engine_path;
+    paths[1] = path;
+
+    visitor :: (short_name: string, full_name: string, paths: [2] string) {
+        relative_path := full_name;
+        advance(*relative_path, paths[0].count);
+        out_path := concatenate(paths[1], "/", relative_path);
+        // print("out: %\n", out_path);
+        make_directory_if_it_does_not_exist(strip_path_filename(out_path));
+        copy_file(full_name, out_path);
+    }
+
+    res := visit_files(engine_path, true, paths, visitor);
+    assert(res);
+}
+
 setup_build :: (output_path: string) -> Build_Options {
     options := get_build_options();
     set_optimization_level(*options, 0, 0);
