@@ -41,6 +41,21 @@ setup_build :: () -> Build_Options {
     return options;
 };
 
+add_engine_to_workspace :: (w: Workspace) {
+    // cd := getcwd();
+    // defer setcwd(cd);
+
+    // setcwd(#filepath);
+
+    add_build_file("physics.jai", w);
+    add_build_file("renderer.jai", w);
+    add_build_file("asset_manager.jai", w);
+    add_build_file("FBX.jai", w);
+    add_build_file("imgui.jai", w);
+    add_build_file("os_api.jai", w);
+    add_build_file("game.jai", w);
+}
+
 build_workspace :: (name: string) -> Workspace, Build_Options {
     options := setup_build();
     options.output_type = Build_Output_Type.EXECUTABLE;
@@ -54,6 +69,7 @@ build_workspace :: (name: string) -> Workspace, Build_Options {
 
 build_debug :: () -> Workspace, Build_Options {
     w, options := build_workspace("renderer");
+    add_engine_to_workspace(w);
     add_build_file("main.jai", w);
 
     add_build_string("DEBUG :: true;", w);

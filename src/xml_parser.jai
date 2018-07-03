@@ -1,5 +1,7 @@
 // Simple desecnt parser without Schemas!
 
+#load "lexer.jai";
+
 Xml :: struct {
     line_number: u32;
     character_number: u32;

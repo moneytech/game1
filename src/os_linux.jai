@@ -3,8 +3,6 @@
 #import "GL";
 #import "Compiler";
 
-#load "os_api.jai";
-
 #scope_file
 libdl :: #foreign_system_library "dl";
 

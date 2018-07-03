@@ -537,10 +537,6 @@ matrix_rotate :: (degrees: float64, tx: float, ty: float, tz: float) -> Matrix4 
 RADIANS_TO_DEGREES :: 180 / 3.14159265359;
 DEGREES_TO_RADIANS :: 3.14159265359 / 180;
 
-#run {
-    print("RAD :%\n", RADIANS_TO_DEGREES);
-};
-
 matrix_rotate :: (q: Quaternion) -> Matrix4 {
     rta := sqrt(1 - q.w*q.w);
     if (rta == 0) {

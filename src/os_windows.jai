@@ -4,8 +4,6 @@
 #import "Compiler";
 #import "Window_Creation";
 
-#load "os_api.jai";
-
 #scope_file
 User32   :: #foreign_system_library "user32";
 Kernel32 :: #foreign_system_library "kernel32";
