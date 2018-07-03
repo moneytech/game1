@@ -58,6 +58,36 @@ Game_Window :: struct {
     glc: OS_GL_Context;
 }
 
+update_camera :: (game: *Game, dt: float) {
+    using Key_Current_State;
+
+    if input_button_states[Key_Code.MOUSE_BUTTON_RIGHT] & DOWN {
+        delta := make_Vector3(xx mouse_delta_x, xx mouse_delta_y, 0);
+        delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+        sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+        delta = mul(delta, make_Vector3(sx, sy, 1));
+
+        rotation_current := game.renderer.camera.rotation;
+        quat := set_angle_vector(delta.x * 1.5, 0, 1, 0) * rotation_current * set_angle_vector(delta.y * 1.5, 1, 0, 0);
+        game.renderer.camera.rotation = quat;
+    } else if input_button_states[Key_Code.MOUSE_BUTTON_MIDDLE] & DOWN {
+        delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
+        delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+        sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+        delta = mul(delta, make_Vector3(sx, sy, 1));
+        q := game.renderer.camera.rotation;
+
+        move := delta * 5;
+
+        game.renderer.camera.position += q * (move * 20);
+    }
+
+    if mouse_delta_z != 0 {
+        q := game.renderer.camera.rotation;
+        game.renderer.camera.position += q * make_Vector3(0.0, 0.0, -mouse_delta_z * 0.01);
+    }
+
+}
 
 init_game :: (window_title: string, vr: bool = false) -> *Game {
     os_init_platform();
