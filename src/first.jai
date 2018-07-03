@@ -4,7 +4,7 @@
 #import "File";
 #import "File_Utilities";
 
-setup_build :: () -> Build_Options {
+setup_build :: (output_path: string) -> Build_Options {
     options := get_build_options();
     set_optimization_level(*options, 0, 0);
     options.backend = Backend.LLVM;
@@ -12,23 +12,25 @@ setup_build :: () -> Build_Options {
 
     options.output_type = Build_Output_Type.NO_OUTPUT;
     options.output_executable_name = "";
-    options.output_path = concatenate(#filepath, "../run_tree/");
+    options.output_path = output_path;
     make_directory_if_it_does_not_exist(options.output_path);
     
     set_build_options(options);
 
-    stb_src := C_compiler_make_source_file("src/stb.cpp");
-    miniz_src := C_compiler_make_source_file("src/miniz.c");
+    print("Output path: %\n", output_path);
+
+    stb_src := C_compiler_make_source_file(concatenate(#filepath, "/stb.cpp"));
+    miniz_src := C_compiler_make_source_file(concatenate(#filepath, "/miniz.c"));
     // compile stb lib
      #if OS_WINDOWS {
-        stb_lib := C_compiler_make_lib("run_tree/stb.dll", true, stb_src);
-        miniz_lib := C_compiler_make_lib("run_tree/miniz.dll", true, miniz_src);
+        stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/stb.dll"), true, stb_src);
+        miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/miniz.dll"), true, miniz_src);
     } else {
-        stb_lib := C_compiler_make_lib("run_tree/libstb.so", true, stb_src);
-        miniz_lib := C_compiler_make_lib("run_tree/libminiz.so", true, miniz_src);
+        stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/libstb.so"), true, stb_src);
+        miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/libminiz.so"), true, miniz_src);
 
-        stb_stat := C_compiler_make_lib("run_tree/libstb.a", false,  C_compiler_make_object("run_tree/stb.o", stb_src));
-        miniz_stat := C_compiler_make_lib("run_tree/libminiz.a", false, C_compiler_make_object("run_tree/miniz.o", miniz_src));
+        stb_stat := C_compiler_make_lib(concatenate(options.output_path, "/libstb.a"), false,  C_compiler_make_object(concatenate(options.output_path, "/stb.o"), stb_src));
+        miniz_stat := C_compiler_make_lib(concatenate(options.output_path, "/libminiz.a"), false, C_compiler_make_object(concatenate(options.output_path, "/miniz.o"), miniz_src));
         C_compiler_build_target(<< stb_stat);
         C_compiler_build_target(<< miniz_stat);
     }
@@ -42,11 +44,6 @@ setup_build :: () -> Build_Options {
 };
 
 add_engine_to_workspace :: (w: Workspace) {
-    // cd := getcwd();
-    // defer setcwd(cd);
-
-    // setcwd(#filepath);
-
     add_build_file("physics.jai", w);
     add_build_file("renderer.jai", w);
     add_build_file("asset_manager.jai", w);
@@ -56,19 +53,19 @@ add_engine_to_workspace :: (w: Workspace) {
     add_build_file("game.jai", w);
 }
 
-build_workspace :: (name: string) -> Workspace, Build_Options {
-    options := setup_build();
+build_workspace :: (name: string, output_path: string) -> Workspace, Build_Options {
+    options := setup_build(output_path);
     options.output_type = Build_Output_Type.EXECUTABLE;
     options.output_executable_name = name;
     
     w := compiler_create_workspace(name);
-    set_build_file_path(#filepath, w);
+    set_build_file_path(copy_string(#filepath), w);
     set_build_options(options, w);
     return w, options;
 }
 
 build_debug :: () -> Workspace, Build_Options {
-    w, options := build_workspace("renderer");
+    w, options := build_workspace("renderer", concatenate(#filepath, "../run_tree/"));
     add_engine_to_workspace(w);
     add_build_file("main.jai", w);
 
@@ -214,6 +211,8 @@ C_compiler_is_target_outdated :: (target: C_Target) -> bool {
     return false;
 }
 
+#import "Process";
+
 // builds the target and returns a path to its output
 C_compiler_build_target :: (target: C_Target, flag_string: string = "") -> string {
     if (!C_compiler_is_target_outdated(target)) return target.output_path;
@@ -260,7 +259,7 @@ C_compiler_build_target :: (target: C_Target, flag_string: string = "") -> strin
 
     if (cmd_string.count) {
         print("Running command: %\n", cmd_string);
-        os_run_command(cmd_string);
+        process_start(cmd_string);
         free(cmd_string.data);
     }
 

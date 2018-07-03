@@ -1,4 +1,5 @@
 
+WATER_HEIGHT :: 0.05;
 
 Game :: struct {
     renderer: *GL_Renderer;

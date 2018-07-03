@@ -260,8 +260,6 @@ update_editor :: (game: *Game, dt: float) {
     }
 }
 
-WATER_HEIGHT :: 0.05;
-
 render_editor_scene :: (using game: *Game, water := false) {
     start_scene(renderer);
     clear_screen(0.5, 0.5, 0.5, 1.0);
