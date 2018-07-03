@@ -156,3 +156,55 @@ make_aabb_mesh :: (a: AABB) -> *Model {
     store_mesh_in_buffer(m);
     return out;
 }
+
+
+create_textured_rect_mesh :: (v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3, tex: *Texture) -> *Mesh {
+    m := New(Mesh);
+    
+    V2 :: make_Vector2;
+    t0 := V2(0, 0);
+    t1 := V2(1, 0);
+    t2 := V2(1, 1);
+    t3 := V2(0, 1);
+
+    add_quad(*m.vertices, v0, v1, v2, v3);
+    add_quad(*m.tex_coords, t0, t1, t2, t3);
+
+    mat := New(Material);
+    mat.diffuse = make_Color(1, 1, 1);
+    m.material = mat;
+    mat.textures[TEXTURE_DIFFUSE_INDEX] = tex;
+    store_mesh_in_buffer(m);
+    return m;
+}
+
+create_skybox_model :: (up: *Texture, down: *Texture, left: *Texture, right: *Texture, front: *Texture, back: *Texture) -> *Model {
+    set_texture_wrap(up, true);
+    set_texture_wrap(down, true);
+    set_texture_wrap(left, true);
+    set_texture_wrap(right, true);
+    set_texture_wrap(front, true);
+    set_texture_wrap(back, true);
+
+    mod := New(Model);
+
+    V3 :: make_Vector3;
+    v0 := V3(-1, -1, -1);
+    v1 := V3(-1,  1, -1);
+    v2 := V3(-1,  1,  1);
+    v3 := V3(-1, -1,  1);
+    v4 := V3( 1, -1, -1);
+    v5 := V3( 1,  1, -1);
+    v6 := V3( 1,  1,  1);
+    v7 := V3( 1, -1,  1);
+
+    array_add(*mod.meshes, create_textured_rect_mesh(v5, v1, v2, v6, up));
+    array_add(*mod.meshes, create_textured_rect_mesh(v7, v3, v0, v4, down));
+    array_add(*mod.meshes, create_textured_rect_mesh(v2, v1, v0, v3, left));
+    array_add(*mod.meshes, create_textured_rect_mesh(v5, v6, v7, v4, right));
+    array_add(*mod.meshes, create_textured_rect_mesh(v6, v2, v3, v7, front));
+    array_add(*mod.meshes, create_textured_rect_mesh(v1, v5, v4, v0, back));
+
+    mod.model_matrix = matrix_scale(10000, 10000, 10000);
+    return mod;
+}

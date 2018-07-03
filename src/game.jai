@@ -128,3 +128,177 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
 
     return game;
 }
+
+ttf_buffer: [1<<20] u8;
+temp_bitmap: [512*512] u8;
+
+my_stbtt_initfont :: (font: *Font) {
+    f, success := file_open("c:/windows/fonts/times.ttf");
+    if !success assert(false);
+    file_read(f, ttf_buffer.data, ttf_buffer.count);
+    font.char_height = 16.0;
+    stbtt_BakeFontBitmap(ttf_buffer.data,0, 16.0, temp_bitmap.data,512,512, 32,96, font.cdata.data); // no guarantee this fits!
+    file_close(*f);
+}
+
+font: *Font;
+
+file_update_callback :: (notif: *File_Notification, userdata: *void) {
+    g := cast(*Game) userdata;
+    print("CALLBACK %\n", notif.name);
+    if (contains_key(*g.asset_man.textures, notif.name)) {
+        print("Updating file: %\n", notif.name);
+        load_image(g.asset_man, notif.name);
+    } else if (contains_key(*g.asset_man.shader_catalog, notif.name)) {
+        print("Reloading shader: %\n", notif.name);
+        // reload_shader(*g.asset_man, notif.name);
+    } else {
+        print("No key for %\n", notif.name);
+    }
+}
+
+draw_geometry :: (using game: *Game, water := false) {
+    start_scene(game.renderer);
+    draw_scene(game.renderer, <<game.current_scene);
+
+    #if DEVELOPER {
+        draw_debug_bodies(game);
+    }
+
+    if water {
+        draw_water(<<renderer, water_reflect_frame_buffer.color_texture, water_refract_frame_buffer.color_texture, water_dudv_texture, WATER_HEIGHT);
+    }
+    finish_scene(game.renderer);
+    set_clip_plane(renderer, false);
+}
+
+update_game :: (game: *Game) {
+    if (joysticks.count) {
+        game.joy = *joysticks[0];
+    } else {
+        game.joy = null;
+    }
+}
+
+render_game :: (using game: *Game) {
+    game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
+    gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
+
+    old_camera := game.renderer.camera;
+    new_camera := old_camera;
+    new_camera.position.y -= 2 * (new_camera.position.y - WATER_HEIGHT);
+    phi := get_euler_angles(new_camera.rotation);
+    new_camera.rotation = new_camera.rotation * set_angle_vector(xx (-phi * 2), 1, 0, 0);
+    game.renderer.camera = new_camera;
+
+    use_frame_buffer(renderer, *game.water_reflect_frame_buffer);
+    set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
+    draw_geometry(game);
+    use_frame_buffer(renderer, null);
+
+
+    game.renderer.camera = old_camera;
+    use_frame_buffer(renderer, *game.water_refract_frame_buffer);
+    set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
+    draw_geometry(game);
+    use_frame_buffer(renderer, null);
+
+    set_clip_plane(renderer, false);
+    draw_geometry(game, true);
+
+    game.renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+}
+
+
+Hash_Map :: struct (Value_Type: Type, table_size := 1024) {
+    Hash_Entry :: struct {
+        key: string;
+        next: *Hash_Entry;
+        value: Value_Type;
+    }
+
+    table: [table_size] Hash_Entry;
+}
+
+hash_key :: (str: string) -> u32 {
+    hash: u32 = 5381;
+    c: s16;
+
+    for 0..str.count-1 {
+        // double cast to ensure sign extension
+        c =  xx cast(s8) str[it];
+        hash = ((hash << 5) + hash) + xx c;
+    }
+
+    return hash;
+}
+
+contains_key :: (using map: *Hash_Map, str: string) -> bool {
+    slot := hash_key(str) & (table_size-1);
+    e := *table[slot];
+
+    while e != null {
+        if (!e.key.count) break;
+
+        if (str == e.key) break;
+
+        e = e.next;
+    }
+
+    if !e return false;
+    return e.key.count != 0;
+}
+
+get_slot :: (using map: *Hash_Map, str: string) -> map.Value_Type {
+    slot := hash_key(str) & (table_size-1);
+    e := *table[slot];
+
+    while e != null {
+        if (!e.key.count) {
+            e.key = copy_string(str);
+            break;
+        }
+
+        if (str == e.key) break;
+
+        if (!e.next) {
+            e.next = New(map.Hash_Entry);
+            e = e.next;
+            e.key = copy_string(str);
+            e.next = null;
+            break;
+        }
+
+        e = e.next;
+        assert(e != null);
+    }
+
+    return e.value;
+}
+
+set_slot :: (using map: *Hash_Map, str: string, val: map.Value_Type) {
+    slot := hash_key(str) & (table_size-1);
+    e := *table[slot];
+
+    while e != null {
+        if (!e.key.count) {
+            e.key = copy_string(str);
+            break;
+        }
+
+        if (str == e.key) break;
+
+        if (!e.next) {
+            e.next = New(map.Hash_Entry);
+            e = e.next;
+            e.key = copy_string(str);
+            e.next = null;
+            break;
+        }
+
+        e = e.next;
+        assert(e != null);
+    }
+
+    e.value = val;
+}

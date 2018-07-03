@@ -301,79 +301,10 @@ create_test_scene :: (game: *Game) -> Scene {
     return sc;
 }
 
-create_textured_rect_mesh :: (v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3, tex: *Texture) -> *Mesh {
-    m := New(Mesh);
-    
-    V2 :: make_Vector2;
-    t0 := V2(0, 0);
-    t1 := V2(1, 0);
-    t2 := V2(1, 1);
-    t3 := V2(0, 1);
 
-    add_quad(*m.vertices, v0, v1, v2, v3);
-    add_quad(*m.tex_coords, t0, t1, t2, t3);
-
-    mat := New(Material);
-    mat.diffuse = make_Color(1, 1, 1);
-    m.material = mat;
-    mat.textures[TEXTURE_DIFFUSE_INDEX] = tex;
-    store_mesh_in_buffer(m);
-    return m;
-}
-
-create_skybox_model :: (up: *Texture, down: *Texture, left: *Texture, right: *Texture, front: *Texture, back: *Texture) -> *Model {
-    set_texture_wrap(up, true);
-    set_texture_wrap(down, true);
-    set_texture_wrap(left, true);
-    set_texture_wrap(right, true);
-    set_texture_wrap(front, true);
-    set_texture_wrap(back, true);
-
-    mod := New(Model);
-
-    V3 :: make_Vector3;
-    v0 := V3(-1, -1, -1);
-    v1 := V3(-1,  1, -1);
-    v2 := V3(-1,  1,  1);
-    v3 := V3(-1, -1,  1);
-    v4 := V3( 1, -1, -1);
-    v5 := V3( 1,  1, -1);
-    v6 := V3( 1,  1,  1);
-    v7 := V3( 1, -1,  1);
-
-    array_add(*mod.meshes, create_textured_rect_mesh(v5, v1, v2, v6, up));
-    array_add(*mod.meshes, create_textured_rect_mesh(v7, v3, v0, v4, down));
-    array_add(*mod.meshes, create_textured_rect_mesh(v2, v1, v0, v3, left));
-    array_add(*mod.meshes, create_textured_rect_mesh(v5, v6, v7, v4, right));
-    array_add(*mod.meshes, create_textured_rect_mesh(v6, v2, v3, v7, front));
-    array_add(*mod.meshes, create_textured_rect_mesh(v1, v5, v4, v0, back));
-
-    mod.model_matrix = matrix_scale(10000, 10000, 10000);
-    return mod;
-}
 
 _logger :: (message: string, ident: string, mode: Log_Mode, data: *void) {
     print("%: %\n", ident, message);
-}
-
-
-// dae_model: *Model;
-draw_geometry :: (using game: *Game, water := false) {
-    start_scene(game.renderer);
-    draw_scene(game.renderer, <<game.current_scene);
-    // dae_model.model_matrix = matrix_translate(0, 10, 0);
-    // draw_model(game.renderer, <<dae_model);
-
-    #if DEVELOPER {
-        // render_editor(game);
-        draw_debug_bodies(game);
-    }
-
-    if water {
-        draw_water(<<renderer, water_reflect_frame_buffer.color_texture, water_refract_frame_buffer.color_texture, water_dudv_texture, WATER_HEIGHT);
-    }
-    finish_scene(game.renderer);
-    set_clip_plane(renderer, false);
 }
 
 main :: () {
@@ -425,9 +356,10 @@ main :: () {
             }
         }
 
-        if (joysticks.count) {
-            joy := joysticks[0];
-            game.joy = *joysticks[0];
+        update_game(game);
+
+        if game.joy {
+            joy := game.joy;
 
             // game.renderer.camera.position.x += joy.left_thumb.x;
             // game.renderer.camera.position.z -= joy.left_thumb.y;
@@ -461,8 +393,6 @@ main :: () {
             }
 
             if (joy.buttons & JOYSTICK_BUTTON_BACK) exit = true;
-        } else {
-            game.joy = null;
         }
 
         if (exit) break;
@@ -476,33 +406,7 @@ main :: () {
         update_camera(game, 1.0/60.0);
         update_physics(game, 1.0/60.0);
         update_scene(game, game.current_scene, 1.0/60.0);
-        game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
-        // update_editor(*game, 1.0);
-        gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
-
-        old_camera := game.renderer.camera;
-        new_camera := old_camera;
-        new_camera.position.y -= 2 * (new_camera.position.y - WATER_HEIGHT);
-        phi := get_euler_angles(new_camera.rotation);
-        new_camera.rotation = new_camera.rotation * set_angle_vector(xx (-phi * 2), 1, 0, 0);
-        game.renderer.camera = new_camera;
-
-        use_frame_buffer(renderer, *game.water_reflect_frame_buffer);
-        set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
-        draw_geometry(game);
-        use_frame_buffer(renderer, null);
-
-
-        game.renderer.camera = old_camera;
-        use_frame_buffer(renderer, *game.water_refract_frame_buffer);
-        set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
-        draw_geometry(game);
-        use_frame_buffer(renderer, null);
-
-        set_clip_plane(renderer, false);
-        draw_geometry(game, true);
-
-        game.renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+        render_game(game);
         do_label(*imgui, 1, <<font, 0.0, 0.0, "Hello World");
 
         // renderer.projection_matrix = matrix_ortho(0, cast(float) WINDOW_WIDTH, cast(float) WINDOW_HEIGHT, 0, -1, 1);
@@ -539,8 +443,6 @@ main :: () {
         setcwd(orig_wd);
     }
 }
-
-font: *Font;
 
 /*
 struct Html_Phase {
@@ -591,163 +493,3 @@ void render_html_dom(Html_Dom *dom) {
     }
 }
 */
-
-ttf_buffer: [1<<20] u8;
-temp_bitmap: [512*512] u8;
-
-my_stbtt_initfont :: (font: *Font) {
-    f, success := file_open("c:/windows/fonts/times.ttf");
-    if !success assert(false);
-    file_read(f, ttf_buffer.data, ttf_buffer.count);
-    font.char_height = 16.0;
-    stbtt_BakeFontBitmap(ttf_buffer.data,0, 16.0, temp_bitmap.data,512,512, 32,96, font.cdata.data); // no guarantee this fits!
-    file_close(*f);
-}
-
-
-file_update_callback :: (notif: *File_Notification, userdata: *void) {
-    g := cast(*Game) userdata;
-    print("CALLBACK %\n", notif.name);
-    if (contains_key(*g.asset_man.textures, notif.name)) {
-        print("Updating file: %\n", notif.name);
-        load_image(g.asset_man, notif.name);
-    } else if (contains_key(*g.asset_man.shader_catalog, notif.name)) {
-        print("Reloading shader: %\n", notif.name);
-        // reload_shader(*g.asset_man, notif.name);
-    } else {
-        print("No key for %\n", notif.name);
-    }
-}
-
-/*
-
-#include <string.h>
-#include <stdio.h>
-void report_error(int err, const char *err_str, int line, int char_num) {
-    printf("Error:%d:%d: %s\n", line, char_num, err_str);
-}
-
-void Game::report_error(char *format, ...) {
-    assert(false);
-}
-
-void print_token(ML_Token *tok) {
-    printf("%d:%d: ", tok->line_number, tok->character_number);
-    switch(tok->type) {
-        case ML_TOKEN_UNINITIALIZED:
-            printf("Uninitialized token\n");
-            break;
-        case ML_TOKEN_STRING:
-            printf("string: \"%.*s\"\n", (int)tok->string.length, tok->string.data);
-            break;
-        case ML_TOKEN_HTML_COMMENT:
-            printf("<!\n");
-            break;
-        case ML_TOKEN_IDENTIFIER:
-            printf("ident: \"%.*s\"\n", (int)tok->string.length, tok->string.data);
-            break;
-        case ML_TOKEN_INTEGER:
-            printf("int: %llu\n", tok->integer);
-            break;
-        case ML_TOKEN_FLOAT:
-            printf("float: %f\n", tok->float64);
-            break;
-        default:
-            printf("tok: '%c'\n", tok->type);
-    }
-}
-*/
-
-
-Hash_Map :: struct (Value_Type: Type, table_size := 1024) {
-    Hash_Entry :: struct {
-        key: string;
-        next: *Hash_Entry;
-        value: Value_Type;
-    }
-
-    table: [table_size] Hash_Entry;
-}
-
-hash_key :: (str: string) -> u32 {
-    hash: u32 = 5381;
-    c: s16;
-
-    for 0..str.count-1 {
-        // double cast to ensure sign extension
-        c =  xx cast(s8) str[it];
-        hash = ((hash << 5) + hash) + xx c;
-    }
-
-    return hash;
-}
-
-contains_key :: (using map: *Hash_Map, str: string) -> bool {
-    slot := hash_key(str) & (table_size-1);
-    e := *table[slot];
-
-    while e != null {
-        if (!e.key.count) break;
-
-        if (str == e.key) break;
-
-        e = e.next;
-    }
-
-	if !e return false;
-    return e.key.count != 0;
-}
-
-get_slot :: (using map: *Hash_Map, str: string) -> map.Value_Type {
-    slot := hash_key(str) & (table_size-1);
-    e := *table[slot];
-
-    while e != null {
-        if (!e.key.count) {
-            e.key = copy_string(str);
-            break;
-        }
-
-        if (str == e.key) break;
-
-        if (!e.next) {
-            e.next = New(map.Hash_Entry);
-            e = e.next;
-            e.key = copy_string(str);
-            e.next = null;
-            break;
-        }
-
-        e = e.next;
-        assert(e != null);
-    }
-
-    return e.value;
-}
-
-set_slot :: (using map: *Hash_Map, str: string, val: map.Value_Type) {
-    slot := hash_key(str) & (table_size-1);
-    e := *table[slot];
-
-    while e != null {
-        if (!e.key.count) {
-            e.key = copy_string(str);
-            break;
-        }
-
-        if (str == e.key) break;
-
-        if (!e.next) {
-            e.next = New(map.Hash_Entry);
-            e = e.next;
-            e.key = copy_string(str);
-            e.next = null;
-            break;
-        }
-
-        e = e.next;
-        assert(e != null);
-    }
-
-    e.value = val;
-}
