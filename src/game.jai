@@ -110,7 +110,7 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
     win := os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, window_title);
     ctx := os_create_gl_context(win);
     os_make_current(win, ctx);
-    os_set_vsync(true);
+    os_set_vsync(!vr);
 
     game := New(Game);
     window := New(Game_Window);
