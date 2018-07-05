@@ -4,6 +4,9 @@
 #import "File";
 #import "File_Utilities";
 
+ENGINE_SRC_PATH :: #filepath;
+
+
 copy_engine_assets_to :: (path: string) {
     engine_path := concatenate(#filepath, "../run_tree/assets");
     paths: [2] string;
@@ -78,7 +81,9 @@ build_workspace :: (name: string, output_path: string) -> Workspace, Build_Optio
     options.output_executable_name = name;
     
     w := compiler_create_workspace(name);
-    set_build_file_path(copy_string(#filepath), w);
+    file_path := copy_string(#filepath);
+    print("file_path: %\n", file_path);
+    set_build_file_path(file_path, w);
     set_build_options(options, w);
     return w, options;
 }

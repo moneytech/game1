@@ -43,6 +43,33 @@ Frame_Buffer :: struct {
     id: u32 = xx -1;
 }
 
+create_frame_buffer_from_textures :: (using rdr: *GL_Renderer, color_texture: *Texture, depth_texture: *Texture) -> Frame_Buffer {
+    buf: Frame_Buffer;
+    buf.color_texture = color_texture;
+    buf.depth_texture = depth_texture;
+
+    glGenFramebuffers(1, *buf.id);
+    glBindFramebuffer(GL_FRAMEBUFFER, buf.id);
+
+    attach: [1] u32 = {:u32: GL_COLOR_ATTACHMENT0 };
+    glDrawBuffers(xx attach.count, attach.data);
+
+    if buf.color_texture {
+        glBindTexture(GL_TEXTURE_2D, buf.color_texture.id);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, buf.color_texture.id, 0);
+    }
+
+    if buf.depth_texture {
+        glBindTexture(GL_TEXTURE_2D, buf.depth_texture.id);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, buf.depth_texture.id, 0);
+    }
+
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    use_frame_buffer(rdr, null);
+    return buf;
+}
+
 create_frame_buffer :: (using rdr: *GL_Renderer, width: u16, height: u16) -> Frame_Buffer {
     buf: Frame_Buffer;
     buf.color_texture = New(Texture);
@@ -61,11 +88,6 @@ create_frame_buffer :: (using rdr: *GL_Renderer, width: u16, height: u16) -> Fra
 
     glBindTexture(GL_TEXTURE_2D, buf.depth_texture.id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, buf.depth_texture.id, 0);
-
-    glGenRenderbuffers(1, *buf.depth_buffer_id);
-    glBindRenderbuffer(GL_RENDERBUFFER, buf.depth_buffer_id);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, buf.depth_buffer_id);
 
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 
@@ -409,12 +431,19 @@ set_clip_plane :: (using rdr: *GL_Renderer, enable: bool) {
     rdr.enable_clip_plane = enable;
 }
 
+set_texture :: (tex: *Texture, width: u16, height: u16, texId: GLuint, type := Texture.RGBA) {
+    tex.width = width;
+    tex.height = height;
+    tex.id = texId;
+    tex.type = type;
+}
+
 create_texture :: (tex: *Texture, width: u16, height: u16, data: *void, type := Texture.RGBA) {
     texId: GLuint;
     glGenTextures(1, *texId);
     glBindTexture(GL_TEXTURE_2D, texId);
 
-    interal_format: GLenum;
+    interal_format: GLint;
     format: GLenum;
 
     if type == {
@@ -422,13 +451,13 @@ create_texture :: (tex: *Texture, width: u16, height: u16, data: *void, type := 
             interal_format = GL_RGBA;
             format = GL_RGBA;
         case Texture.DEPTH;
-            interal_format = GL_DEPTH_COMPONENT32F;
+            interal_format = GL_DEPTH_COMPONENT24;
             format = GL_DEPTH_COMPONENT;
         case;
             print("Unhandled texture type: %\n", type);
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Filtering
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Filtering
     tex.type = type;

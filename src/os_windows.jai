@@ -55,7 +55,7 @@ FILE_NOTIFY_INFORMATION :: struct {
     NextEntryOffset: s32;
     Action: s32;
     FileNameLength: s32;
-    FileName: [1] s16;
+    FileName: [1] u16;
 }
 
 HMODULE :: HANDLE;
