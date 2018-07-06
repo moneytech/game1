@@ -205,8 +205,8 @@ update_editor :: (game: *Game, dt: float) {
 
         if brush_x < 0 brush_x = 0;
         if brush_y < 0 brush_y = 0;
-        if brush_xw >= terrain_texture.width brush_xw = terrain_texture.width-1;
-        if brush_yh >= terrain_texture.height brush_yh = terrain_texture.height-1;
+        if brush_xw >= xx terrain_texture.width brush_xw = xx (terrain_texture.width-1);
+        if brush_yh >= xx terrain_texture.height brush_yh = xx (terrain_texture.height-1);
 
         if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & DOWN {
             
@@ -243,7 +243,7 @@ render_editor_scene :: (using game: *Game, water := false) {
     draw_mesh(<<renderer, <<selected_points_mesh);
 
     if water {
-        draw_water(<<renderer, water_reflect_frame_buffer.color_texture, water_refract_frame_buffer.color_texture, water_dudv_texture, WATER_HEIGHT);
+        draw_water(<<renderer, water_dudv_texture, WATER_HEIGHT);
     }
     finish_scene(renderer);
     set_clip_plane(renderer, false);
@@ -258,14 +258,14 @@ render_editor :: (using game: *Game) {
     new_camera.rotation = new_camera.rotation * set_angle_vector(xx (-phi * 2), 1, 0, 0);
     game.renderer.camera = new_camera;
 
-    use_frame_buffer(renderer, *water_reflect_frame_buffer);
+    use_frame_buffer(renderer, *renderer.water_reflect_frame_buffer);
     set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
     render_editor_scene(game);
     use_frame_buffer(renderer, null);
 
 
     game.renderer.camera = old_camera;
-    use_frame_buffer(renderer, *water_refract_frame_buffer);
+    use_frame_buffer(renderer, *renderer.water_refract_frame_buffer);
     set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
     render_editor_scene(game);
     use_frame_buffer(renderer, null);

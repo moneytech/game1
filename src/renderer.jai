@@ -31,10 +31,28 @@ Texture :: struct {
     #destructor delete_texture;
 };
 
+Viewport :: struct {
+    x: s32;
+    y: s32;
+    w: u32;
+    h: u32;
+}
+
+make_Viewport :: (x: s32, y: s32, w: u32, h: u32) -> Viewport {
+    v: Viewport = ---;
+    v.x = x;
+    v.y = y;
+    v.w = w;
+    v.h = h;
+    return v;
+}
+
 Frame_Buffer :: struct {
     color_texture: *Texture;
     depth_texture: *Texture;
     id: u32 = xx -1;
+
+    viewport: Viewport;
 }
 
 set_frame_buffer_textures :: (fb: *Frame_Buffer, color_texture: *Texture, depth_texture: *Texture) {
@@ -54,6 +72,12 @@ set_frame_buffer_textures :: (fb: *Frame_Buffer, color_texture: *Texture, depth_
     }
 
     if color_texture || depth_texture then assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    tex: *Texture;
+    if color_texture tex = color_texture;
+    else tex = depth_texture;
+    
+    if tex set_viewport(fb, make_Viewport(0, 0, tex.width, tex.height));
 }
 
 create_frame_buffer_from_textures :: (using rdr: *GL_Renderer, color_texture: *Texture, depth_texture: *Texture) -> Frame_Buffer {
@@ -86,6 +110,8 @@ create_frame_buffer :: (using rdr: *GL_Renderer, width: u32, height: u32) -> Fra
 
     set_frame_buffer_textures(*buf, buf.color_texture, buf.depth_texture);
 
+    set_viewport(*buf, make_Viewport(0, 0, width, height));
+
     use_frame_buffer(rdr, null);
     return buf;
 }
@@ -108,6 +134,7 @@ use_frame_buffer :: (using rdr: *GL_Renderer, fb: *Frame_Buffer) {
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, fb.id);
+    use_viewport(fb.viewport);
     current_frame_buffer = fb;
 }
 
@@ -285,6 +312,7 @@ GL_Renderer :: struct {
     gbuffer_normal: u32;
     gbuffer_albedo_spec: u32;
     gbuffer_depth: u32;
+    gbuffer_viewport: Viewport;
 
     render_to_gbuffer: *Shader;
     render_light_using_gbuffer: *Shader;
@@ -315,6 +343,7 @@ GL_Renderer :: struct {
 }
 
 resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
+    gbuffer_viewport = make_Viewport(0, 0, w, h);
     glBindTexture(GL_TEXTURE_2D, gbuffer_position);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx w, xx h, 0, GL_RGB, GL_FLOAT, null);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -609,9 +638,9 @@ clear_screen :: (r: float, g: float, b: float, a: float) {
     // glDepthFunc(GL_LEQUAL);
 }
 
-enable_scissor :: (x: s32, y: s32, w: s32, h: s32) {
+enable_scissor :: (v: Viewport) {
     glEnable(GL_SCISSOR_TEST);
-    glScissor(x, y, xx w, xx h);
+    glScissor(v.x, v.y, xx v.w, xx v.h);
 }
 
 disable_scissor :: () {
@@ -858,6 +887,8 @@ draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: stri
 }
 
 start_scene :: (using rdr: *GL_Renderer) {
+    use_viewport(gbuffer_viewport);
+    disable_scissor();
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
     clear_screen(0, 0, 0, 1);
 
@@ -869,6 +900,9 @@ start_scene :: (using rdr: *GL_Renderer) {
 
 finish_scene :: (using rdr: *GL_Renderer) {
     use_frame_buffer(rdr, current_frame_buffer);
+    if current_frame_buffer enable_scissor(current_frame_buffer.viewport);
+    defer disable_scissor();
+
     clear_screen(0, 0, 0, 1);
 
     old_proj := projection_matrix;
@@ -1172,8 +1206,13 @@ draw_water :: (using rdr: GL_Renderer, dudv_texture: *Texture, water_height: flo
     glDeleteBuffers(1, *buf);
 }
 
-set_viewport :: (x: s32, y: s32, width: s32, height: s32) {
-    glViewport(x, y, xx width, xx height);
+set_viewport :: (fb: *Frame_Buffer, v: Viewport) {
+    fb.viewport = v;
+}
+
+use_viewport :: (v: Viewport) {
+    glViewport(v.x, v.y, v.w, v.h);
+    assert(v.w > 0 && v.h > 0);
 }
 
 #if DEVELOPER {

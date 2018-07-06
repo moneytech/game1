@@ -127,7 +127,7 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
 
     // @TODO update framebuffer sizes when window gets resized
     // init(game.renderer, game.window.width, game.window.height);
-    init(game.renderer, 1080, 1200);
+    init(game.renderer, game.window.width, game.window.height);
 
     game.water_dudv_texture = load_image(game.asset_man, "assets/water_dudv.png");
 
@@ -214,6 +214,7 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
 
     
     // @FixMe the water reflection rotates dramatically when the camera is rolled (tilted) about the Z axis, breaking VR immersion
+    // maybe it's just that the roll should be inverted ?
     old_camera := game.renderer.camera;
     new_camera := old_camera;
     new_camera.position.y -= 2 * (new_camera.position.y - WATER_HEIGHT);
