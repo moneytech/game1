@@ -23,8 +23,8 @@ Texture :: struct {
     using Texture_Type;
 
     type: Texture_Type;
-    width: u16;
-    height: u16;
+    width: u32;
+    height: u32;
 
     id: u32;
 
@@ -34,43 +34,44 @@ Texture :: struct {
 Frame_Buffer :: struct {
     color_texture: *Texture;
     depth_texture: *Texture;
-
-    // @Redundant we get this implicitly through our textures
-    width: u16;
-    height: u16;
-
-    depth_buffer_id: u32 = xx -1;
     id: u32 = xx -1;
+}
+
+set_frame_buffer_textures :: (fb: *Frame_Buffer, color_texture: *Texture, depth_texture: *Texture) {
+    fb.color_texture = color_texture;
+    fb.depth_texture = depth_texture;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fb.id);
+
+    if fb.color_texture {
+        glBindTexture(GL_TEXTURE_2D, fb.color_texture.id);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fb.color_texture.id, 0);
+    }
+
+    if fb.depth_texture {
+        glBindTexture(GL_TEXTURE_2D, fb.depth_texture.id);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fb.depth_texture.id, 0);
+    }
+
+    if color_texture || depth_texture then assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
 
 create_frame_buffer_from_textures :: (using rdr: *GL_Renderer, color_texture: *Texture, depth_texture: *Texture) -> Frame_Buffer {
     buf: Frame_Buffer;
-    buf.color_texture = color_texture;
-    buf.depth_texture = depth_texture;
-
     glGenFramebuffers(1, *buf.id);
     glBindFramebuffer(GL_FRAMEBUFFER, buf.id);
 
     attach: [1] u32 = {:u32: GL_COLOR_ATTACHMENT0 };
     glDrawBuffers(xx attach.count, attach.data);
 
-    if buf.color_texture {
-        glBindTexture(GL_TEXTURE_2D, buf.color_texture.id);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, buf.color_texture.id, 0);
-    }
-
-    if buf.depth_texture {
-        glBindTexture(GL_TEXTURE_2D, buf.depth_texture.id);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, buf.depth_texture.id, 0);
-    }
-
-    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-
+    set_frame_buffer_textures(*buf, color_texture, depth_texture);
+    
     use_frame_buffer(rdr, null);
     return buf;
 }
 
-create_frame_buffer :: (using rdr: *GL_Renderer, width: u16, height: u16) -> Frame_Buffer {
+// quickly create a working framebuffer
+create_frame_buffer :: (using rdr: *GL_Renderer, width: u32, height: u32) -> Frame_Buffer {
     buf: Frame_Buffer;
     buf.color_texture = New(Texture);
     buf.depth_texture = New(Texture);
@@ -83,13 +84,7 @@ create_frame_buffer :: (using rdr: *GL_Renderer, width: u16, height: u16) -> Fra
     attach: [1] u32 = {:u32: GL_COLOR_ATTACHMENT0 };
     glDrawBuffers(xx attach.count, attach.data);
 
-    glBindTexture(GL_TEXTURE_2D, buf.color_texture.id);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, buf.color_texture.id, 0);
-
-    glBindTexture(GL_TEXTURE_2D, buf.depth_texture.id);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, buf.depth_texture.id, 0);
-
-    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    set_frame_buffer_textures(*buf, buf.color_texture, buf.depth_texture);
 
     use_frame_buffer(rdr, null);
     return buf;
@@ -100,10 +95,7 @@ delete_frame_buffer :: (fb: *Frame_Buffer) {
     Delete(fb.color_texture);
     Delete(fb.depth_texture);
 
-    glDeleteRenderbuffers(1, *fb.depth_buffer_id);
-
     fb.id = xx -1;
-    fb.depth_buffer_id = xx -1;
     fb.color_texture = null;
     fb.depth_texture = null;
 }
@@ -302,6 +294,8 @@ GL_Renderer :: struct {
     render_water: *Shader;
 
     current_frame_buffer: *Frame_Buffer;
+    water_reflect_frame_buffer: Frame_Buffer;
+    water_refract_frame_buffer: Frame_Buffer;
 
     enable_clip_plane: bool;
     clip_plane: Vector4;
@@ -320,18 +314,51 @@ GL_Renderer :: struct {
     model_matrix_stack: [..] Matrix4;
 }
 
+resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
+    glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx w, xx h, 0, GL_RGB, GL_FLOAT, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx w, xx h, 0, GL_RGB, GL_FLOAT, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+
+    glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, xx w, xx h, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_depth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+
+    resize_frame_buffer(*water_reflect_frame_buffer, w, h);
+    resize_frame_buffer(*water_refract_frame_buffer, w, h);
+}
+
+resize_frame_buffer :: (fb: *Frame_Buffer, w: u32, h: u32) {
+    resize_texture(fb.color_texture, w, h);
+    resize_texture(fb.depth_texture, w, h);
+}
+
 
 debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
-    #if OS_WINDOWS {
-        // print("source: %\n", source);
-        // print("type: %\n", type);
-        // print("id: %\n", id);
-        // print("severity: %\n", severity);
-        // print("length: %\n", length);
-        // print("message: %\n", message);
-        // print("userParam: %\n", userParam);
-        if (type == GL_DEBUG_TYPE_ERROR) print("GL Error:%\n", point_at_c_string(message));
-    }
+	pctx := cast(*Context) userParam;
+    ctx := <<pctx;
+	push_context ctx {
+		#if OS_WINDOWS {
+			// print("source: %\n", source);
+			// print("type: %\n", type);
+			// print("id: %\n", id);
+			// print("severity: %\n", severity);
+			// print("length: %\n", length);
+			// print("message: %\n", message);
+			// print("userParam: %\n", userParam);
+			if type == GL_DEBUG_TYPE_ERROR print("GL Error:%\n", point_at_c_string(message));
+		}
+	}
 }
 
 push_model_matrix :: (using rdr: *GL_Renderer, mat: Matrix4) {
@@ -346,9 +373,9 @@ current_model_matrix :: (using rdr: GL_Renderer) -> Matrix4 {
     return model_matrix_stack[model_matrix_stack.count-1];
 }
 
-init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
+init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     print("rdr: %\n", rdr);
-    glDebugMessageCallback(debug_callback, rdr);
+    glDebugMessageCallback(debug_callback, *context);
     
     push_model_matrix(rdr, matrix_identity());
     // glBegin(GL_TRIANGLES);
@@ -362,48 +389,38 @@ init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
     glGenVertexArrays(1, *rdr.VertexArrayID);
     glBindVertexArray(rdr.VertexArrayID);
 
+    water_reflect_frame_buffer = create_frame_buffer(rdr, width, height);
+    water_refract_frame_buffer = create_frame_buffer(rdr, width, height);
+
     glGenFramebuffers(1, *gbuffer_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
 
     glGenTextures(1, *gbuffer_position);
     glGenTextures(1, *gbuffer_normal);
     glGenTextures(1, *gbuffer_albedo_spec);
+    glGenRenderbuffers(1, *gbuffer_depth);
 
-    glBindTexture(GL_TEXTURE_2D, gbuffer_position);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx screen_width, xx screen_height, 0, GL_RGB, GL_FLOAT, null);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    resize_rendering_buffers(rdr, width, height);
+
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gbuffer_position, 0);
-
-    glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, xx screen_width, xx screen_height, 0, GL_RGB, GL_FLOAT, null);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gbuffer_normal, 0);
-
-    glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, xx screen_width, xx screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gbuffer_albedo_spec, 0);
 
     attach: [3] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attach.data);
 
-    glGenRenderbuffers(1, *gbuffer_depth);
-    glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_depth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
 
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 
     #if DEVELOPER {
+        // @TODO resizing picking framebuffer
         glGenFramebuffers(1, *picking_framebuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
 
         glGenTextures(1, *picking_pos_texture);
         glBindTexture(GL_TEXTURE_2D, picking_pos_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, xx screen_width, xx screen_height, 0, GL_RG, GL_FLOAT, null);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, xx width, xx height, 0, GL_RG, GL_FLOAT, null);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, picking_pos_texture, 0);
@@ -413,7 +430,7 @@ init :: (using rdr: *GL_Renderer, screen_width: u32, screen_height: u32) {
 
         glGenRenderbuffers(1, *picking_depth);
         glBindRenderbuffer(GL_RENDERBUFFER, picking_depth);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, picking_depth);
 
         assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
@@ -431,14 +448,35 @@ set_clip_plane :: (using rdr: *GL_Renderer, enable: bool) {
     rdr.enable_clip_plane = enable;
 }
 
-set_texture :: (tex: *Texture, width: u16, height: u16, texId: GLuint, type := Texture.RGBA) {
+set_texture :: (tex: *Texture, width: u32, height: u32, texId: GLuint, type := Texture.RGBA) {
     tex.width = width;
     tex.height = height;
     tex.id = texId;
     tex.type = type;
 }
 
-create_texture :: (tex: *Texture, width: u16, height: u16, data: *void, type := Texture.RGBA) {
+resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
+    glBindTexture(GL_TEXTURE_2D, tex.id);
+    type := tex.type;
+
+    interal_format: GLint;
+    format: GLenum;
+
+    if type == {
+        case Texture.RGBA;
+            interal_format = GL_RGBA;
+            format = GL_RGBA;
+        case Texture.DEPTH;
+            interal_format = GL_DEPTH_COMPONENT24;
+            format = GL_DEPTH_COMPONENT;
+        case;
+            print("Unhandled texture type: %\n", type);
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+}
+
+create_texture :: (tex: *Texture, width: u32, height: u32, data: *void, type := Texture.RGBA) {
     texId: GLuint;
     glGenTextures(1, *texId);
     glBindTexture(GL_TEXTURE_2D, texId);
@@ -569,6 +607,15 @@ clear_screen :: (r: float, g: float, b: float, a: float) {
     glCullFace(GL_BACK);
 
     // glDepthFunc(GL_LEQUAL);
+}
+
+enable_scissor :: (x: s32, y: s32, w: s32, h: s32) {
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(x, y, xx w, xx h);
+}
+
+disable_scissor :: () {
+    glDisable(GL_SCISSOR_TEST);
 }
 
 draw_rect :: (using rdr: GL_Renderer, rect: Rectangle, color: Color, alpha := 1.0) {
@@ -1047,7 +1094,9 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     }
 }
 
-draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_texture: *Texture, dudv_texture: *Texture, water_height: float) {
+draw_water :: (using rdr: GL_Renderer, dudv_texture: *Texture, water_height: float) {
+    reflect_texture := water_reflect_frame_buffer.color_texture;
+    refract_texture := water_refract_frame_buffer.color_texture;
     glEnable(GL_DEPTH_TEST);
     glUseProgram(render_water.id);
 
@@ -1121,6 +1170,10 @@ draw_water :: (using rdr: GL_Renderer, reflect_texture: *Texture, refract_textur
     glDisable(GL_DEPTH_TEST);
 
     glDeleteBuffers(1, *buf);
+}
+
+set_viewport :: (x: s32, y: s32, width: s32, height: s32) {
+    glViewport(x, y, xx width, xx height);
 }
 
 #if DEVELOPER {

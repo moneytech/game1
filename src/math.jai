@@ -225,6 +225,10 @@ Quaternion :: struct {
     x: float;
     y: float;
     z: float;
+
+    #constructor (q: *Quaternion) {
+        <<q = set_angle_vector(0, 0, 1, 0);
+    }
 }
 
 // Radians
@@ -245,13 +249,18 @@ get_euler_angles :: (using q: Quaternion) -> float64, float64, float64 {
     return phi, theta, gamma;
 }
 
-operator* :: (q0: Quaternion, q1: Quaternion) -> Quaternion {
+operator* :: (_q0: Quaternion, _q1: Quaternion) -> Quaternion {
+    q0 := normalize(_q0);
+    q1 := normalize(_q1);
     o: Quaternion = ---;
-    dot := q0.x*q1.x + q0.y*q1.y + q0.z*q1.z;
-    o.w = q0.w*q1.w - dot;
-    o.x = q0.w*q1.x + q1.w*q0.x + (q0.y*q1.z - q0.z*q1.y);
-    o.y = q0.w*q1.y + q1.w*q0.y + (q0.z*q1.x - q0.x*q1.z);
-    o.z = q0.w*q1.z + q1.w*q0.z + (q0.x*q1.y - q0.y*q1.x);
+    // o.w = q0.w*q1.w - q0.x*q1.x - q0.y*q1.y - q0.z*q1.z;
+    // o.x = q0.w*q1.x + q1.w*q0.x + (q0.y*q1.z - q0.z*q1.y);
+    // o.y = q0.w*q1.y + q1.w*q0.y + (q0.z*q1.x - q0.x*q1.z);
+    // o.z = q0.w*q1.z + q1.w*q0.z + (q0.x*q1.y - q0.y*q1.x);
+    o.x = q0.x*q1.w + q0.y*q1.z - q0.z*q1.y + q0.w*q1.x;
+    o.y =-q0.x*q1.z + q0.y*q1.w + q0.z*q1.x + q0.w*q1.y;
+    o.z = q0.x*q1.y - q0.y*q1.x + q0.z*q1.w + q0.w*q1.z;
+    o.w =-q0.x*q1.x - q0.y*q1.y - q0.z*q1.z + q0.w*q1.w;
     return o;
 }
 
@@ -320,6 +329,7 @@ inverse :: (q: Quaternion) -> Quaternion {
 normalize :: (q: Quaternion) -> Quaternion {
     o: Quaternion = ---;
     len := length(q);
+
     o.w = q.w / len;
     o.x = q.x / len;
     o.y = q.y / len;
@@ -464,30 +474,53 @@ operator* :: (using mat: Matrix4, v: Vector4) -> Vector4 {
     return result;
 }
 
-operator* :: (using _mat: Matrix4, mat: Matrix4) -> Matrix4 {
-    result: Matrix4 = ---;
-    result.flat[0] = m[0][0] * mat.m[0][0] + m[0][1] * mat.m[1][0] + m[0][2] * mat.m[2][0] + m[0][3] * mat.m[3][0];
-    result.flat[1] = m[0][0] * mat.m[0][1] + m[0][1] * mat.m[1][1] + m[0][2] * mat.m[2][1] + m[0][3] * mat.m[3][1];
-    result.flat[2] = m[0][0] * mat.m[0][2] + m[0][1] * mat.m[1][2] + m[0][2] * mat.m[2][2] + m[0][3] * mat.m[3][2];
-    result.flat[3] = m[0][0] * mat.m[0][3] + m[0][1] * mat.m[1][3] + m[0][2] * mat.m[2][3] + m[0][3] * mat.m[3][3];
+operator* :: (mA: $T/Matrix4, mB: T) -> Matrix4 #body_text {
+    builder: String_Builder;
+    print_to_builder(*builder, "result: Matrix4 = ---;\n");
+    
+    for row: 0..3 {
+        for col: 0..3 {
+            print_to_builder(*builder, "result.m[%][%] =", row, col);
+            
+            for col_b: 0..3 {
+                if col_b print_to_builder(*builder, " +");
+                print_to_builder(*builder, " mA.m[%1][%2] * mB.m[%3][%4]", row, col_b, col_b, col);
+            }
 
-    result.flat[4] = m[1][0] * mat.m[0][0] + m[1][1] * mat.m[1][0] + m[1][2] * mat.m[2][0] + m[1][3] * mat.m[3][0];
-    result.flat[5] = m[1][0] * mat.m[0][1] + m[1][1] * mat.m[1][1] + m[1][2] * mat.m[2][1] + m[1][3] * mat.m[3][1];
-    result.flat[6] = m[1][0] * mat.m[0][2] + m[1][1] * mat.m[1][2] + m[1][2] * mat.m[2][2] + m[1][3] * mat.m[3][2];
-    result.flat[7] = m[1][0] * mat.m[0][3] + m[1][1] * mat.m[1][3] + m[1][2] * mat.m[2][3] + m[1][3] * mat.m[3][3];
+            print_to_builder(*builder, ";\n");
+        }
+    }
 
-    result.flat[8] = m[2][0] * mat.m[0][0] + m[2][1] * mat.m[1][0] + m[2][2] * mat.m[2][0] + m[2][3] * mat.m[3][0];
-    result.flat[9] = m[2][0] * mat.m[0][1] + m[2][1] * mat.m[1][1] + m[2][2] * mat.m[2][1] + m[2][3] * mat.m[3][1];
-    result.flat[10] = m[2][0] * mat.m[0][2] + m[2][1] * mat.m[1][2] + m[2][2] * mat.m[2][2] + m[2][3] * mat.m[3][2];
-    result.flat[11] = m[2][0] * mat.m[0][3] + m[2][1] * mat.m[1][3] + m[2][2] * mat.m[2][3] + m[2][3] * mat.m[3][3];
+    print_to_builder(*builder, "return result;\n");
 
-    result.flat[12] = m[3][0] * mat.m[0][0] + m[3][1] * mat.m[1][0] + m[3][2] * mat.m[2][0] + m[3][3] * mat.m[3][0];
-    result.flat[13] = m[3][0] * mat.m[0][1] + m[3][1] * mat.m[1][1] + m[3][2] * mat.m[2][1] + m[3][3] * mat.m[3][1];
-    result.flat[14] = m[3][0] * mat.m[0][2] + m[3][1] * mat.m[1][2] + m[3][2] * mat.m[2][2] + m[3][3] * mat.m[3][2];
-    result.flat[15] = m[3][0] * mat.m[0][3] + m[3][1] * mat.m[1][3] + m[3][2] * mat.m[2][3] + m[3][3] * mat.m[3][3];
-
-    return result;
+    str := builder_to_string(*builder);
+    return str;
 }
+
+// {
+//     result: Matrix4 = ---;
+//     result.flat[0] = m[0][0] * mat.m[0][0] + m[0][1] * mat.m[1][0] + m[0][2] * mat.m[2][0] + m[0][3] * mat.m[3][0];
+//     result.flat[1] = m[0][0] * mat.m[0][1] + m[0][1] * mat.m[1][1] + m[0][2] * mat.m[2][1] + m[0][3] * mat.m[3][1];
+//     result.flat[2] = m[0][0] * mat.m[0][2] + m[0][1] * mat.m[1][2] + m[0][2] * mat.m[2][2] + m[0][3] * mat.m[3][2];
+//     result.flat[3] = m[0][0] * mat.m[0][3] + m[0][1] * mat.m[1][3] + m[0][2] * mat.m[2][3] + m[0][3] * mat.m[3][3];
+
+//     result.flat[4] = m[1][0] * mat.m[0][0] + m[1][1] * mat.m[1][0] + m[1][2] * mat.m[2][0] + m[1][3] * mat.m[3][0];
+//     result.flat[5] = m[1][0] * mat.m[0][1] + m[1][1] * mat.m[1][1] + m[1][2] * mat.m[2][1] + m[1][3] * mat.m[3][1];
+//     result.flat[6] = m[1][0] * mat.m[0][2] + m[1][1] * mat.m[1][2] + m[1][2] * mat.m[2][2] + m[1][3] * mat.m[3][2];
+//     result.flat[7] = m[1][0] * mat.m[0][3] + m[1][1] * mat.m[1][3] + m[1][2] * mat.m[2][3] + m[1][3] * mat.m[3][3];
+
+//     result.flat[8] = m[2][0] * mat.m[0][0] + m[2][1] * mat.m[1][0] + m[2][2] * mat.m[2][0] + m[2][3] * mat.m[3][0];
+//     result.flat[9] = m[2][0] * mat.m[0][1] + m[2][1] * mat.m[1][1] + m[2][2] * mat.m[2][1] + m[2][3] * mat.m[3][1];
+//     result.flat[10] = m[2][0] * mat.m[0][2] + m[2][1] * mat.m[1][2] + m[2][2] * mat.m[2][2] + m[2][3] * mat.m[3][2];
+//     result.flat[11] = m[2][0] * mat.m[0][3] + m[2][1] * mat.m[1][3] + m[2][2] * mat.m[2][3] + m[2][3] * mat.m[3][3];
+
+//     result.flat[12] = m[3][0] * mat.m[0][0] + m[3][1] * mat.m[1][0] + m[3][2] * mat.m[2][0] + m[3][3] * mat.m[3][0];
+//     result.flat[13] = m[3][0] * mat.m[0][1] + m[3][1] * mat.m[1][1] + m[3][2] * mat.m[2][1] + m[3][3] * mat.m[3][1];
+//     result.flat[14] = m[3][0] * mat.m[0][2] + m[3][1] * mat.m[1][2] + m[3][2] * mat.m[2][2] + m[3][3] * mat.m[3][2];
+//     result.flat[15] = m[3][0] * mat.m[0][3] + m[3][1] * mat.m[1][3] + m[3][2] * mat.m[2][3] + m[3][3] * mat.m[3][3];
+
+//     return result;
+// }
 
 matrix_screen_space :: (halfWidth: float, halfHeight: float) -> Matrix4 {
 	mat: Matrix4;
@@ -534,20 +567,30 @@ matrix_rotate :: (degrees: float64, tx: float, ty: float, tz: float) -> Matrix4 
     return result;
 }
 
+matrix_rotate :: (q: Quaternion) -> Matrix4 {
+    using q1 := normalize(q);
+    result: Matrix4;
+    result.m[0][0] = 1 - 2*y*y - 2*z*z;
+    result.m[0][1] = 2*x*y - 2*z*w;
+    result.m[0][2] = 2*x*z + 2*y*w;
+
+    
+    result.m[1][0] = 2*x*y + 2*z*w;
+    result.m[1][1] = 1 - 2*x*x - 2*z*z;
+    result.m[1][2] = 2*y*z - 2*x*w;
+
+    
+    result.m[2][0] = 2*x*z - 2*y*w;
+    result.m[2][1] = 2*y*z + 2*x*w;
+    result.m[2][2] = 1 - 2*x*x - 2*y*y;
+
+    result.m[3][3] = 1;
+
+    return result;
+}
+
 RADIANS_TO_DEGREES :: 180 / 3.14159265359;
 DEGREES_TO_RADIANS :: 3.14159265359 / 180;
-
-matrix_rotate :: (q: Quaternion) -> Matrix4 {
-    rta := sqrt(1 - q.w*q.w);
-    if (rta == 0) {
-        return matrix_identity();
-    }
-    theta := acos(q.w) * 2;
-    x := q.x / rta;
-    y := q.y / rta;
-    z := q.z / rta;
-    return matrix_rotate((cast(float64) theta) * RADIANS_TO_DEGREES, x, y, z);
-}
 
 matrix_translate :: (x: float, y: float, z: float) -> Matrix4 {
     mat: Matrix4;
@@ -597,10 +640,13 @@ matrix_frustum :: (left: float, right: float, bottom: float, top: float, _near: 
     
     mat.m[0][0] = 2 * _near / (right - left);
     mat.m[0][2] = A;
+
     mat.m[1][1] = 2 * _near / (top - bottom);
     mat.m[1][2] = B;
+
     mat.m[2][2] = C;
     mat.m[2][3] = D;
+
     mat.m[3][2] = -1.0;
     mat.m[3][3] = 0.0;
     return mat;

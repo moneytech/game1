@@ -406,6 +406,7 @@ main :: () {
         update_camera(game, 1.0/60.0);
         update_physics(game, 1.0/60.0);
         update_scene(game, game.current_scene, 1.0/60.0);
+        game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
         render_game(game);
         do_label(*imgui, 1, <<font, 0.0, 0.0, "Hello World");
 

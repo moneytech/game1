@@ -11,8 +11,6 @@ Game :: struct {
 
     fov: float = 60;
 
-    water_reflect_frame_buffer: Frame_Buffer;
-    water_refract_frame_buffer: Frame_Buffer;
     water_dudv_texture: *Texture;
 }
 
@@ -128,10 +126,8 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
     game.asset_man = asset_man;
 
     // @TODO update framebuffer sizes when window gets resized
-    init(game.renderer, game.window.width, game.window.height);
-
-    game.water_reflect_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
-    game.water_refract_frame_buffer = create_frame_buffer(game.renderer, xx game.window.width, xx game.window.height);
+    // init(game.renderer, game.window.width, game.window.height);
+    init(game.renderer, 1080, 1200);
 
     game.water_dudv_texture = load_image(game.asset_man, "assets/water_dudv.png");
 
@@ -153,8 +149,8 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
 
     
 
-    game.renderer.camera.position.z = 30;
-    game.renderer.camera.position.y = 5;
+    game.renderer.camera.position.z = 0;
+    game.renderer.camera.position.y = 1.8;
     game.renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
 
     return game;
@@ -197,7 +193,7 @@ draw_geometry :: (using game: *Game, water := false) {
     }
 
     if water {
-        draw_water(<<renderer, water_reflect_frame_buffer.color_texture, water_refract_frame_buffer.color_texture, water_dudv_texture, WATER_HEIGHT);
+        draw_water(<<renderer, water_dudv_texture, WATER_HEIGHT);
     }
     finish_scene(game.renderer);
     set_clip_plane(renderer, false);
@@ -211,9 +207,10 @@ update_game :: (game: *Game) {
     }
 }
 
-render_game :: (using game: *Game) {
-    game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
-    gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
+render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
+    // game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
+    // gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
+    use_frame_buffer(game.renderer, target_frame_buffer);
 
     old_camera := game.renderer.camera;
     new_camera := old_camera;
@@ -222,17 +219,17 @@ render_game :: (using game: *Game) {
     new_camera.rotation = new_camera.rotation * set_angle_vector(xx (-phi * 2), 1, 0, 0);
     game.renderer.camera = new_camera;
 
-    use_frame_buffer(renderer, *game.water_reflect_frame_buffer);
+    use_frame_buffer(renderer, *renderer.water_reflect_frame_buffer);
     set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
     draw_geometry(game);
-    use_frame_buffer(renderer, null);
+    use_frame_buffer(renderer, target_frame_buffer);
 
 
     game.renderer.camera = old_camera;
-    use_frame_buffer(renderer, *game.water_refract_frame_buffer);
+    use_frame_buffer(renderer, *renderer.water_refract_frame_buffer);
     set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
     draw_geometry(game);
-    use_frame_buffer(renderer, null);
+    use_frame_buffer(renderer, target_frame_buffer);
 
     set_clip_plane(renderer, false);
     draw_geometry(game, true);
