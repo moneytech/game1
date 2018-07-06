@@ -212,6 +212,8 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
     // gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
     use_frame_buffer(game.renderer, target_frame_buffer);
 
+    
+    // @FixMe the water reflection rotates dramatically when the camera is rolled (tilted) about the Z axis, breaking VR immersion
     old_camera := game.renderer.camera;
     new_camera := old_camera;
     new_camera.position.y -= 2 * (new_camera.position.y - WATER_HEIGHT);
