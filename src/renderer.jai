@@ -325,10 +325,12 @@ GL_Renderer :: struct {
     render_text: *Shader;
     render_rect: *Shader;
     render_water: *Shader;
+    render_gamma_correction: *Shader;
 
     current_frame_buffer: *Frame_Buffer;
     water_reflect_frame_buffer: Frame_Buffer;
     water_refract_frame_buffer: Frame_Buffer;
+    scratch_frame_buffer: Frame_Buffer;
 
     enable_clip_plane: bool;
     clip_plane: Vector4;
@@ -370,11 +372,13 @@ resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
 
     resize_frame_buffer(*water_reflect_frame_buffer, w, h);
     resize_frame_buffer(*water_refract_frame_buffer, w, h);
+    resize_frame_buffer(*scratch_frame_buffer, w, h);
 }
 
 resize_frame_buffer :: (fb: *Frame_Buffer, w: u32, h: u32) {
     resize_texture(fb.color_texture, w, h);
     resize_texture(fb.depth_texture, w, h);
+    set_viewport(fb, make_Viewport(0, 0, w, h));
 }
 
 
@@ -425,6 +429,7 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
 
     water_reflect_frame_buffer = create_frame_buffer(rdr, width, height);
     water_refract_frame_buffer = create_frame_buffer(rdr, width, height);
+    scratch_frame_buffer = create_frame_buffer(rdr, width, height);
 
     glGenFramebuffers(1, *gbuffer_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
@@ -508,6 +513,8 @@ resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
     }
 
     glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    tex.width = width;
+    tex.height = height;
 }
 
 create_texture :: (tex: *Texture, width: u32, height: u32, data: *void, type := Texture.RGBA) {
@@ -701,15 +708,17 @@ draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: 
     glDisable(GL_BLEND);
 }
 
-draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float) {
-    if (tex) {
-        glUseProgram(render_plain_texture.id);
+draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float, shader: *Shader = null) {
+    if tex {
+        if !shader then shader = render_plain_texture;
+
+        glUseProgram(shader.id);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, tex.id);
 
-        in_texture := glGetUniformLocation(render_plain_texture.id, "in_texture");
+        in_texture := glGetUniformLocation(shader.id, "in_texture");
         glUniform1i(in_texture, 0);
-        update_matrices(rdr, matrix_identity(), render_plain_texture);
+        update_matrices(rdr, matrix_identity(), shader);
     }
 
     xw := x+width;
@@ -905,13 +914,13 @@ start_scene :: (using rdr: *GL_Renderer) {
 
 finish_scene :: (using rdr: *GL_Renderer) {
     use_frame_buffer(rdr, current_frame_buffer);
-    if current_frame_buffer enable_scissor(current_frame_buffer.viewport);
-    defer disable_scissor();
-
+    enable_scissor(current_frame_buffer.viewport);
     clear_screen(0, 0, 0, 1);
 
     old_proj := projection_matrix;
     projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
+    defer projection_matrix = old_proj;
+
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
     glActiveTexture(GL_TEXTURE2);
@@ -934,9 +943,9 @@ finish_scene :: (using rdr: *GL_Renderer) {
 
     }
 
-    glUseProgram(0);
+    // glUseProgram(0);
 
-    projection_matrix = old_proj;
+    disable_scissor();
 }
 
 draw_cube :: (x: float, y: float, z: float, size: float) {

@@ -200,9 +200,6 @@ initialize_vr :: (using game: *Game) {
     temp_fb = create_frame_buffer(game.renderer, xx vr.buffer_size.w, xx vr.buffer_size.h);
 
     enable_vr = true;
-
-    // @TODO move this into renderer
-    glEnable(GL_FRAMEBUFFER_SRGB);
 }
 
 shutdown_vr :: (using game: *Game) {
@@ -270,6 +267,7 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     game.renderer.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
     game.renderer.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     game.renderer.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
+    game.renderer.render_gamma_correction = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/gamma_correction.frag");
 
     // @Temporary
     game.text_strings = load_text_strings(asset_man);
@@ -450,7 +448,9 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
         game.renderer.projection_matrix = matrix_ortho(0, 1, 1, 0, -1, 1);
         // set_viewport(0, 0, xx vr.buffer_size.w, xx vr.buffer_size.h);
         use_frame_buffer(game.renderer, *vr_frame_buffer);
-        draw_textured_rect(<<game.renderer, temp_fb.color_texture, 0, 0, 1, 1);
+
+        // apply gamma correction
+        draw_textured_rect(<<game.renderer, temp_fb.color_texture, 0, 0, 1, 1, renderer.render_gamma_correction);
 
         ovr_CommitTextureSwapChain(vr.session, vr.color_swap_chain);
         ovr_CommitTextureSwapChain(vr.session, vr.depth_swap_chain);
@@ -473,7 +473,18 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
         game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) width/cast(float) height, 1.0, 100000.0);
         resize_rendering_buffers(game.renderer, width, height);
         glViewport(0, 0, width, height);
-        render_scene(game, target_frame_buffer);
+
+        use_frame_buffer(game.renderer, *renderer.scratch_frame_buffer);
+        render_scene(game, *renderer.scratch_frame_buffer);
+
+        game.renderer.projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
+
+        // apply gamma correction
+        use_frame_buffer(game.renderer, target_frame_buffer);
+        use_frame_buffer(game.renderer, renderer.current_frame_buffer);
+        if renderer.current_frame_buffer enable_scissor(renderer.current_frame_buffer.viewport);
+        clear_screen(0, 0, 0, 1);
+        draw_textured_rect(<<game.renderer, renderer.scratch_frame_buffer.color_texture, 0, 0, 1, 1, renderer.render_gamma_correction);
     }
 }
 

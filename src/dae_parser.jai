@@ -38,12 +38,14 @@ Material :: struct {
     textures: [1] *Image;
 }
 
-Texture :: struct {
+_Tex :: struct {
     using xml: Xml_Node;
     texture: string;
     texcoord: string;
     texture_type: Collada_Texture_Type;
 }
+
+Texture :: _Tex;
 
 Color :: struct {
     using xml: Xml_Node;
