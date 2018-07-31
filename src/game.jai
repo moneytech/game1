@@ -1,3 +1,4 @@
+#load "OVR.jai";
 
 WATER_HEIGHT :: 0.05;
 
@@ -12,15 +13,40 @@ Game :: struct {
     fov: float = 60;
 
     water_dudv_texture: *Texture;
+
+    enable_vr := false;
+
+    vr: struct {
+        session: ovrSession;
+        luid: ovrGraphicsLuid;
+        hmd_desc: ovrHmdDesc;
+
+        eyeRenderDesc: [2] ovrEyeRenderDesc;
+        hmdToEyeViewPose: [2] ovrPosef;
+        layer: ovrLayerEyeFovDepth;
+        color_texture: *Texture;
+        depth_texture: *Texture;
+        vr_frame_buffer: Frame_Buffer;
+        temp_fb: Frame_Buffer;
+
+        buffer_size: ovrSizei;
+        color_swap_chain: ovrTextureSwapChain;
+        depth_swap_chain: ovrTextureSwapChain;
+
+        mirror_texture_id: u32;
+        mirror_texture: ovrMirrorTexture;
+    };
+
+    frame_index := 0;
 }
 
 Scene :: struct {
     models: [..] *Model;
     actors: [..] *Actor;
-    cameras: [..] Camera;
+    cameras: [..] *Camera;
     lights: [..] Light;
 
-    active_camera: Camera;
+    active_camera: *Camera;
 }
 
 draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
@@ -87,8 +113,114 @@ update_camera :: (game: *Game, dt: float) {
 
 }
 
-init_game :: (window_title: string, vr: bool = false) -> *Game {
+initialize_vr :: (using game: *Game) {
+    params: ovrInitParams;
+    params.Flags = xx (ovrInit_RequestVersion);
+    params.RequestedMinorVersion = OVR_MINOR_VERSION;
+    res := ovr_Initialize(*params);
+    if OVR_FAILURE(res) {
+        logprint("VR", "ovr_Initialize failed with %\n", res);
+        return;
+    }
+
+    res = ovr_Create(*vr.session, *vr.luid);
+
+    if OVR_FAILURE(res) {
+        ovr_Shutdown();
+        logprint("VR", "ovr_Create failed with %\n", res);
+        return;
+    }
+
+    using game.vr;
+    hmd_desc = ovr_GetHmdDesc(vr.session);
+    tex0size := ovr_GetFovTextureSize(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0], 1.0);
+    tex1size := ovr_GetFovTextureSize(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1], 1.0);
+
+    vr.buffer_size.w = tex0size.w + tex1size.w;
+    vr.buffer_size.h = max(tex0size.h, tex1size.h);
+
+    logprint("VR", "buffer size: %\n", vr.buffer_size);
+
+    {
+        desc: ovrTextureSwapChainDesc;
+        desc.Type = ovrTexture_2D;
+        desc.ArraySize = 1;
+        desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
+        desc.Width = vr.buffer_size.w;
+        desc.Height = vr.buffer_size.h;
+        desc.MipLevels = 1;
+        desc.SampleCount = 1;
+        desc.StaticImage = ovrFalse;
+
+
+        if ovr_CreateTextureSwapChainGL(vr.session, *desc, *vr.color_swap_chain) == 0 {
+        }
+
+        desc.Format = OVR_FORMAT_D32_FLOAT;
+
+        if ovr_CreateTextureSwapChainGL(vr.session, *desc, *vr.depth_swap_chain) == 0 {
+        }
+    }
+
+    mirror_desc: ovrMirrorTextureDesc;
+
+    mirror_desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
+    mirror_desc.Width = xx game.window.width;
+    mirror_desc.Height = xx game.window.height;
+    mirror_desc.MiscFlags = 0;
+    mirror_desc.MirrorOptions = xx ovrMirrorOption_PostDistortion;
+
+    ovr_CreateMirrorTextureWithOptionsGL(vr.session, *mirror_desc, *vr.mirror_texture);
+    ovr_GetMirrorTextureBufferGL(vr.session, vr.mirror_texture, *vr.mirror_texture_id);
+
+    eyeRenderDesc[0] = ovr_GetRenderDesc(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0]);
+    eyeRenderDesc[1] = ovr_GetRenderDesc(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1]);
+    hmdToEyeViewPose[0] = eyeRenderDesc[0].HmdToEyePose;
+    hmdToEyeViewPose[1] = eyeRenderDesc[1].HmdToEyePose;
+
+    
+    layer.Header.Type = ovrLayerType_EyeFovDepth;
+    layer.Header.Flags = 0;
+    layer.ColorTexture[0] = vr.color_swap_chain;
+    layer.ColorTexture[1] = vr.color_swap_chain;
+    layer.DepthTexture[0] = vr.depth_swap_chain;
+    layer.DepthTexture[1] = vr.depth_swap_chain;
+    layer.Fov[0] = eyeRenderDesc[0].Fov;
+    layer.Fov[1] = eyeRenderDesc[1].Fov;
+    layer.Viewport[0] = make_Recti(0, 0, vr.buffer_size.w / 2, vr.buffer_size.h);
+    layer.Viewport[1] = make_Recti(vr.buffer_size.w / 2, 0, vr.buffer_size.w / 2, vr.buffer_size.h);
+
+    color_texture = New(Texture);
+    depth_texture = New(Texture);
+
+    set_texture(color_texture, xx vr.buffer_size.w, xx vr.buffer_size.h, 0, Texture.RGBA);
+    set_texture(depth_texture, xx vr.buffer_size.w, xx vr.buffer_size.h, 0, Texture.DEPTH);
+
+    vr_frame_buffer = create_frame_buffer_from_textures(renderer, null, null);
+    temp_fb = create_frame_buffer(game.renderer, xx vr.buffer_size.w, xx vr.buffer_size.h);
+
+    enable_vr = true;
+
+    // @TODO move this into renderer
+    glEnable(GL_FRAMEBUFFER_SRGB);
+}
+
+shutdown_vr :: (using game: *Game) {
+    ovr_Destroy(vr.session);
+    ovr_Shutdown();
+}
+
+game_vr_mode_active :: inline (using game: *Game) -> bool {
+    return vr.session != null;
+}
+
+game_logger :: (message: string, ident: string, mode: Log_Mode, data: *void) -> void {
+    print("[%] %", ident, message);
+}
+
+init_game :: (window_title: string, options: ..string) -> *Game {
     os_init_platform();
+    context.logger = game_logger;
 
     orig_wd: string;
     if running_at_compile_time() {
@@ -108,7 +240,6 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
     win := os_create_window(WINDOW_WIDTH, WINDOW_HEIGHT, window_title);
     ctx := os_create_gl_context(win);
     os_make_current(win, ctx);
-    os_set_vsync(!vr);
 
     game := New(Game);
     window := New(Game_Window);
@@ -121,6 +252,7 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
 
     game.window = window;
     game.renderer = New(GL_Renderer);
+    game.renderer.game = game;
     asset_man := New(Asset_Manager);
     asset_man.game = game;
     game.asset_man = asset_man;
@@ -152,6 +284,14 @@ init_game :: (window_title: string, vr: bool = false) -> *Game {
     game.renderer.camera.position.z = 0;
     game.renderer.camera.position.y = 1.8;
     game.renderer.camera.rotation = set_angle_vector(0, 0, 1, 0);
+    
+    for options {
+        if it == "-vr" {
+            initialize_vr(game);
+        }
+    }
+
+    os_set_vsync(game.vr.session == null);
 
     return game;
 }
@@ -207,7 +347,7 @@ update_game :: (game: *Game) {
     }
 }
 
-render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
+render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
     // game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
     // gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
     use_frame_buffer(game.renderer, target_frame_buffer);
@@ -236,8 +376,105 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
 
     set_clip_plane(renderer, false);
     draw_geometry(game, true);
+}
 
-    game.renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
+    if game.enable_vr && game_vr_mode_active(game) {
+        using game.vr;
+
+        _proj := renderer.projection_matrix;
+        defer renderer.projection_matrix = _proj;
+
+        resize_rendering_buffers(game.renderer, xx (vr.buffer_size.w / 2), xx vr.buffer_size.h);
+        eyeRenderDesc[0] = ovr_GetRenderDesc(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0]);
+        eyeRenderDesc[1] = ovr_GetRenderDesc(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1]);
+        hmdToEyeViewPose[0] = eyeRenderDesc[0].HmdToEyePose;
+        hmdToEyeViewPose[1] = eyeRenderDesc[1].HmdToEyePose;
+
+        displayMidpointSeconds := ovr_GetPredictedDisplayTime(vr.session, game.frame_index);
+        hmdState := ovr_GetTrackingState(vr.session, displayMidpointSeconds, ovrTrue);
+        ovr_CalcEyePoses(hmdState.HeadPose.ThePose, hmdToEyeViewPose.data, layer.RenderPose.data);
+
+        color_tex_id: u32;
+        depth_tex_id: u32;
+        {
+            currentIndex: s32;
+            ovr_GetTextureSwapChainCurrentIndex(vr.session, vr.color_swap_chain, *currentIndex);
+            ovr_GetTextureSwapChainBufferGL(vr.session, vr.color_swap_chain, currentIndex, *color_tex_id);
+        }
+        {
+            currentIndex: s32;
+            ovr_GetTextureSwapChainCurrentIndex(vr.session, vr.depth_swap_chain, *currentIndex);
+            ovr_GetTextureSwapChainBufferGL(vr.session, vr.depth_swap_chain, currentIndex, *depth_tex_id);
+        }
+        color_texture.id = color_tex_id;
+        depth_texture.id = depth_tex_id;
+
+        set_frame_buffer_textures(*vr_frame_buffer, color_texture, depth_texture);
+
+        result := ovr_WaitToBeginFrame(vr.session, game.frame_index);
+
+        ovr_BeginFrame(vr.session, game.frame_index);
+
+        for eye: 0..1 {
+            vp := layer.Viewport[eye];
+            set_viewport(*temp_fb, make_Viewport(vp.Pos.x, vp.Pos.y, xx vp.Size.w, xx vp.Size.h));
+
+            ts := ovr_GetTrackingState(vr.session, ovr_GetTimeInSeconds(), ovrTrue);
+            pos_offset := to_vector3(layer.RenderPose[eye].Position);
+
+            q := to_quaternion(layer.RenderPose[eye].Orientation);
+
+            camera_orig := game.renderer.camera;
+            defer game.renderer.camera = camera_orig;
+
+            game.renderer.camera.position += pos_offset;
+            game.renderer.camera.rotation = q;
+            fov := layer.Fov[eye];
+
+            m0 := ovrMatrix4f_Projection(fov, 0.001, 100000.0, 0);
+            m1: Matrix4;
+
+            for x: 0..3 {
+                for y: 0..3 {
+                    m1.m[x][y] = m0.M[x][y];
+                }
+            }
+            game.renderer.projection_matrix = m1;
+            render_scene(game, *temp_fb);
+        }
+
+        glDisable(GL_CULL_FACE);
+        defer glEnable(GL_CULL_FACE);
+        
+        game.renderer.projection_matrix = matrix_ortho(0, 1, 1, 0, -1, 1);
+        // set_viewport(0, 0, xx vr.buffer_size.w, xx vr.buffer_size.h);
+        use_frame_buffer(game.renderer, *vr_frame_buffer);
+        draw_textured_rect(<<game.renderer, temp_fb.color_texture, 0, 0, 1, 1);
+
+        ovr_CommitTextureSwapChain(vr.session, vr.color_swap_chain);
+        ovr_CommitTextureSwapChain(vr.session, vr.depth_swap_chain);
+
+        layers := *layer.Header;
+        result = ovr_EndFrame(vr.session, game.frame_index, null, *layers, 1);
+        // is_visible = (result == xx ovrSuccess);
+
+        ovr_GetMirrorTextureBufferGL(vr.session, vr.mirror_texture, *vr.mirror_texture_id);
+    } else {
+        width := game.window.width;
+        height := game.window.height;
+
+        if target_frame_buffer {
+            vp := target_frame_buffer.viewport;
+            width = vp.w;
+            height = vp.h;
+        }
+
+        game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) width/cast(float) height, 1.0, 100000.0);
+        resize_rendering_buffers(game.renderer, width, height);
+        glViewport(0, 0, width, height);
+        render_scene(game, target_frame_buffer);
+    }
 }
 
 

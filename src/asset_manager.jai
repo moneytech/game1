@@ -610,7 +610,7 @@ Model_load_fbx :: (path: string) -> *Model {
         if it.properties.count {
             if it.properties[0].string_data == "UnitScaleFactor" {
                 scale_factor = xx it.properties[4].primitive.f64;
-                print("scale factor: %, %\n", path, scale_factor);
+                logprint("AssetMan", "scale factor: %, %\n", path, scale_factor);
             }
         }
     }

@@ -130,6 +130,7 @@ use_frame_buffer :: (using rdr: *GL_Renderer, fb: *Frame_Buffer) {
     if !fb {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         current_frame_buffer = null;
+        use_viewport(make_Viewport(0, 0, game.window.width, game.window.height));
         return;
     }
 
@@ -299,11 +300,15 @@ Shader :: struct {
 Camera :: struct {
     position: Vector3;
     rotation: Quaternion;
+
+    dual_lens := false;
 };
 
 #run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
 
 GL_Renderer :: struct {
+    game: *Game;
+
     lights: [..] Light;
 
     VertexArrayID: u32;
