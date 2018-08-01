@@ -3,7 +3,7 @@
 
 selected_points_mesh: *Mesh;
 selected_points_indices: [..] u32;
-picking_position_buf: [] Vector2;
+picking_position_buf: [] s32;
 
 __terrain: *Mesh;
 terrain_map: Height_Map;
@@ -17,6 +17,7 @@ Tool_Mode :: enum u16 {
     BRUSH_TEXTURE_PAINT;
 }
 
+under_cursor := -1;
 terrain_texture: Texture;
 terrain_texture_buffer: [512 * 512] u32;
 tool_brush_add_sub_vector: Vector3;
@@ -63,15 +64,16 @@ update_point_mesh :: (m: *Mesh, map: Height_Map, indices: [] u32) {
 }
 
 init_editor :: (game: *Game) {
+    picking_position_buf.count = game.window.width * game.window.height;
+    picking_position_buf.data = alloc(picking_position_buf.count*size_of(s32));
+
+    /*
     m := New(Mesh);
     m.material = New(Material);
     m.material.diffuse = make_Color(1.0, 0.5, 0.0);
     m.primitive_type = Primitive_Type.POINTS;
 
     selected_points_mesh = m;
-
-    picking_position_buf.count = game.window.width * game.window.height;
-    picking_position_buf.data = alloc(picking_position_buf.count*size_of(Vector2));
 
     tool_brush_add_sub_vector = make_Vector3(0.0, 0.2, 0.0);
 
@@ -85,9 +87,22 @@ init_editor :: (game: *Game) {
     }
     create_texture(*terrain_texture, 512, 512, terrain_texture_buffer.data, Texture.RGBA);
     __terrain.material.textures[TEXTURE_DIFFUSE_INDEX] = *terrain_texture;
+    */
 }
 
+draw_scene_with_pick_id :: (rdr: *GL_Renderer, sc: Scene) {
+    for sc.actors {
+        if it.body && it.model {
+            orient := matrix_rotate(it.orientiation);
+            it.model.model_matrix = matrix_translate(it.body.position) * orient;
+        }
+    }
+    for sc.models draw_picking_model(rdr, <<it, cast(s32) (it_index+1));
+}
+
+
 update_editor :: (game: *Game, dt: float) {
+    game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
     x, y, success := get_mouse_pointer_position(true);
     if !success return;
 
@@ -95,7 +110,7 @@ update_editor :: (game: *Game, dt: float) {
 
     renderer := game.renderer;
     start_picking(renderer);
-    draw_picking_mesh(<<renderer, <<__terrain, renderer.picking_shader);
+    draw_scene_with_pick_id(renderer, <<game.current_scene);
     finish_picking(renderer);
     get_picking_position_data(<<renderer, picking_position_buf.data);
 
@@ -103,6 +118,7 @@ update_editor :: (game: *Game, dt: float) {
 
     using Key_Current_State;
 
+    /*
     if current_tool_mode == Tool_Mode.VERTEX_PICK {
         if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
             if success {
@@ -228,8 +244,15 @@ update_editor :: (game: *Game, dt: float) {
             generate_terrain_line_mesh(terrain_map, __terrain_line_mesh);
         }
     }
+    */
+
+    under_cursor = -1;
+    if !(x >= 0 && x < game.window.width) return;
+    if !(y >= 0 && y < game.window.height) return;
+    under_cursor = picking_position_buf[in];
 }
 
+/*
 render_editor_scene :: (using game: *Game, water := false) {
     start_scene(renderer);
     clear_screen(0.5, 0.5, 0.5, 1.0);
@@ -248,37 +271,17 @@ render_editor_scene :: (using game: *Game, water := false) {
     finish_scene(renderer);
     set_clip_plane(renderer, false);
 }
+*/
 
 render_editor :: (using game: *Game) {
-
-    old_camera := game.renderer.camera;
-    new_camera := old_camera;
-    new_camera.position.y -= 2 * (new_camera.position.y - WATER_HEIGHT);
-    phi := get_euler_angles(new_camera.rotation);
-    new_camera.rotation = new_camera.rotation * set_angle_vector(xx (-phi * 2), 1, 0, 0);
-    game.renderer.camera = new_camera;
-
-    use_frame_buffer(renderer, *renderer.water_reflect_frame_buffer);
-    set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
-    render_editor_scene(game);
-    use_frame_buffer(renderer, null);
-
-
-    game.renderer.camera = old_camera;
-    use_frame_buffer(renderer, *renderer.water_refract_frame_buffer);
-    set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
-    render_editor_scene(game);
-    use_frame_buffer(renderer, null);
-
-    set_clip_plane(renderer, false);
-    render_editor_scene(game, true);
+    render_game(game);
 
     // renderer.projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
     // draw_textured_rect(<<renderer, water_reflect_frame_buffer.color_texture, 0, 0, 0.25, 0.25);
     // draw_textured_rect(<<renderer, water_refract_frame_buffer.color_texture, 0, 0.25, 0.25, 0.25);
 
     renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
-    draw_rect(<<renderer, 0, 0, 500, font.char_height*5, make_Color(0.2, 0.2, 0.2), 0.5);
+    draw_rect(<<renderer, 0, 0, 500, font.char_height*6, make_Color(0.2, 0.2, 0.2), 0.5);
     
     h := font.char_height*0.75;
     draw_text(<<renderer, <<font, 0, h+font.char_height*0, "Current Tool: %", current_tool_mode);
@@ -291,4 +294,5 @@ render_editor :: (using game: *Game) {
     b := (texture_paint_color >> 16) & 0xFF;
     a := (texture_paint_color >> 24) & 0xFF;
     draw_text(<<renderer, <<font, 0, h+font.char_height*4, "Texture Paint Color: %,%,%,%", r, g, b, a);
+    draw_text(<<renderer, <<font, 0, h+font.char_height*5, "Under cursor: %", under_cursor);
 }

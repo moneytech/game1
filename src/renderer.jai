@@ -459,7 +459,7 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
 
         glGenTextures(1, *picking_pos_texture);
         glBindTexture(GL_TEXTURE_2D, picking_pos_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, xx width, xx height, 0, GL_RG, GL_FLOAT, null);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, xx width, xx height, 0, GL_RED_INTEGER, GL_INT, null);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, picking_pos_texture, 0);
@@ -914,7 +914,9 @@ start_scene :: (using rdr: *GL_Renderer) {
 
 finish_scene :: (using rdr: *GL_Renderer) {
     use_frame_buffer(rdr, current_frame_buffer);
-    enable_scissor(current_frame_buffer.viewport);
+    if current_frame_buffer enable_scissor(current_frame_buffer.viewport);
+    else disable_scissor();
+    
     clear_screen(0, 0, 0, 1);
 
     old_proj := projection_matrix;
@@ -1230,16 +1232,22 @@ use_viewport :: (v: Viewport) {
 }
 
 #if DEVELOPER {
-    draw_picking_mesh :: (using rdr: GL_Renderer, m:Mesh, sh: *Shader) {
+    draw_picking_model :: (rdr: *GL_Renderer, m: Model, pick_id: s32 = -1) {
+        push_model_matrix(rdr, m.model_matrix);
+        for m.meshes {
+            if m.draw_mode == {
+                case DRAW_MODE_SOLID; draw_picking_mesh(<<rdr, << it, rdr.picking_shader, pick_id);
+                // case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(<<rdr, << it);
+            }
+        }
+        pop_model_matrix(rdr);
+    }
+
+
+    draw_picking_mesh :: (using rdr: GL_Renderer, m:Mesh, sh: *Shader, pick_id: s32 = -1) {
         glEnable(GL_DEPTH_TEST);
 
-        proj := glGetUniformLocation(sh.id, "projection");
-        view := glGetUniformLocation(sh.id, "view");
-        model := glGetUniformLocation(sh.id, "model");
-        glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
-        glUniformMatrix4fv(view, 1, GL_TRUE, view_matrix.flat.data);
-        glUniformMatrix4fv(model, 1, GL_TRUE, m.model_matrix.flat.data); // @TODO why doesn't this use update_matrices ?
-
+        update_matrices(rdr, m.model_matrix, sh);
         glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
 
         vertex_size := m.vertices.count * size_of(Vector3);
@@ -1248,9 +1256,8 @@ use_viewport :: (v: Viewport) {
         tangent_size := m.tangent_normals.count * size_of(Vector3);
         color_size := m.colors.count * size_of(Color);
         glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size+color_size));
+        glVertexAttribI1i(1, pick_id);
 
         assert(m.primitive_type == Primitive_Type.TRIANGLES);
         if m.indices.count {
@@ -1262,7 +1269,6 @@ use_viewport :: (v: Viewport) {
         else glDrawArrays(GL_TRIANGLES, 0, xx m.vertices.count);
 
         glDisableVertexAttribArray(0);
-        glDisableVertexAttribArray(1);
 
         glDisable(GL_DEPTH_TEST);
     }
@@ -1282,9 +1288,9 @@ use_viewport :: (v: Viewport) {
         glUseProgram(0);
     }
 
-    get_picking_position_data :: (using rdr: GL_Renderer, data: *Vector2) {
+    get_picking_position_data :: (using rdr: GL_Renderer, data: *s32) {
         glBindTexture(GL_TEXTURE_2D, picking_pos_texture);
-        glGetTexImage(GL_TEXTURE_2D, 0, GL_RG, GL_FLOAT, data);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_INT, data);
     }
 } // DEVELOPER
 
@@ -1303,11 +1309,6 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
     tangent_size := m.tangent_normals.count * size_of(Vector3);
     color_size := m.colors.count * size_of(Color);
     total_size := vertex_size + tex_size + normal_size + tangent_size + color_size;
-
-    #if DEVELOPER {
-        picking_pos_size := m.map_position.count * size_of(Vector2);
-        total_size += picking_pos_size;
-    }
 
     if !m.buffer_id {
         glGenBuffers(1, *m.buffer_id);
@@ -1332,9 +1333,6 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
         memcpy(ptr+(vertex_size+normal_size), m.tex_coords.data, tex_size);
         memcpy(ptr+(vertex_size+normal_size+tex_size), m.tangent_normals.data, tangent_size);
         memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size), m.colors.data, color_size);
-        #if DEVELOPER {
-            memcpy(ptr+(vertex_size+normal_size+tex_size+tangent_size+color_size), m.map_position.data, picking_pos_size);
-        }
     }
 
     glUnmapBuffer(GL_ARRAY_BUFFER);

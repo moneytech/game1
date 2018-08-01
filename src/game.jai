@@ -1,4 +1,5 @@
 #load "OVR.jai";
+#load "editor.jai";
 
 WATER_HEIGHT :: 0.05;
 
