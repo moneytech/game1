@@ -188,6 +188,15 @@ Material :: struct {
     specular: Color;
     emissive: Color;
     transparency: float;
+
+    disable_lighting := false;
+    disable_backface_culling := false;
+    disable_vertex_colors := false;
+
+    #constructor (using m: *Material) {
+        ambient = make_Color(0.2, 0.2, 0.2);
+        diffuse = make_Color(1.0, 1.0, 1.0);
+    }
 };
 
 Primitive_Type :: enum u32 #complete {
@@ -232,9 +241,11 @@ reset_mesh_arrays :: (using m: *Mesh) {
 }
 
 Model :: struct {
+    using object: Scene_Object;
+
     meshes: [..] *Mesh;
     model_matrix: Matrix4;
-    draw_mode: bool = DRAW_MODE_SOLID;
+    draw_mode := DRAW_MODE_SOLID;
 
     #constructor init_model;
 };
@@ -243,8 +254,9 @@ init_model :: (m: *Model) {
     // m.model_matrix = matrix_identity();
 }
 
-DRAW_MODE_SOLID     :: false;
-DRAW_MODE_WIREFRAME :: true;
+DRAW_MODE_SOLID     :: 0;
+DRAW_MODE_WIREFRAME :: 1;
+DRAW_MODE_SOLID_AND_WIREFRAME :: 2;
 
 BITMAP_FRAME_FLIP_VERTICLE   :: (1 << 0);
 BITMAP_FRAME_FLIP_HORIZONTAL :: (1 << 1);
@@ -279,6 +291,8 @@ Light_Type :: enum {
 };
 
 Light :: struct {
+    using object: Scene_Object;
+
     type: Light_Type;
     position: Vector3;
     ambient: Color;
@@ -298,6 +312,8 @@ Shader :: struct {
 };
 
 Camera :: struct {
+    using object: Scene_Object;
+
     position: Vector3;
     rotation: Quaternion;
 
@@ -331,6 +347,8 @@ GL_Renderer :: struct {
     water_reflect_frame_buffer: Frame_Buffer;
     water_refract_frame_buffer: Frame_Buffer;
     scratch_frame_buffer: Frame_Buffer;
+
+    wireframe_material: *Material;
 
     enable_clip_plane: bool;
     clip_plane: Vector4;
@@ -476,6 +494,13 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     }
 
     use_frame_buffer(rdr, null);
+
+
+    wireframe_material = New(Material);
+    wireframe_material.diffuse = make_Color(1.0, 0.5, 0.0);
+    wireframe_material.disable_lighting = true;
+    wireframe_material.disable_backface_culling = true;
+    wireframe_material.disable_vertex_colors = true;
 }
 
 set_clip_plane :: (using rdr: *GL_Renderer, enable: bool, plane: Vector4) {
@@ -1031,7 +1056,14 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     specular_map := glGetUniformLocation(render_to_gbuffer.id, "specular_map");
 
     assert(m.material != null);
+
     mat := m.material;
+
+    if mat.disable_backface_culling then glDisable(GL_CULL_FACE);
+    else glEnable(GL_CULL_FACE);
+
+    defer if mat.disable_backface_culling then glEnable(GL_CULL_FACE);
+
     diffuse_tex :=  mat.textures[TEXTURE_DIFFUSE_INDEX];
     normal_tex := mat.textures[TEXTURE_NORMAL_INDEX];
     spec_tex := mat.textures[TEXTURE_SPECULAR_INDEX];
@@ -1078,24 +1110,26 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
     
-    if m.normals.count {
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) vertex_size);
-    } else {
-        glVertexAttrib3f(1, 0, 0, 0);
-    }
-
     if (tex_size && (diffuse_tex || normal_tex || spec_tex)) {
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size));
     }
 
-    if (normal_tex) {
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size));
+    if !mat.disable_lighting {
+        if m.normals.count {
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) vertex_size);
+        } else {
+            glVertexAttrib3f(1, 0, 0, 0);
+        }
+
+        if (normal_tex) {
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size));
+        }
     }
 
-    if m.colors.count {
+    if m.colors.count && !mat.disable_vertex_colors {
         glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
     } else {
@@ -1236,6 +1270,7 @@ use_viewport :: (v: Viewport) {
         push_model_matrix(rdr, m.model_matrix);
         for m.meshes {
             if m.draw_mode == {
+                case DRAW_MODE_SOLID_AND_WIREFRAME; #through;
                 case DRAW_MODE_SOLID; draw_picking_mesh(<<rdr, << it, rdr.picking_shader, pick_id);
                 // case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(<<rdr, << it);
             }
@@ -1277,6 +1312,8 @@ use_viewport :: (v: Viewport) {
         glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
         glClearColor(1, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        value: GLint = -1;
+        glClearBufferiv(GL_COLOR, 0, *value);
 
         pos := camera.position;
         view_matrix = matrix_rotate(inverse(camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
@@ -1296,8 +1333,6 @@ use_viewport :: (v: Viewport) {
 
 draw_mesh_wireframe :: (rdr: GL_Renderer, m: Mesh) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    // @TODO we should probably use a temporary material heres
-    // and disable lighting to get consistent results
     draw_mesh(rdr, m);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
@@ -1351,7 +1386,15 @@ draw_model :: (rdr: *GL_Renderer, m: Model) {
     for m.meshes {
         if m.draw_mode == {
             case DRAW_MODE_SOLID; draw_mesh(<<rdr, << it);
-            case DRAW_MODE_WIREFRAME; draw_mesh_wireframe(<<rdr, << it);
+            case DRAW_MODE_SOLID_AND_WIREFRAME;
+                draw_mesh(<<rdr, << it);
+                #through;
+            case DRAW_MODE_WIREFRAME;
+                mat := it.material;
+                defer it.material = mat;
+
+                it.material = rdr.wireframe_material;
+                draw_mesh_wireframe(<<rdr, << it);
         }
     }
     pop_model_matrix(rdr);

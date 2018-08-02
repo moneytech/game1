@@ -17,7 +17,7 @@ Tool_Mode :: enum u16 {
     BRUSH_TEXTURE_PAINT;
 }
 
-under_cursor := -1;
+under_cursor: s32 = -1;
 terrain_texture: Texture;
 terrain_texture_buffer: [512 * 512] u32;
 tool_brush_add_sub_vector: Vector3;
@@ -43,6 +43,8 @@ collect_indices_around_circle :: (map: Height_Map, p: Vector2, radius: float) {
 
     store_mesh_in_buffer(selected_points_mesh, true);
 }
+
+selected_game_object: *Scene_Object;
 
 #scope_export
 
@@ -96,8 +98,17 @@ draw_scene_with_pick_id :: (rdr: *GL_Renderer, sc: Scene) {
             orient := matrix_rotate(it.orientiation);
             it.model.model_matrix = matrix_translate(it.body.position) * orient;
         }
+
+        if it.model {
+            draw_picking_model(rdr, <<it.model, it.object_id);
+        } else {
+            logprint("Editor", "Warning: Actor % has no model!\n", it.object_id);
+        }
     }
-    for sc.models draw_picking_model(rdr, <<it, cast(s32) (it_index+1));
+
+    // @TODO lights and light picking mesh
+    // @OTOD cameras and camera meshes
+    // for sc.models draw_picking_model(rdr, <<it, cast(s32) (it_index+1));
 }
 
 
@@ -250,6 +261,43 @@ update_editor :: (game: *Game, dt: float) {
     if !(x >= 0 && x < game.window.width) return;
     if !(y >= 0 && y < game.window.height) return;
     under_cursor = picking_position_buf[in];
+    
+    if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
+        if under_cursor != -1 {
+            selected_game_object = find_object_by_id(game.current_scene, under_cursor);
+        } else {
+            selected_game_object = null;
+        }
+    }
+
+    if selected_game_object {
+        if input_button_states[#char "G"] & DOWN {
+            delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
+            delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+            // sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+            // delta = mul(delta, make_Vector3(sx, sy, 1));
+
+            assert(selected_game_object.object_type == Actor);
+            actor := cast(*Actor) selected_game_object;
+
+            if actor.body {
+                len := length(actor.body.position - game.renderer.camera.position);
+                delta *= (len / 2);
+            } else {
+                delta *= 5;
+            }
+
+            q := game.renderer.camera.rotation;
+            delta = q * delta;
+            print("delta: %\n", delta);
+
+            if actor.body {
+                actor.body.position -= delta;
+            } else {
+                actor.model.model_matrix = actor.model.model_matrix * matrix_translate(-delta.x, -delta.y, -delta.z);
+            }
+        }
+    }
 }
 
 /*
@@ -274,7 +322,23 @@ render_editor_scene :: (using game: *Game, water := false) {
 */
 
 render_editor :: (using game: *Game) {
+
+    if selected_game_object {
+        // @TODO
+        assert(selected_game_object.object_type == Actor);
+
+        actor := cast(*Actor) selected_game_object;
+        actor.model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
+    }
+
     render_game(game);
+
+    if selected_game_object {
+        // @TODO
+        assert(selected_game_object.object_type == Actor);
+        actor := cast(*Actor) selected_game_object;
+        actor.model.draw_mode = DRAW_MODE_SOLID;
+    }
 
     // renderer.projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
     // draw_textured_rect(<<renderer, water_reflect_frame_buffer.color_texture, 0, 0, 0.25, 0.25);

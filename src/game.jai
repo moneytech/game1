@@ -45,9 +45,45 @@ Scene :: struct {
     models: [..] *Model;
     actors: [..] *Actor;
     cameras: [..] *Camera;
-    lights: [..] Light;
+    lights: [..] *Light;
+    all_objects: [..] *Scene_Object;
+
+    next_available_id: s32 = 1;
 
     active_camera: *Camera;
+}
+
+add_to_scene :: (sc: *Scene, thing: *$T) #body_text {
+    builder: String_Builder;
+ACTOR_STRING :: #string DONE
+    assert(thing.object_id == -1);
+    thing.object_id = sc.next_available_id;
+    sc.next_available_id += 1;
+    #if DEBUG {
+         if find_object_by_id(sc, thing.object_id) != null {
+            logprint("Scene", "Error: object id % is already registered in scene!\n", thing.object_id);
+         }
+    }
+DONE
+    append(*builder, ACTOR_STRING);
+
+    // @Warning idk if this is safe in the long run
+    array_name := sprint("%", <<cast(*Type) *T);
+    print_to_builder(*builder, "thing.object_type = %;\n", array_name);
+
+    to_lower(array_name);
+    defer free(array_name);
+    print_to_builder(*builder, "array_add(*sc.%s, thing);\n", array_name);
+    append(*builder, "array_add(*sc.all_objects, thing);\n");
+    return builder_to_string(*builder);
+}
+
+find_object_by_id :: (sc: *Scene, id: s32) -> *Scene_Object {
+    for sc.all_objects {
+        if it.object_id == id then return it;
+    }
+
+    return null;
 }
 
 draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
@@ -56,6 +92,8 @@ draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
             orient := matrix_rotate(it.orientiation);
             it.model.model_matrix = matrix_translate(it.body.position) * orient;
         }
+
+        if it.model draw_model(rdr, <<it.model);
     }
     for sc.models draw_model(rdr, <<it);
 }
@@ -66,7 +104,14 @@ update_scene :: (game: *Game, sc: *Scene, dt: float) {
     }
 }
 
+Scene_Object :: struct {
+    object_id: s32 = -1;
+    object_type: Type;
+}
+
 Actor :: struct {
+    using object: Scene_Object;
+
     model: *Model;
     body: *Rigid_Body;
     orientiation: Quaternion; // orientiation around Y axis
