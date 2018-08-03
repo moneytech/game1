@@ -88,9 +88,9 @@ find_object_by_id :: (sc: *Scene, id: s32) -> *Scene_Object {
 
 draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
     for sc.actors {
-        if it.body && it.model {
-            orient := matrix_rotate(it.orientiation);
-            it.model.model_matrix = matrix_translate(it.body.position) * orient;
+        if it.model {
+            orient := matrix_rotate(it.orientation);
+            it.model.model_matrix = matrix_translate(it.position) * orient;
         }
 
         if it.model draw_model(rdr, <<it.model);
@@ -100,6 +100,12 @@ draw_scene :: (rdr: *GL_Renderer, sc: Scene) {
 
 update_scene :: (game: *Game, sc: *Scene, dt: float) {
     for sc.actors {
+        if it.body {
+            it.position = it.body.position;
+            // @TODO Rigid_Body.orientation should probably be a Quaternion
+            // it.orientation = it.body.orientation;
+        }
+
         if it.update_callback it.update_callback(game, it, dt);
     }
 }
@@ -114,7 +120,9 @@ Actor :: struct {
 
     model: *Model;
     body: *Rigid_Body;
-    orientiation: Quaternion; // orientiation around Y axis
+
+    position: Vector3;
+    orientation: Quaternion; // orientiation around Y axis
 
     update_callback: (game: *Game, actor: *Actor, dt: float);
     picked_by_player: (game: *Game, actor: *Actor, player: *Actor, dt: float);

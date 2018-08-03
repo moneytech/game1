@@ -17,6 +17,20 @@ Tool_Mode :: enum u16 {
     BRUSH_TEXTURE_PAINT;
 }
 
+Action :: enum {
+    NONE;
+    DRAG;
+}
+
+action_info: struct {
+    drag: struct {
+        target_position: Vector3;
+        xyz_lock: Vector3;
+    };
+
+};
+editor_action: Action;
+
 under_cursor: s32 = -1;
 terrain_texture: Texture;
 terrain_texture_buffer: [512 * 512] u32;
@@ -68,6 +82,7 @@ update_point_mesh :: (m: *Mesh, map: Height_Map, indices: [] u32) {
 init_editor :: (game: *Game) {
     picking_position_buf.count = game.window.width * game.window.height;
     picking_position_buf.data = alloc(picking_position_buf.count*size_of(s32));
+    action_info.drag.xyz_lock = make_Vector3(1, 1, 1);
 
     /*
     m := New(Mesh);
@@ -94,9 +109,9 @@ init_editor :: (game: *Game) {
 
 draw_scene_with_pick_id :: (rdr: *GL_Renderer, sc: Scene) {
     for sc.actors {
-        if it.body && it.model {
-            orient := matrix_rotate(it.orientiation);
-            it.model.model_matrix = matrix_translate(it.body.position) * orient;
+        if it.model {
+            orient := matrix_rotate(it.orientation);
+            it.model.model_matrix = matrix_translate(it.position) * orient;
         }
 
         if it.model {
@@ -261,41 +276,74 @@ update_editor :: (game: *Game, dt: float) {
     if !(x >= 0 && x < game.window.width) return;
     if !(y >= 0 && y < game.window.height) return;
     under_cursor = picking_position_buf[in];
-    
-    if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
-        if under_cursor != -1 {
-            selected_game_object = find_object_by_id(game.current_scene, under_cursor);
-        } else {
-            selected_game_object = null;
-        }
-    }
 
     if selected_game_object {
-        if input_button_states[#char "G"] & DOWN {
+        assert(selected_game_object.object_type == Actor);
+        actor := cast(*Actor) selected_game_object;
+
+        if input_button_states[#char "G"] & START && editor_action != Action.DRAG {
+            editor_action = Action.DRAG;
+            action_info.drag.xyz_lock = make_Vector3(1, 1, 1);
+            action_info.drag.target_position = actor.position;
+        }
+
+        if editor_action == Action.DRAG {
+
+            if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
+                // apply the action
+                editor_action = Action.NONE;
+                if actor.body then actor.body.position = action_info.drag.target_position;
+
+                actor.position = action_info.drag.target_position;
+
+                return;
+            }
+
+            if input_button_states[Key_Code.MOUSE_BUTTON_RIGHT] & START {
+                editor_action = Action.NONE;
+                return;
+            }
+
+            // @TODO maybe in these we only reset the part of the target position that the user doesn't want to affect
+            // that way preserving the movement along the desired axis that has already been done
+            if input_button_states[#char "X"] & START {
+                action_info.drag.xyz_lock = make_Vector3(1, 0, 0);
+                action_info.drag.target_position = actor.position;
+            }
+
+            if input_button_states[#char "Y"] & START {
+                action_info.drag.xyz_lock = make_Vector3(0, 1, 0);
+                action_info.drag.target_position = actor.position;
+            }
+
+            if input_button_states[#char "Z"] & START {
+                action_info.drag.xyz_lock = make_Vector3(0, 0, 1);
+                action_info.drag.target_position = actor.position;
+            }
+
             delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
             delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
             // sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
             // delta = mul(delta, make_Vector3(sx, sy, 1));
 
-            assert(selected_game_object.object_type == Actor);
-            actor := cast(*Actor) selected_game_object;
-
-            if actor.body {
-                len := length(actor.body.position - game.renderer.camera.position);
-                delta *= (len / 2);
-            } else {
-                delta *= 5;
-            }
+            len := length(actor.position - game.renderer.camera.position);
+            delta *= (len / 2);
 
             q := game.renderer.camera.rotation;
             delta = q * delta;
-            print("delta: %\n", delta);
 
-            if actor.body {
-                actor.body.position -= delta;
-            } else {
-                actor.model.model_matrix = actor.model.model_matrix * matrix_translate(-delta.x, -delta.y, -delta.z);
-            }
+            delta = delta 'mul' action_info.drag.xyz_lock;
+            action_info.drag.target_position -= delta;
+        }
+    } else {
+        editor_action = Action.NONE;
+    }
+
+    if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
+        if under_cursor != -1 {
+            selected_game_object = find_object_by_id(game.current_scene, under_cursor);
+        } else {
+            selected_game_object = null;
         }
     }
 }
@@ -323,22 +371,24 @@ render_editor_scene :: (using game: *Game, water := false) {
 
 render_editor :: (using game: *Game) {
 
-    if selected_game_object {
-        // @TODO
-        assert(selected_game_object.object_type == Actor);
+    if selected_game_object then assert(selected_game_object.object_type == Actor);
+    actor := cast(*Actor) selected_game_object;
 
-        actor := cast(*Actor) selected_game_object;
-        actor.model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
+    if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
+
+    old_position: Vector3;
+    if editor_action == Action.DRAG {
+        old_position = actor.position;
+        actor.position = action_info.drag.target_position;
     }
 
     render_game(game);
 
-    if selected_game_object {
-        // @TODO
-        assert(selected_game_object.object_type == Actor);
-        actor := cast(*Actor) selected_game_object;
-        actor.model.draw_mode = DRAW_MODE_SOLID;
+    if editor_action == Action.DRAG {
+        actor.position = old_position;
     }
+
+    if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID;
 
     // renderer.projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
     // draw_textured_rect(<<renderer, water_reflect_frame_buffer.color_texture, 0, 0, 0.25, 0.25);
