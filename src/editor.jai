@@ -327,7 +327,7 @@ update_editor :: (game: *Game, dt: float) {
             // delta = mul(delta, make_Vector3(sx, sy, 1));
 
             len := length(actor.position - game.renderer.camera.position);
-            delta *= (len / 2);
+            delta *= len;
 
             q := game.renderer.camera.rotation;
             delta = q * delta;

@@ -2,14 +2,17 @@
 
 out vec4 frag_color;
 
-in vec2 tex_coords;
-
 uniform sampler2D g_position;
 uniform sampler2D g_normal;
 uniform sampler2D g_albedospec;
 
+uniform vec4 viewport;
 
-// match Light in renderer.h
+vec2 get_ndc_position() {
+    return gl_FragCoord.xy / viewport.zw;
+}
+
+// match Light in renderer.jai
 struct Light {
     vec3 position;
     vec3 ambient;
@@ -29,6 +32,7 @@ vec3 schlick(float F0, vec3 l, vec3 h) {
 }
 
 void main() {
+    vec2 tex_coords = get_ndc_position();
 
     float specular_exp = texture(g_albedospec, tex_coords).a;
     vec3 frag_pos = texture(g_position, tex_coords).rgb;

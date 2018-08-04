@@ -251,7 +251,7 @@ Model :: struct {
 };
 
 init_model :: (m: *Model) {
-    // m.model_matrix = matrix_identity();
+    m.model_matrix = matrix_identity();
 }
 
 DRAW_MODE_SOLID     :: 0;
@@ -325,7 +325,7 @@ Camera :: struct {
 GL_Renderer :: struct {
     game: *Game;
 
-    lights: [..] Light;
+    lights: [] Light;
 
     VertexArrayID: u32;
     gbuffer_framebuffer: u32;
@@ -943,10 +943,24 @@ finish_scene :: (using rdr: *GL_Renderer) {
     else disable_scissor();
     
     clear_screen(0, 0, 0, 1);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer_framebuffer);
+    if !current_frame_buffer then glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    else glBindFramebuffer(GL_DRAW_FRAMEBUFFER, current_frame_buffer.id);
 
-    old_proj := projection_matrix;
-    projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
-    defer projection_matrix = old_proj;
+    src_vp := gbuffer_viewport;
+    dst_vp := make_Viewport(0, 0, game.window.width, game.window.height);
+    if current_frame_buffer then dst_vp = current_frame_buffer.viewport;
+
+    glBlitFramebuffer(xx src_vp.x, xx src_vp.y, xx src_vp.w, xx src_vp.h,
+            xx dst_vp.x, xx dst_vp.y, xx dst_vp.w, xx dst_vp.h,
+            GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    use_frame_buffer(rdr, current_frame_buffer);
+
+    // old_proj := projection_matrix;
+    // projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
+    // defer projection_matrix = old_proj;
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
@@ -960,11 +974,17 @@ finish_scene :: (using rdr: *GL_Renderer) {
     tex_normal := glGetUniformLocation(render_light_using_gbuffer.id, "g_normal");
     tex_pos := glGetUniformLocation(render_light_using_gbuffer.id, "g_position");
     tex_albedo := glGetUniformLocation(render_light_using_gbuffer.id, "g_albedospec");
+    vp := glGetUniformLocation(render_light_using_gbuffer.id, "viewport");
+    assert(tex_normal != -1);
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniform1i(tex_pos, 0);
     glUniform1i(tex_normal, 1);
     glUniform1i(tex_albedo, 2);
-    draw_textured_rect(<<rdr, null, 0, 0, 1, 1);
+    glUniform4f(vp, cast(float) dst_vp.x, cast(float) dst_vp.y, cast(float) dst_vp.w, cast(float) dst_vp.h);
+    sphere := create_sphere(3, 50, 50);
+    // sphere
+    for sphere.meshes it.material = wireframe_material;
+    draw_model(rdr, <<sphere, render_light_using_gbuffer);
 
     for lights {
 
@@ -1036,24 +1056,27 @@ update_matrices :: (using rdr: GL_Renderer, model_matrix: Matrix4, sh: *Shader) 
     glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
 }
 
-draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
+draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
     glEnable(GL_DEPTH_TEST);
 
-    update_matrices(rdr, m.model_matrix, render_to_gbuffer);
+    if !shader then shader = render_to_gbuffer;
+    glUseProgram(shader.id);
+
+    update_matrices(rdr, m.model_matrix, shader);
 
     // @Cleanup not used in render_to_gbuffer ??
-    viewer_pos := glGetUniformLocation(render_to_gbuffer.id, "camera_position");
+    viewer_pos := glGetUniformLocation(shader.id, "camera_position");
     glUniform3f(viewer_pos, camera.position.x, camera.position.y, camera.position.z);
 
     // material
-    mat_diffuse := glGetUniformLocation(render_to_gbuffer.id, "material.diffuse");
-    mat_spec_exp := glGetUniformLocation(render_to_gbuffer.id, "material.specular_exp");
-    use_diffuse_map := glGetUniformLocation(render_to_gbuffer.id, "use_diffuse_map");
-    use_normal_map := glGetUniformLocation(render_to_gbuffer.id, "use_normal_map");
-    use_specular_map := glGetUniformLocation(render_to_gbuffer.id, "use_specular_map");
-    diffuse_map := glGetUniformLocation(render_to_gbuffer.id, "diffuse_map");
-    normal_map := glGetUniformLocation(render_to_gbuffer.id, "normal_map");
-    specular_map := glGetUniformLocation(render_to_gbuffer.id, "specular_map");
+    mat_diffuse := glGetUniformLocation(shader.id, "material.diffuse");
+    mat_spec_exp := glGetUniformLocation(shader.id, "material.specular_exp");
+    use_diffuse_map := glGetUniformLocation(shader.id, "use_diffuse_map");
+    use_normal_map := glGetUniformLocation(shader.id, "use_normal_map");
+    use_specular_map := glGetUniformLocation(shader.id, "use_specular_map");
+    diffuse_map := glGetUniformLocation(shader.id, "diffuse_map");
+    normal_map := glGetUniformLocation(shader.id, "normal_map");
+    specular_map := glGetUniformLocation(shader.id, "specular_map");
 
     assert(m.material != null);
 
@@ -1091,7 +1114,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh) {
 
     if rdr.enable_clip_plane {
         glEnable(GL_CLIP_DISTANCE0);
-        cp := glGetUniformLocation(render_to_gbuffer.id, "clip_plane");
+        cp := glGetUniformLocation(shader.id, "clip_plane");
         glUniform4f(cp, clip_plane.x, clip_plane.y, clip_plane.z, clip_plane.w);
     }
 
@@ -1381,13 +1404,13 @@ store_mesh_in_buffer :: (m: *Mesh, dynamic := false, update_vertices := true, up
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, xx m.indices.count * size_of(u16), m.indices.data, GL_STATIC_DRAW);
 }
 
-draw_model :: (rdr: *GL_Renderer, m: Model) {
+draw_model :: (rdr: *GL_Renderer, m: Model, shader: *Shader = null) {
     push_model_matrix(rdr, m.model_matrix);
     for m.meshes {
         if m.draw_mode == {
-            case DRAW_MODE_SOLID; draw_mesh(<<rdr, << it);
+            case DRAW_MODE_SOLID; draw_mesh(<<rdr, << it, shader);
             case DRAW_MODE_SOLID_AND_WIREFRAME;
-                draw_mesh(<<rdr, << it);
+                draw_mesh(<<rdr, << it, shader);
                 #through;
             case DRAW_MODE_WIREFRAME;
                 mat := it.material;

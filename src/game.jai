@@ -316,12 +316,12 @@ init_game :: (window_title: string, options: ..string) -> *Game {
 
     game.renderer.render_to_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
     game.renderer.render_light_using_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
-    game.renderer.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_plain_texture.frag");
+    game.renderer.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_plain_texture.vert", "assets/shaders/render_plain_texture.frag");
     game.renderer.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
     game.renderer.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
     game.renderer.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     game.renderer.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
-    game.renderer.render_gamma_correction = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/gamma_correction.frag");
+    game.renderer.render_gamma_correction = load_shader_pair(asset_man, "assets/shaders/render_plain_texture.vert", "assets/shaders/gamma_correction.frag");
 
     // @Temporary
     game.text_strings = load_text_strings(asset_man);
@@ -538,6 +538,8 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
         use_frame_buffer(game.renderer, renderer.current_frame_buffer);
         if renderer.current_frame_buffer enable_scissor(renderer.current_frame_buffer.viewport);
         clear_screen(0, 0, 0, 1);
+
+        game.renderer.view_matrix = matrix_identity();
         draw_textured_rect(<<game.renderer, renderer.scratch_frame_buffer.color_texture, 0, 0, 1, 1, renderer.render_gamma_correction);
     }
 }
