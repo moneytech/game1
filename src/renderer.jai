@@ -69,6 +69,7 @@ set_frame_buffer_textures :: (fb: *Frame_Buffer, color_texture: *Texture, depth_
     if fb.depth_texture {
         glBindTexture(GL_TEXTURE_2D, fb.depth_texture.id);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fb.depth_texture.id, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fb.depth_texture.id, 0);
     }
 
     if color_texture || depth_texture then assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
@@ -189,9 +190,11 @@ Material :: struct {
     emissive: Color;
     transparency: float;
 
+    // maybe these should be Mesh properties since they're rendering options as opposed to rendering attributes ?
     disable_lighting := false;
     disable_backface_culling := false;
     disable_vertex_colors := false;
+    disable_depth_test := false;
 
     #constructor (using m: *Material) {
         ambient = make_Color(0.2, 0.2, 0.2);
@@ -342,6 +345,7 @@ GL_Renderer :: struct {
     render_rect: *Shader;
     render_water: *Shader;
     render_gamma_correction: *Shader;
+    null_shader: *Shader;
 
     current_frame_buffer: *Frame_Buffer;
     water_reflect_frame_buffer: Frame_Buffer;
@@ -349,6 +353,7 @@ GL_Renderer :: struct {
     scratch_frame_buffer: Frame_Buffer;
 
     wireframe_material: *Material;
+    light_sphere: *Model;
 
     enable_clip_plane: bool;
     clip_plane: Vector4;
@@ -501,6 +506,16 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     wireframe_material.disable_lighting = true;
     wireframe_material.disable_backface_culling = true;
     wireframe_material.disable_vertex_colors = true;
+
+    light_material := New(Material);
+    <<light_material = <<wireframe_material;
+    light_material.disable_backface_culling = false;
+    light_material.disable_depth_test = true;
+
+    light_sphere = create_sphere(1, 50, 50);
+    light_sphere.model_matrix = matrix_scale(10, 10, 10);
+    for light_sphere.meshes
+        it.material = light_material;
 }
 
 set_clip_plane :: (using rdr: *GL_Renderer, enable: bool, plane: Vector4) {
@@ -519,25 +534,32 @@ set_texture :: (tex: *Texture, width: u32, height: u32, texId: GLuint, type := T
     tex.type = type;
 }
 
+
+update_texture :: (tex: *Texture, data: *void) {
+    resize_texture(tex, tex.width, tex.height, data);
+}
+
 resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
     glBindTexture(GL_TEXTURE_2D, tex.id);
     type := tex.type;
 
     interal_format: GLint;
     format: GLenum;
+    ty: u32 = GL_UNSIGNED_BYTE;
 
     if type == {
         case Texture.RGBA;
             interal_format = GL_RGBA;
             format = GL_RGBA;
         case Texture.DEPTH;
-            interal_format = GL_DEPTH_COMPONENT24;
-            format = GL_DEPTH_COMPONENT;
+            interal_format = GL_DEPTH24_STENCIL8;
+            format = GL_DEPTH_STENCIL;
+            ty = GL_UNSIGNED_INT_24_8;
         case;
             print("Unhandled texture type: %\n", type);
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, ty, data);
     tex.width = width;
     tex.height = height;
 }
@@ -545,29 +567,14 @@ resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
 create_texture :: (tex: *Texture, width: u32, height: u32, data: *void, type := Texture.RGBA) {
     texId: GLuint;
     glGenTextures(1, *texId);
-    glBindTexture(GL_TEXTURE_2D, texId);
-
-    interal_format: GLint;
-    format: GLenum;
-
-    if type == {
-        case Texture.RGBA;
-            interal_format = GL_RGBA;
-            format = GL_RGBA;
-        case Texture.DEPTH;
-            interal_format = GL_DEPTH_COMPONENT24;
-            format = GL_DEPTH_COMPONENT;
-        case;
-            print("Unhandled texture type: %\n", type);
-    }
-
-    glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Filtering
     tex.type = type;
     tex.width = width;
     tex.height = height;
     tex.id = texId;
+
+    resize_texture(tex, width, height, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Filtering
 }
 
 set_texture_wrap :: (tex: *Texture, clamp_to_edge: bool) {
@@ -575,28 +582,6 @@ set_texture_wrap :: (tex: *Texture, clamp_to_edge: bool) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-update_texture :: (tex: *Texture, data: *void) {
-    interal_format: GLenum;
-    format: GLenum;
-    type: GLenum;
-
-    if tex.type == {
-        case Texture.RGBA;
-            interal_format = GL_RGBA;
-            format = GL_RGBA;
-            type = GL_UNSIGNED_BYTE;
-        case Texture.DEPTH;
-            interal_format = GL_DEPTH_COMPONENT32F;
-            format = GL_DEPTH_COMPONENT;
-            type = GL_FLOAT;
-        case;
-            print("Unhandled texture type: %\n", type);
-    }
-
-    glBindTexture(GL_TEXTURE_2D, tex.id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tex.width, tex.height, format, type, data);
 }
 
 delete_texture :: (tex: *Texture) {
@@ -958,9 +943,41 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     use_frame_buffer(rdr, current_frame_buffer);
 
-    // old_proj := projection_matrix;
-    // projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
-    // defer projection_matrix = old_proj;
+    glUseProgram(null_shader.id);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glDepthMask(GL_FALSE);
+
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_ALWAYS, 0, 0);
+    glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
+
+    glEnable(GL_DEPTH_TEST);
+    glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
+
+    // render lights stencils
+    draw_model(rdr, <<light_sphere, null_shader);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glDisable(GL_STENCIL_TEST);
+    // simple global ambient contribution
+    /*
+    glDisable(GL_DEPTH_TEST);
+
+    UseShader(AmbientBaseShader);
+    RenderQuad(-1, -1, 2, 2);
+    */
+
+    glEnable(GL_STENCIL_TEST);
+    glCullFace(GL_FRONT);
+    glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
+
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    // forward render the actual lights
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
@@ -981,10 +998,7 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glUniform1i(tex_normal, 1);
     glUniform1i(tex_albedo, 2);
     glUniform4f(vp, cast(float) dst_vp.x, cast(float) dst_vp.y, cast(float) dst_vp.w, cast(float) dst_vp.h);
-    sphere := create_sphere(3, 50, 50);
-    // sphere
-    for sphere.meshes it.material = wireframe_material;
-    draw_model(rdr, <<sphere, render_light_using_gbuffer);
+    draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
 
     for lights {
 
@@ -993,6 +1007,11 @@ finish_scene :: (using rdr: *GL_Renderer) {
     // glUseProgram(0);
 
     disable_scissor();
+
+    glDisable(GL_STENCIL_TEST);
+    glDepthMask(GL_TRUE);
+    glCullFace(GL_BACK);
+    glDisable(GL_BLEND);
 }
 
 draw_cube :: (x: float, y: float, z: float, size: float) {
@@ -1057,8 +1076,6 @@ update_matrices :: (using rdr: GL_Renderer, model_matrix: Matrix4, sh: *Shader) 
 }
 
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
-    glEnable(GL_DEPTH_TEST);
-
     if !shader then shader = render_to_gbuffer;
     glUseProgram(shader.id);
 
@@ -1083,9 +1100,9 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
     mat := m.material;
 
     if mat.disable_backface_culling then glDisable(GL_CULL_FACE);
-    else glEnable(GL_CULL_FACE);
-
     defer if mat.disable_backface_culling then glEnable(GL_CULL_FACE);
+
+    if !mat.disable_depth_test then glEnable(GL_DEPTH_TEST);
 
     diffuse_tex :=  mat.textures[TEXTURE_DIFFUSE_INDEX];
     normal_tex := mat.textures[TEXTURE_NORMAL_INDEX];
@@ -1231,11 +1248,6 @@ draw_water :: (using rdr: GL_Renderer, dudv_texture: *Texture, water_height: flo
     glUniform1i(refract_id, 1);
     glUniform1i(dudv_id, 2);
     glUniform1f(offset_id, water_distort_offset);
-
-    // @FixMe water distortion is time sensitive! the water will move unpredicatably with the speed of the machine!
-    DISTORT_OFFSET_STEP :: 0.0005;
-    water_distort_offset += DISTORT_OFFSET_STEP;
-    if water_distort_offset > 1.0 water_distort_offset = 0.0;
 
     // @TODO specify water height through uniform or vertex attrib
 

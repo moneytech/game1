@@ -168,6 +168,8 @@ update_camera :: (game: *Game, dt: float) {
 }
 
 initialize_vr :: (using game: *Game) {
+    if game_vr_mode_active(game) return;
+
     params: ovrInitParams;
     params.Flags = xx (ovrInit_RequestVersion);
     params.RequestedMinorVersion = OVR_MINOR_VERSION;
@@ -322,6 +324,7 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     game.renderer.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
     game.renderer.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
     game.renderer.render_gamma_correction = load_shader_pair(asset_man, "assets/shaders/render_plain_texture.vert", "assets/shaders/gamma_correction.frag");
+    game.renderer.null_shader = load_shader_pair(asset_man, "assets/shaders/null_shader.vert", "assets/shaders/null_shader.frag");
 
     // @Temporary
     game.text_strings = load_text_strings(asset_man);
@@ -343,7 +346,8 @@ init_game :: (window_title: string, options: ..string) -> *Game {
         }
     }
 
-    os_set_vsync(game.vr.session == null);
+    // os_set_vsync(game.vr.session == null);
+    os_set_vsync(false);
 
     return game;
 }
@@ -391,12 +395,17 @@ draw_geometry :: (using game: *Game, water := false) {
     set_clip_plane(renderer, false);
 }
 
-update_game :: (game: *Game) {
+update_game :: (game: *Game, dt: float) {
     if (joysticks.count) {
         game.joy = *joysticks[0];
     } else {
         game.joy = null;
     }
+
+    using game;
+    DISTORT_OFFSET_STEP :: 0.01;
+    renderer.water_distort_offset += DISTORT_OFFSET_STEP * dt;
+    if renderer.water_distort_offset > 1.0 then renderer.water_distort_offset = 0.0;
 }
 
 render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
