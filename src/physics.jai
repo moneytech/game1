@@ -267,9 +267,7 @@ do_ray_aabb_test :: (r: Ray, aabb: AABB) -> bool {
     return tmax > max(tmin, 0.0);
 }
 
-do_ray_sphere_test :: (r: Ray, sp: Sphere) -> bool {
-
-}
+// do_ray_sphere_test :: (r: Ray, sp: Sphere) -> bool {}
 
 same_direction :: (a: Vector3, b: Vector3) -> bool {
     return dot(a, b) > 0;

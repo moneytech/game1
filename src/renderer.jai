@@ -323,6 +323,7 @@ Camera :: struct {
     dual_lens := false;
 };
 
+
 #run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
 
 GL_Renderer :: struct {

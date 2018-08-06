@@ -39,7 +39,7 @@ setup_build :: (output_path: string) -> Build_Options {
     
     set_build_options(options);
 
-    print("Output path: %\n", output_path);
+    // print("Output path: %\n", output_path);
 
     stb_src := C_compiler_make_source_file(concatenate(#filepath, "/stb.cpp"));
     miniz_src := C_compiler_make_source_file(concatenate(#filepath, "/miniz.c"));
@@ -82,7 +82,7 @@ build_workspace :: (name: string, output_path: string) -> Workspace, Build_Optio
     
     w := compiler_create_workspace(name);
     file_path := copy_string(#filepath);
-    print("file_path: %\n", file_path);
+    // print("file_path: %\n", file_path);
     set_build_file_path(file_path, w);
     set_build_options(options, w);
     return w, options;
