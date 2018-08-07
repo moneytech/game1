@@ -43,22 +43,29 @@ setup_build :: (output_path: string) -> Build_Options {
 
     stb_src := C_compiler_make_source_file(concatenate(#filepath, "/stb.cpp"));
     miniz_src := C_compiler_make_source_file(concatenate(#filepath, "/miniz.c"));
+    nuklear_src := C_compiler_make_source_file(concatenate(#filepath, "/nuklear.c"));
     // compile stb lib
      #if OS_WINDOWS {
         stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/stb.dll"), true, stb_src);
         miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/miniz.dll"), true, miniz_src);
+        nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/nuklear.dll"), true, nuklear_src);
     } else {
         stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/libstb.so"), true, stb_src);
         miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/libminiz.so"), true, miniz_src);
+        nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/libnuklear.so"), true, nuklear_src);
 
         stb_stat := C_compiler_make_lib(concatenate(options.output_path, "/libstb.a"), false,  C_compiler_make_object(concatenate(options.output_path, "/stb.o"), stb_src));
         miniz_stat := C_compiler_make_lib(concatenate(options.output_path, "/libminiz.a"), false, C_compiler_make_object(concatenate(options.output_path, "/miniz.o"), miniz_src));
+        nuklear_stat := C_compiler_make_lib(concatenate(options.output_path, "/libnuklear.a"), false, C_compiler_make_object(concatenate(options.output_path, "/nuklear.o"), nuklear_src));
+
         C_compiler_build_target(<< stb_stat);
         C_compiler_build_target(<< miniz_stat);
+        C_compiler_build_target(<< nuklear_stat);
     }
 
     C_compiler_build_target(<< stb_lib);
     C_compiler_build_target(<< miniz_lib);
+    C_compiler_build_target(<< nuklear_lib);
 
     compiler_add_library_search_directory(options.output_path);
 
@@ -73,6 +80,7 @@ add_engine_to_workspace :: (w: Workspace) {
     add_build_file("imgui.jai", w);
     add_build_file("os_api.jai", w);
     add_build_file("game.jai", w);
+    add_build_file("nuklear.jai", w);
 }
 
 build_workspace :: (name: string, output_path: string) -> Workspace, Build_Options {
