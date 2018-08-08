@@ -395,18 +395,18 @@ render_editor :: (using game: *Game) {
     // draw_textured_rect(<<renderer, water_refract_frame_buffer.color_texture, 0, 0.25, 0.25, 0.25);
 
     renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
-    draw_rect(<<renderer, 0, 0, 500, font.char_height*6, make_Color(0.2, 0.2, 0.2), 0.5);
+    // draw_rect(<<renderer, 0, 0, 500, font.char_height*6, make_Color(0.2, 0.2, 0.2), 0.5);
     
-    h := font.char_height*0.75;
-    draw_text(<<renderer, <<font, 0, h+font.char_height*0, "Current Tool: %", current_tool_mode);
-    draw_text(<<renderer, <<font, 0, h+font.char_height*1, "Brush Radius: %", tool_brush_radius);
-    draw_text(<<renderer, <<font, 0, h+font.char_height*2, "Add/Sub Vector: %", tool_brush_add_sub_vector);
-    draw_text(<<renderer, <<font, 0, h+font.char_height*3, "Show line mesh: %", draw_line_overlay);
+    // h := font.char_height*0.75;
+    // draw_text(<<renderer, <<font, 0, h+font.char_height*0, "Current Tool: %", current_tool_mode);
+    // draw_text(<<renderer, <<font, 0, h+font.char_height*1, "Brush Radius: %", tool_brush_radius);
+    // draw_text(<<renderer, <<font, 0, h+font.char_height*2, "Add/Sub Vector: %", tool_brush_add_sub_vector);
+    // draw_text(<<renderer, <<font, 0, h+font.char_height*3, "Show line mesh: %", draw_line_overlay);
 
-    r := texture_paint_color & 0xFF;
-    g := (texture_paint_color >> 8) & 0xFF;
-    b := (texture_paint_color >> 16) & 0xFF;
-    a := (texture_paint_color >> 24) & 0xFF;
-    draw_text(<<renderer, <<font, 0, h+font.char_height*4, "Texture Paint Color: %,%,%,%", r, g, b, a);
-    draw_text(<<renderer, <<font, 0, h+font.char_height*5, "Under cursor: %", under_cursor);
+    // r := texture_paint_color & 0xFF;
+    // g := (texture_paint_color >> 8) & 0xFF;
+    // b := (texture_paint_color >> 16) & 0xFF;
+    // a := (texture_paint_color >> 24) & 0xFF;
+    // draw_text(<<renderer, <<font, 0, h+font.char_height*4, "Texture Paint Color: %,%,%,%", r, g, b, a);
+    // draw_text(<<renderer, <<font, 0, h+font.char_height*5, "Under cursor: %", under_cursor);
 }

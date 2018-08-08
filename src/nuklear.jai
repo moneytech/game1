@@ -1,5 +1,5 @@
 nuklear :: #foreign_library "nuklear";
-nk_char :: s8;
+nk_char :: u8;
 
 nk_uchar :: u8;
 
@@ -23,23 +23,23 @@ nk_flags :: nk_uint;
 
 nk_rune :: nk_uint;
 
-_dummy_array0 :: [1] s8;
+_dummy_array0 :: [1] u8;
 
-_dummy_array1 :: [1] s8;
+_dummy_array1 :: [1] u8;
 
-_dummy_array2 :: [1] s8;
+_dummy_array2 :: [1] u8;
 
-_dummy_array3 :: [1] s8;
+_dummy_array3 :: [1] u8;
 
-_dummy_array4 :: [1] s8;
+_dummy_array4 :: [1] u8;
 
-_dummy_array5 :: [1] s8;
+_dummy_array5 :: [1] u8;
 
-_dummy_array6 :: [1] s8;
+_dummy_array6 :: [1] u8;
 
-_dummy_array7 :: [1] s8;
+_dummy_array7 :: [1] u8;
 
-_dummy_array8 :: [1] s8;
+_dummy_array8 :: [1] u8;
 
 nk_draw_command :: struct {
 }
@@ -96,7 +96,7 @@ nk_recti :: struct {
     h: s16;
 }
 
-nk_glyph :: [4] s8;
+nk_glyph :: [4] u8;
 
 anon_struct_1 :: union {
     ptr: *void;
@@ -194,7 +194,7 @@ nk_plugin_filter :: #type (a0: *nk_text_edit, a1: nk_rune) -> s32 #c_callback;
 
 nk_plugin_paste :: #type (a0: nk_handle, a1: *nk_text_edit) -> void #c_callback;
 
-nk_plugin_copy :: #type (a0: nk_handle, a1: *s8, a2: s32) -> void #c_callback;
+nk_plugin_copy :: #type (a0: nk_handle, a1: *u8, a2: s32) -> void #c_callback;
 
 nk_allocator :: struct {
     userdata: nk_handle;
@@ -281,7 +281,7 @@ nk_input_button :: (unk0: *nk_context, unk1: nk_buttons, x: s32, y: s32, down: s
 
 nk_input_scroll :: (unk0: *nk_context, val: nk_vec2) -> void #foreign nuklear;
 
-nk_input_char :: (unk0: *nk_context, unk1: s8) -> void #foreign nuklear;
+nk_input_char :: (unk0: *nk_context, unk1: u8) -> void #foreign nuklear;
 
 nk_input_glyph :: (unk0: *nk_context, unk1: nk_glyph) -> void #foreign nuklear;
 
@@ -338,13 +338,13 @@ using nk_panel_flags :: enum s32 {
         NK_WINDOW_NO_INPUT :: 1024;
 }
 
-nk_begin :: (ctx: *nk_context, title: *s8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign nuklear;
+nk_begin :: (ctx: *nk_context, title: *u8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign nuklear;
 
-nk_begin_titled :: (ctx: *nk_context, name: *s8, title: *s8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign nuklear;
+nk_begin_titled :: (ctx: *nk_context, name: *u8, title: *u8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign nuklear;
 
 nk_end :: (ctx: *nk_context) -> void #foreign nuklear;
 
-nk_window_find :: (ctx: *nk_context, name: *s8) -> *nk_window #foreign nuklear;
+nk_window_find :: (ctx: *nk_context, name: *u8) -> *nk_window #foreign nuklear;
 
 nk_window_get_bounds :: (ctx: *nk_context) -> nk_rect #foreign nuklear;
 
@@ -372,35 +372,35 @@ nk_window_has_focus :: (unk0: *nk_context) -> s32 #foreign nuklear;
 
 nk_window_is_hovered :: (unk0: *nk_context) -> s32 #foreign nuklear;
 
-nk_window_is_collapsed :: (ctx: *nk_context, name: *s8) -> s32 #foreign nuklear;
+nk_window_is_collapsed :: (ctx: *nk_context, name: *u8) -> s32 #foreign nuklear;
 
-nk_window_is_closed :: (unk0: *nk_context, unk1: *s8) -> s32 #foreign nuklear;
+nk_window_is_closed :: (unk0: *nk_context, unk1: *u8) -> s32 #foreign nuklear;
 
-nk_window_is_hidden :: (unk0: *nk_context, unk1: *s8) -> s32 #foreign nuklear;
+nk_window_is_hidden :: (unk0: *nk_context, unk1: *u8) -> s32 #foreign nuklear;
 
-nk_window_is_active :: (unk0: *nk_context, unk1: *s8) -> s32 #foreign nuklear;
+nk_window_is_active :: (unk0: *nk_context, unk1: *u8) -> s32 #foreign nuklear;
 
 nk_window_is_any_hovered :: (unk0: *nk_context) -> s32 #foreign nuklear;
 
 nk_item_is_any_active :: (unk0: *nk_context) -> s32 #foreign nuklear;
 
-nk_window_set_bounds :: (unk0: *nk_context, name: *s8, bounds: nk_rect) -> void #foreign nuklear;
+nk_window_set_bounds :: (unk0: *nk_context, name: *u8, bounds: nk_rect) -> void #foreign nuklear;
 
-nk_window_set_position :: (unk0: *nk_context, name: *s8, pos: nk_vec2) -> void #foreign nuklear;
+nk_window_set_position :: (unk0: *nk_context, name: *u8, pos: nk_vec2) -> void #foreign nuklear;
 
-nk_window_set_size :: (unk0: *nk_context, name: *s8, unk1: nk_vec2) -> void #foreign nuklear;
+nk_window_set_size :: (unk0: *nk_context, name: *u8, unk1: nk_vec2) -> void #foreign nuklear;
 
-nk_window_set_focus :: (unk0: *nk_context, name: *s8) -> void #foreign nuklear;
+nk_window_set_focus :: (unk0: *nk_context, name: *u8) -> void #foreign nuklear;
 
-nk_window_close :: (ctx: *nk_context, name: *s8) -> void #foreign nuklear;
+nk_window_close :: (ctx: *nk_context, name: *u8) -> void #foreign nuklear;
 
-nk_window_collapse :: (unk0: *nk_context, name: *s8, state: nk_collapse_states) -> void #foreign nuklear;
+nk_window_collapse :: (unk0: *nk_context, name: *u8, state: nk_collapse_states) -> void #foreign nuklear;
 
-nk_window_collapse_if :: (unk0: *nk_context, name: *s8, unk1: nk_collapse_states, cond: s32) -> void #foreign nuklear;
+nk_window_collapse_if :: (unk0: *nk_context, name: *u8, unk1: nk_collapse_states, cond: s32) -> void #foreign nuklear;
 
-nk_window_show :: (unk0: *nk_context, name: *s8, unk1: nk_show_states) -> void #foreign nuklear;
+nk_window_show :: (unk0: *nk_context, name: *u8, unk1: nk_show_states) -> void #foreign nuklear;
 
-nk_window_show_if :: (unk0: *nk_context, name: *s8, unk1: nk_show_states, cond: s32) -> void #foreign nuklear;
+nk_window_show_if :: (unk0: *nk_context, name: *u8, unk1: nk_show_states, cond: s32) -> void #foreign nuklear;
 
 nk_layout_set_min_row_height :: (unk0: *nk_context, height: float32) -> void #foreign nuklear;
 
@@ -448,33 +448,33 @@ nk_layout_space_rect_to_screen :: (unk0: *nk_context, unk1: nk_rect) -> nk_rect 
 
 nk_layout_space_rect_to_local :: (unk0: *nk_context, unk1: nk_rect) -> nk_rect #foreign nuklear;
 
-nk_group_begin :: (unk0: *nk_context, title: *s8, unk1: nk_flags) -> s32 #foreign nuklear;
+nk_group_begin :: (unk0: *nk_context, title: *u8, unk1: nk_flags) -> s32 #foreign nuklear;
 
-nk_group_begin_titled :: (unk0: *nk_context, name: *s8, title: *s8, unk1: nk_flags) -> s32 #foreign nuklear;
+nk_group_begin_titled :: (unk0: *nk_context, name: *u8, title: *u8, unk1: nk_flags) -> s32 #foreign nuklear;
 
 nk_group_end :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_group_scrolled_offset_begin :: (unk0: *nk_context, x_offset: *nk_uint, y_offset: *nk_uint, title: *s8, flags: nk_flags) -> s32 #foreign nuklear;
+nk_group_scrolled_offset_begin :: (unk0: *nk_context, x_offset: *nk_uint, y_offset: *nk_uint, title: *u8, flags: nk_flags) -> s32 #foreign nuklear;
 
-nk_group_scrolled_begin :: (unk0: *nk_context, off: *nk_scroll, title: *s8, unk1: nk_flags) -> s32 #foreign nuklear;
+nk_group_scrolled_begin :: (unk0: *nk_context, off: *nk_scroll, title: *u8, unk1: nk_flags) -> s32 #foreign nuklear;
 
 nk_group_scrolled_end :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_tree_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, title: *s8, initial_state: nk_collapse_states, hash: *s8, len: s32, seed: s32) -> s32 #foreign nuklear;
+nk_tree_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, title: *u8, initial_state: nk_collapse_states, hash: *u8, len: s32, seed: s32) -> s32 #foreign nuklear;
 
-nk_tree_image_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, unk2: nk_image, title: *s8, initial_state: nk_collapse_states, hash: *s8, len: s32, seed: s32) -> s32 #foreign nuklear;
+nk_tree_image_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, unk2: nk_image, title: *u8, initial_state: nk_collapse_states, hash: *u8, len: s32, seed: s32) -> s32 #foreign nuklear;
 
 nk_tree_pop :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_tree_state_push :: (unk0: *nk_context, unk1: nk_tree_type, title: *s8, state: *nk_collapse_states) -> s32 #foreign nuklear;
+nk_tree_state_push :: (unk0: *nk_context, unk1: nk_tree_type, title: *u8, state: *nk_collapse_states) -> s32 #foreign nuklear;
 
-nk_tree_state_image_push :: (unk0: *nk_context, unk1: nk_tree_type, unk2: nk_image, title: *s8, state: *nk_collapse_states) -> s32 #foreign nuklear;
+nk_tree_state_image_push :: (unk0: *nk_context, unk1: nk_tree_type, unk2: nk_image, title: *u8, state: *nk_collapse_states) -> s32 #foreign nuklear;
 
 nk_tree_state_pop :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_tree_element_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, title: *s8, initial_state: nk_collapse_states, selected: *s32, hash: *s8, len: s32, seed: s32) -> s32 #foreign nuklear;
+nk_tree_element_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, title: *u8, initial_state: nk_collapse_states, selected: *s32, hash: *u8, len: s32, seed: s32) -> s32 #foreign nuklear;
 
-nk_tree_element_image_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, unk2: nk_image, title: *s8, initial_state: nk_collapse_states, selected: *s32, hash: *s8, len: s32, seed: s32) -> s32 #foreign nuklear;
+nk_tree_element_image_push_hashed :: (unk0: *nk_context, unk1: nk_tree_type, unk2: nk_image, title: *u8, initial_state: nk_collapse_states, selected: *s32, hash: *u8, len: s32, seed: s32) -> s32 #foreign nuklear;
 
 nk_tree_element_pop :: (unk0: *nk_context) -> void #foreign nuklear;
 
@@ -488,7 +488,7 @@ nk_list_view :: struct {
     scroll_value: nk_uint;
 }
 
-nk_list_view_begin :: (unk0: *nk_context, out: *nk_list_view, id: *s8, unk1: nk_flags, row_height: s32, row_count: s32) -> s32 #foreign nuklear;
+nk_list_view_begin :: (unk0: *nk_context, out: *nk_list_view, id: *u8, unk1: nk_flags, row_height: s32, row_count: s32) -> s32 #foreign nuklear;
 
 nk_list_view_end :: (unk0: *nk_list_view) -> void #foreign nuklear;
 
@@ -546,29 +546,29 @@ using nk_text_alignment :: enum s32 {
         NK_TEXT_RIGHT :: 20;
 }
 
-nk_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, unk3: nk_flags) -> void #foreign nuklear;
+nk_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, unk3: nk_flags) -> void #foreign nuklear;
 
-nk_text_colored :: (unk0: *nk_context, unk1: *s8, unk2: s32, unk3: nk_flags, unk4: nk_color) -> void #foreign nuklear;
+nk_text_colored :: (unk0: *nk_context, unk1: *u8, unk2: s32, unk3: nk_flags, unk4: nk_color) -> void #foreign nuklear;
 
-nk_text_wrap :: (unk0: *nk_context, unk1: *s8, unk2: s32) -> void #foreign nuklear;
+nk_text_wrap :: (unk0: *nk_context, unk1: *u8, unk2: s32) -> void #foreign nuklear;
 
-nk_text_wrap_colored :: (unk0: *nk_context, unk1: *s8, unk2: s32, unk3: nk_color) -> void #foreign nuklear;
+nk_text_wrap_colored :: (unk0: *nk_context, unk1: *u8, unk2: s32, unk3: nk_color) -> void #foreign nuklear;
 
-nk_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags) -> void #foreign nuklear;
+nk_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags) -> void #foreign nuklear;
 
-nk_label_colored :: (unk0: *nk_context, unk1: *s8, align: nk_flags, unk2: nk_color) -> void #foreign nuklear;
+nk_label_colored :: (unk0: *nk_context, unk1: *u8, align: nk_flags, unk2: nk_color) -> void #foreign nuklear;
 
-nk_label_wrap :: (unk0: *nk_context, unk1: *s8) -> void #foreign nuklear;
+nk_label_wrap :: (unk0: *nk_context, unk1: *u8) -> void #foreign nuklear;
 
-nk_label_colored_wrap :: (unk0: *nk_context, unk1: *s8, unk2: nk_color) -> void #foreign nuklear;
+nk_label_colored_wrap :: (unk0: *nk_context, unk1: *u8, unk2: nk_color) -> void #foreign nuklear;
 
 _nk_image :: (unk0: *nk_context, unk1: nk_image) -> void #foreign nuklear "nk_image";
 
 nk_image_color :: (unk0: *nk_context, unk1: nk_image, unk2: nk_color) -> void #foreign nuklear;
 
-nk_button_text :: (unk0: *nk_context, title: *s8, len: s32) -> s32 #foreign nuklear;
+nk_button_text :: (unk0: *nk_context, title: *u8, len: s32) -> s32 #foreign nuklear;
 
-nk_button_label :: (unk0: *nk_context, title: *s8) -> s32 #foreign nuklear;
+nk_button_label :: (unk0: *nk_context, title: *u8) -> s32 #foreign nuklear;
 
 nk_button_color :: (unk0: *nk_context, unk1: nk_color) -> s32 #foreign nuklear;
 
@@ -576,29 +576,29 @@ nk_button_symbol :: (unk0: *nk_context, unk1: nk_symbol_type) -> s32 #foreign nu
 
 nk_button_image :: (unk0: *nk_context, img: nk_image) -> s32 #foreign nuklear;
 
-nk_button_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, text_alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, text_alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_image_label :: (unk0: *nk_context, img: nk_image, unk1: *s8, text_alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_image_label :: (unk0: *nk_context, img: nk_image, unk1: *u8, text_alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_image_text :: (unk0: *nk_context, img: nk_image, unk1: *s8, unk2: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_image_text :: (unk0: *nk_context, img: nk_image, unk1: *u8, unk2: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_text_styled :: (unk0: *nk_context, unk1: *nk_style_button, title: *s8, len: s32) -> s32 #foreign nuklear;
+nk_button_text_styled :: (unk0: *nk_context, unk1: *nk_style_button, title: *u8, len: s32) -> s32 #foreign nuklear;
 
-nk_button_label_styled :: (unk0: *nk_context, unk1: *nk_style_button, title: *s8) -> s32 #foreign nuklear;
+nk_button_label_styled :: (unk0: *nk_context, unk1: *nk_style_button, title: *u8) -> s32 #foreign nuklear;
 
 nk_button_symbol_styled :: (unk0: *nk_context, unk1: *nk_style_button, unk2: nk_symbol_type) -> s32 #foreign nuklear;
 
 nk_button_image_styled :: (unk0: *nk_context, unk1: *nk_style_button, img: nk_image) -> s32 #foreign nuklear;
 
-nk_button_symbol_text_styled :: (unk0: *nk_context, unk1: *nk_style_button, unk2: nk_symbol_type, unk3: *s8, unk4: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_symbol_text_styled :: (unk0: *nk_context, unk1: *nk_style_button, unk2: nk_symbol_type, unk3: *u8, unk4: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_symbol_label_styled :: (ctx: *nk_context, style: *nk_style_button, symbol: nk_symbol_type, title: *s8, align: nk_flags) -> s32 #foreign nuklear;
+nk_button_symbol_label_styled :: (ctx: *nk_context, style: *nk_style_button, symbol: nk_symbol_type, title: *u8, align: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_image_label_styled :: (unk0: *nk_context, unk1: *nk_style_button, img: nk_image, unk2: *s8, text_alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_image_label_styled :: (unk0: *nk_context, unk1: *nk_style_button, img: nk_image, unk2: *u8, text_alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_button_image_text_styled :: (unk0: *nk_context, unk1: *nk_style_button, img: nk_image, unk2: *s8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_button_image_text_styled :: (unk0: *nk_context, unk1: *nk_style_button, img: nk_image, unk2: *u8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
 nk_button_set_behavior :: (unk0: *nk_context, unk1: nk_button_behavior) -> void #foreign nuklear;
 
@@ -606,53 +606,53 @@ nk_button_push_behavior :: (unk0: *nk_context, unk1: nk_button_behavior) -> s32 
 
 nk_button_pop_behavior :: (unk0: *nk_context) -> s32 #foreign nuklear;
 
-nk_check_label :: (unk0: *nk_context, unk1: *s8, active: s32) -> s32 #foreign nuklear;
+nk_check_label :: (unk0: *nk_context, unk1: *u8, active: s32) -> s32 #foreign nuklear;
 
-nk_check_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, active: s32) -> s32 #foreign nuklear;
+nk_check_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, active: s32) -> s32 #foreign nuklear;
 
-nk_check_flags_label :: (unk0: *nk_context, unk1: *s8, flags: u32, value: u32) -> u32 #foreign nuklear;
+nk_check_flags_label :: (unk0: *nk_context, unk1: *u8, flags: u32, value: u32) -> u32 #foreign nuklear;
 
-nk_check_flags_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, flags: u32, value: u32) -> u32 #foreign nuklear;
+nk_check_flags_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, flags: u32, value: u32) -> u32 #foreign nuklear;
 
-nk_checkbox_label :: (unk0: *nk_context, unk1: *s8, active: *s32) -> s32 #foreign nuklear;
+nk_checkbox_label :: (unk0: *nk_context, unk1: *u8, active: *s32) -> s32 #foreign nuklear;
 
-nk_checkbox_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, active: *s32) -> s32 #foreign nuklear;
+nk_checkbox_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, active: *s32) -> s32 #foreign nuklear;
 
-nk_checkbox_flags_label :: (unk0: *nk_context, unk1: *s8, flags: *u32, value: u32) -> s32 #foreign nuklear;
+nk_checkbox_flags_label :: (unk0: *nk_context, unk1: *u8, flags: *u32, value: u32) -> s32 #foreign nuklear;
 
-nk_checkbox_flags_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, flags: *u32, value: u32) -> s32 #foreign nuklear;
+nk_checkbox_flags_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, flags: *u32, value: u32) -> s32 #foreign nuklear;
 
-nk_radio_label :: (unk0: *nk_context, unk1: *s8, active: *s32) -> s32 #foreign nuklear;
+nk_radio_label :: (unk0: *nk_context, unk1: *u8, active: *s32) -> s32 #foreign nuklear;
 
-nk_radio_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, active: *s32) -> s32 #foreign nuklear;
+nk_radio_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, active: *s32) -> s32 #foreign nuklear;
 
-nk_option_label :: (unk0: *nk_context, unk1: *s8, active: s32) -> s32 #foreign nuklear;
+nk_option_label :: (unk0: *nk_context, unk1: *u8, active: s32) -> s32 #foreign nuklear;
 
-nk_option_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, active: s32) -> s32 #foreign nuklear;
+nk_option_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, active: s32) -> s32 #foreign nuklear;
 
-nk_selectable_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
+nk_selectable_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
 
-nk_selectable_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
+nk_selectable_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
 
-nk_selectable_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
+nk_selectable_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
 
-nk_selectable_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, unk3: s32, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
+nk_selectable_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, unk3: s32, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
 
-nk_selectable_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
+nk_selectable_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
 
-nk_selectable_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, unk3: s32, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
+nk_selectable_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, unk3: s32, align: nk_flags, value: *s32) -> s32 #foreign nuklear;
 
-nk_select_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags, value: s32) -> s32 #foreign nuklear;
+nk_select_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags, value: s32) -> s32 #foreign nuklear;
 
-nk_select_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, align: nk_flags, value: s32) -> s32 #foreign nuklear;
+nk_select_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, align: nk_flags, value: s32) -> s32 #foreign nuklear;
 
-nk_select_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, align: nk_flags, value: s32) -> s32 #foreign nuklear;
+nk_select_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, align: nk_flags, value: s32) -> s32 #foreign nuklear;
 
-nk_select_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, unk3: s32, align: nk_flags, value: s32) -> s32 #foreign nuklear;
+nk_select_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, unk3: s32, align: nk_flags, value: s32) -> s32 #foreign nuklear;
 
-nk_select_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, align: nk_flags, value: s32) -> s32 #foreign nuklear;
+nk_select_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, align: nk_flags, value: s32) -> s32 #foreign nuklear;
 
-nk_select_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, unk3: s32, align: nk_flags, value: s32) -> s32 #foreign nuklear;
+nk_select_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, unk3: s32, align: nk_flags, value: s32) -> s32 #foreign nuklear;
 
 nk_slide_float :: (unk0: *nk_context, min: float32, val: float32, max: float32, step: float32) -> float32 #foreign nuklear;
 
@@ -670,17 +670,17 @@ nk_color_picker :: (unk0: *nk_context, unk1: nk_colorf, unk2: nk_color_format) -
 
 nk_color_pick :: (unk0: *nk_context, unk1: *nk_colorf, unk2: nk_color_format) -> s32 #foreign nuklear;
 
-nk_property_int :: (unk0: *nk_context, name: *s8, min: s32, val: *s32, max: s32, step: s32, inc_per_pixel: float32) -> void #foreign nuklear;
+nk_property_int :: (unk0: *nk_context, name: *u8, min: s32, val: *s32, max: s32, step: s32, inc_per_pixel: float32) -> void #foreign nuklear;
 
-nk_property_float :: (unk0: *nk_context, name: *s8, min: float32, val: *float32, max: float32, step: float32, inc_per_pixel: float32) -> void #foreign nuklear;
+nk_property_float :: (unk0: *nk_context, name: *u8, min: float32, val: *float32, max: float32, step: float32, inc_per_pixel: float32) -> void #foreign nuklear;
 
-nk_property_double :: (unk0: *nk_context, name: *s8, min: float64, val: *float64, max: float64, step: float64, inc_per_pixel: float32) -> void #foreign nuklear;
+nk_property_double :: (unk0: *nk_context, name: *u8, min: float64, val: *float64, max: float64, step: float64, inc_per_pixel: float32) -> void #foreign nuklear;
 
-nk_propertyi :: (unk0: *nk_context, name: *s8, min: s32, val: s32, max: s32, step: s32, inc_per_pixel: float32) -> s32 #foreign nuklear;
+nk_propertyi :: (unk0: *nk_context, name: *u8, min: s32, val: s32, max: s32, step: s32, inc_per_pixel: float32) -> s32 #foreign nuklear;
 
-nk_propertyf :: (unk0: *nk_context, name: *s8, min: float32, val: float32, max: float32, step: float32, inc_per_pixel: float32) -> float32 #foreign nuklear;
+nk_propertyf :: (unk0: *nk_context, name: *u8, min: float32, val: float32, max: float32, step: float32, inc_per_pixel: float32) -> float32 #foreign nuklear;
 
-nk_propertyd :: (unk0: *nk_context, name: *s8, min: float64, val: float64, max: float64, step: float64, inc_per_pixel: float32) -> float64 #foreign nuklear;
+nk_propertyd :: (unk0: *nk_context, name: *u8, min: float64, val: float64, max: float64, step: float64, inc_per_pixel: float32) -> float64 #foreign nuklear;
 
 using nk_edit_flags :: enum s32 {
         NK_EDIT_DEFAULT :: 0;
@@ -713,9 +713,9 @@ using nk_edit_events :: enum s32 {
         NK_EDIT_COMMITED :: 16;
 }
 
-nk_edit_string :: (unk0: *nk_context, unk1: nk_flags, buffer: *s8, len: *s32, max: s32, unk2: nk_plugin_filter) -> nk_flags #foreign nuklear;
+nk_edit_string :: (unk0: *nk_context, unk1: nk_flags, buffer: *u8, len: *s32, max: s32, unk2: nk_plugin_filter) -> nk_flags #foreign nuklear;
 
-nk_edit_string_zero_terminated :: (unk0: *nk_context, unk1: nk_flags, buffer: *s8, max: s32, unk2: nk_plugin_filter) -> nk_flags #foreign nuklear;
+nk_edit_string_zero_terminated :: (unk0: *nk_context, unk1: nk_flags, buffer: *u8, max: s32, unk2: nk_plugin_filter) -> nk_flags #foreign nuklear;
 
 nk_edit_buffer :: (unk0: *nk_context, unk1: nk_flags, unk2: *nk_text_edit, unk3: nk_plugin_filter) -> nk_flags #foreign nuklear;
 
@@ -741,57 +741,57 @@ nk_plot :: (unk0: *nk_context, unk1: nk_chart_type, values: *float32, count: s32
 
 nk_plot_function :: (unk0: *nk_context, unk1: nk_chart_type, userdata: *void, value_getter: #type (a0: *void, a1: s32) -> float32 #c_callback, count: s32, offset: s32) -> void #foreign nuklear;
 
-nk_popup_begin :: (unk0: *nk_context, unk1: nk_popup_type, unk2: *s8, unk3: nk_flags, bounds: nk_rect) -> s32 #foreign nuklear;
+nk_popup_begin :: (unk0: *nk_context, unk1: nk_popup_type, unk2: *u8, unk3: nk_flags, bounds: nk_rect) -> s32 #foreign nuklear;
 
 nk_popup_close :: (unk0: *nk_context) -> void #foreign nuklear;
 
 nk_popup_end :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_combo :: (unk0: *nk_context, items: **s8, count: s32, selected: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo :: (unk0: *nk_context, items: **u8, count: s32, selected: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_separator :: (unk0: *nk_context, items_separated_by_separator: *s8, separator: s32, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_separator :: (unk0: *nk_context, items_separated_by_separator: *u8, separator: s32, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_string :: (unk0: *nk_context, items_separated_by_zeros: *s8, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_string :: (unk0: *nk_context, items_separated_by_zeros: *u8, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **s8) -> void #c_callback, userdata: *void, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **u8) -> void #c_callback, userdata: *void, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combobox :: (unk0: *nk_context, items: **s8, count: s32, selected: *s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
+nk_combobox :: (unk0: *nk_context, items: **u8, count: s32, selected: *s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
 
-nk_combobox_string :: (unk0: *nk_context, items_separated_by_zeros: *s8, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
+nk_combobox_string :: (unk0: *nk_context, items_separated_by_zeros: *u8, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
 
-nk_combobox_separator :: (unk0: *nk_context, items_separated_by_separator: *s8, separator: s32, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
+nk_combobox_separator :: (unk0: *nk_context, items_separated_by_separator: *u8, separator: s32, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
 
-nk_combobox_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **s8) -> void #c_callback, unk1: *void, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
+nk_combobox_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **u8) -> void #c_callback, unk1: *void, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign nuklear;
 
-nk_combo_begin_text :: (unk0: *nk_context, selected: *s8, unk1: s32, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_begin_text :: (unk0: *nk_context, selected: *u8, unk1: s32, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_begin_label :: (unk0: *nk_context, selected: *s8, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_begin_label :: (unk0: *nk_context, selected: *u8, size: nk_vec2) -> s32 #foreign nuklear;
 
 nk_combo_begin_color :: (unk0: *nk_context, color: nk_color, size: nk_vec2) -> s32 #foreign nuklear;
 
 nk_combo_begin_symbol :: (unk0: *nk_context, unk1: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_begin_symbol_label :: (unk0: *nk_context, selected: *s8, unk1: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_begin_symbol_label :: (unk0: *nk_context, selected: *u8, unk1: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_begin_symbol_text :: (unk0: *nk_context, selected: *s8, unk1: s32, unk2: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_begin_symbol_text :: (unk0: *nk_context, selected: *u8, unk1: s32, unk2: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
 
 nk_combo_begin_image :: (unk0: *nk_context, img: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_begin_image_label :: (unk0: *nk_context, selected: *s8, unk1: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_begin_image_label :: (unk0: *nk_context, selected: *u8, unk1: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_begin_image_text :: (unk0: *nk_context, selected: *s8, unk1: s32, unk2: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
+nk_combo_begin_image_text :: (unk0: *nk_context, selected: *u8, unk1: s32, unk2: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_combo_item_label :: (unk0: *nk_context, unk1: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_combo_item_label :: (unk0: *nk_context, unk1: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_combo_item_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_combo_item_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_combo_item_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_combo_item_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_combo_item_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_combo_item_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_combo_item_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_combo_item_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_combo_item_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_combo_item_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
 nk_combo_close :: (unk0: *nk_context) -> void #foreign nuklear;
 
@@ -799,23 +799,23 @@ nk_combo_end :: (unk0: *nk_context) -> void #foreign nuklear;
 
 nk_contextual_begin :: (unk0: *nk_context, unk1: nk_flags, unk2: nk_vec2, trigger_bounds: nk_rect) -> s32 #foreign nuklear;
 
-nk_contextual_item_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, align: nk_flags) -> s32 #foreign nuklear;
+nk_contextual_item_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, align: nk_flags) -> s32 #foreign nuklear;
 
-nk_contextual_item_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags) -> s32 #foreign nuklear;
+nk_contextual_item_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags) -> s32 #foreign nuklear;
 
-nk_contextual_item_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_contextual_item_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_contextual_item_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, len: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_contextual_item_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, len: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_contextual_item_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_contextual_item_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_contextual_item_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_contextual_item_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
 nk_contextual_close :: (unk0: *nk_context) -> void #foreign nuklear;
 
 nk_contextual_end :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_tooltip :: (unk0: *nk_context, unk1: *s8) -> void #foreign nuklear;
+nk_tooltip :: (unk0: *nk_context, unk1: *u8) -> void #foreign nuklear;
 
 nk_tooltip_begin :: (unk0: *nk_context, width: float32) -> s32 #foreign nuklear;
 
@@ -825,33 +825,33 @@ nk_menubar_begin :: (unk0: *nk_context) -> void #foreign nuklear;
 
 nk_menubar_end :: (unk0: *nk_context) -> void #foreign nuklear;
 
-nk_menu_begin_text :: (unk0: *nk_context, title: *s8, title_len: s32, align: nk_flags, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_text :: (unk0: *nk_context, title: *u8, title_len: s32, align: nk_flags, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_image :: (unk0: *nk_context, unk1: *s8, unk2: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_image :: (unk0: *nk_context, unk1: *u8, unk2: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_image_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, align: nk_flags, unk3: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_image_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, align: nk_flags, unk3: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_image_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags, unk2: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_image_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags, unk2: nk_image, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_symbol :: (unk0: *nk_context, unk1: *s8, unk2: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_symbol :: (unk0: *nk_context, unk1: *u8, unk2: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_symbol_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, align: nk_flags, unk3: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_symbol_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, align: nk_flags, unk3: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_begin_symbol_label :: (unk0: *nk_context, unk1: *s8, align: nk_flags, unk2: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
+nk_menu_begin_symbol_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags, unk2: nk_symbol_type, size: nk_vec2) -> s32 #foreign nuklear;
 
-nk_menu_item_text :: (unk0: *nk_context, unk1: *s8, unk2: s32, align: nk_flags) -> s32 #foreign nuklear;
+nk_menu_item_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, align: nk_flags) -> s32 #foreign nuklear;
 
-nk_menu_item_label :: (unk0: *nk_context, unk1: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_menu_item_label :: (unk0: *nk_context, unk1: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_menu_item_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_menu_item_image_label :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_menu_item_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *s8, len: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_menu_item_image_text :: (unk0: *nk_context, unk1: nk_image, unk2: *u8, len: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_menu_item_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_menu_item_symbol_text :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, unk3: s32, alignment: nk_flags) -> s32 #foreign nuklear;
 
-nk_menu_item_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *s8, alignment: nk_flags) -> s32 #foreign nuklear;
+nk_menu_item_symbol_label :: (unk0: *nk_context, unk1: nk_symbol_type, unk2: *u8, alignment: nk_flags) -> s32 #foreign nuklear;
 
 nk_menu_close :: (unk0: *nk_context) -> void #foreign nuklear;
 
@@ -908,7 +908,7 @@ nk_style_load_cursor :: (unk0: *nk_context, unk1: nk_style_cursor, unk2: *nk_cur
 
 nk_style_load_all_cursors :: (unk0: *nk_context, unk1: *nk_cursor) -> void #foreign nuklear;
 
-nk_style_get_color_by_name :: (unk0: nk_style_colors) -> *s8 #foreign nuklear;
+nk_style_get_color_by_name :: (unk0: nk_style_colors) -> *u8 #foreign nuklear;
 
 nk_style_set_font :: (unk0: *nk_context, unk1: *nk_user_font) -> void #foreign nuklear;
 
@@ -954,7 +954,7 @@ nk_rgb_fv :: (rgb: *float32) -> nk_color #foreign nuklear;
 
 nk_rgb_cf :: (c: nk_colorf) -> nk_color #foreign nuklear;
 
-nk_rgb_hex :: (rgb: *s8) -> nk_color #foreign nuklear;
+nk_rgb_hex :: (rgb: *u8) -> nk_color #foreign nuklear;
 
 nk_rgba :: (r: s32, g: s32, b: s32, a: s32) -> nk_color #foreign nuklear;
 
@@ -970,7 +970,7 @@ nk_rgba_fv :: (rgba: *float32) -> nk_color #foreign nuklear;
 
 nk_rgba_cf :: (c: nk_colorf) -> nk_color #foreign nuklear;
 
-nk_rgba_hex :: (rgb: *s8) -> nk_color #foreign nuklear;
+nk_rgba_hex :: (rgb: *u8) -> nk_color #foreign nuklear;
 
 nk_hsva_colorf :: (h: float32, s: float32, v: float32, a: float32) -> nk_colorf #foreign nuklear;
 
@@ -1012,9 +1012,9 @@ nk_color_dv :: (rgba_out: *float64, unk0: nk_color) -> void #foreign nuklear;
 
 nk_color_u32 :: (unk0: nk_color) -> nk_uint #foreign nuklear;
 
-nk_color_hex_rgba :: (output: *s8, unk0: nk_color) -> void #foreign nuklear;
+nk_color_hex_rgba :: (output: *u8, unk0: nk_color) -> void #foreign nuklear;
 
-nk_color_hex_rgb :: (output: *s8, unk0: nk_color) -> void #foreign nuklear;
+nk_color_hex_rgb :: (output: *u8, unk0: nk_color) -> void #foreign nuklear;
 
 nk_color_hsv_i :: (out_h: *s32, out_s: *s32, out_v: *s32, unk0: nk_color) -> void #foreign nuklear;
 
@@ -1086,36 +1086,36 @@ nk_rect_pos :: (unk0: nk_rect) -> nk_vec2 #foreign nuklear;
 
 nk_rect_size :: (unk0: nk_rect) -> nk_vec2 #foreign nuklear;
 
-nk_strlen :: (str: *s8) -> s32 #foreign nuklear;
+nk_strlen :: (str: *u8) -> s32 #foreign nuklear;
 
-nk_stricmp :: (s1: *s8, s2: *s8) -> s32 #foreign nuklear;
+nk_stricmp :: (s1: *u8, s2: *u8) -> s32 #foreign nuklear;
 
-nk_stricmpn :: (s1: *s8, s2: *s8, n: s32) -> s32 #foreign nuklear;
+nk_stricmpn :: (s1: *u8, s2: *u8, n: s32) -> s32 #foreign nuklear;
 
-nk_strtoi :: (str: *s8, endptr: **s8) -> s32 #foreign nuklear;
+nk_strtoi :: (str: *u8, endptr: **u8) -> s32 #foreign nuklear;
 
-nk_strtof :: (str: *s8, endptr: **s8) -> float32 #foreign nuklear;
+nk_strtof :: (str: *u8, endptr: **u8) -> float32 #foreign nuklear;
 
-nk_strtod :: (str: *s8, endptr: **s8) -> float64 #foreign nuklear;
+nk_strtod :: (str: *u8, endptr: **u8) -> float64 #foreign nuklear;
 
-nk_strfilter :: (text: *s8, regexp: *s8) -> s32 #foreign nuklear;
+nk_strfilter :: (text: *u8, regexp: *u8) -> s32 #foreign nuklear;
 
-nk_strmatch_fuzzy_string :: (str: *s8, pattern: *s8, out_score: *s32) -> s32 #foreign nuklear;
+nk_strmatch_fuzzy_string :: (str: *u8, pattern: *u8, out_score: *s32) -> s32 #foreign nuklear;
 
-nk_strmatch_fuzzy_text :: (txt: *s8, txt_len: s32, pattern: *s8, out_score: *s32) -> s32 #foreign nuklear;
+nk_strmatch_fuzzy_text :: (txt: *u8, txt_len: s32, pattern: *u8, out_score: *s32) -> s32 #foreign nuklear;
 
-nk_utf_decode :: (unk0: *s8, unk1: *nk_rune, unk2: s32) -> s32 #foreign nuklear;
+nk_utf_decode :: (unk0: *u8, unk1: *nk_rune, unk2: s32) -> s32 #foreign nuklear;
 
-nk_utf_encode :: (unk0: nk_rune, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_utf_encode :: (unk0: nk_rune, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_utf_len :: (unk0: *s8, byte_len: s32) -> s32 #foreign nuklear;
+nk_utf_len :: (unk0: *u8, byte_len: s32) -> s32 #foreign nuklear;
 
-nk_utf_at :: (buffer: *s8, length: s32, index: s32, unicode: *nk_rune, len: *s32) -> *s8 #foreign nuklear;
+nk_utf_at :: (buffer: *u8, length: s32, index: s32, unicode: *nk_rune, len: *s32) -> *u8 #foreign nuklear;
 
 nk_user_font_glyph :: struct {
 }
 
-nk_text_width_f :: #type (a0: nk_handle, a1: float32, a2: *s8, a3: s32) -> float32 #c_callback;
+nk_text_width_f :: #type (a0: nk_handle, a1: float32, a2: *u8, a3: s32) -> float32 #c_callback;
 
 nk_query_font_glyph_f :: #type (a0: nk_handle, a1: float32, a2: *nk_user_font_glyph, a3: nk_rune, a4: nk_rune) -> void #c_callback;
 
@@ -1202,29 +1202,29 @@ nk_str_clear :: (unk0: *nk_str) -> void #foreign nuklear;
 
 nk_str_free :: (unk0: *nk_str) -> void #foreign nuklear;
 
-nk_str_append_text_char :: (unk0: *nk_str, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_str_append_text_char :: (unk0: *nk_str, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_str_append_str_char :: (unk0: *nk_str, unk1: *s8) -> s32 #foreign nuklear;
+nk_str_append_str_char :: (unk0: *nk_str, unk1: *u8) -> s32 #foreign nuklear;
 
-nk_str_append_text_utf8 :: (unk0: *nk_str, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_str_append_text_utf8 :: (unk0: *nk_str, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_str_append_str_utf8 :: (unk0: *nk_str, unk1: *s8) -> s32 #foreign nuklear;
+nk_str_append_str_utf8 :: (unk0: *nk_str, unk1: *u8) -> s32 #foreign nuklear;
 
 nk_str_append_text_runes :: (unk0: *nk_str, unk1: *nk_rune, unk2: s32) -> s32 #foreign nuklear;
 
 nk_str_append_str_runes :: (unk0: *nk_str, unk1: *nk_rune) -> s32 #foreign nuklear;
 
-nk_str_insert_at_char :: (unk0: *nk_str, pos: s32, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_str_insert_at_char :: (unk0: *nk_str, pos: s32, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_str_insert_at_rune :: (unk0: *nk_str, pos: s32, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_str_insert_at_rune :: (unk0: *nk_str, pos: s32, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_str_insert_text_char :: (unk0: *nk_str, pos: s32, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_str_insert_text_char :: (unk0: *nk_str, pos: s32, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_str_insert_str_char :: (unk0: *nk_str, pos: s32, unk1: *s8) -> s32 #foreign nuklear;
+nk_str_insert_str_char :: (unk0: *nk_str, pos: s32, unk1: *u8) -> s32 #foreign nuklear;
 
-nk_str_insert_text_utf8 :: (unk0: *nk_str, pos: s32, unk1: *s8, unk2: s32) -> s32 #foreign nuklear;
+nk_str_insert_text_utf8 :: (unk0: *nk_str, pos: s32, unk1: *u8, unk2: s32) -> s32 #foreign nuklear;
 
-nk_str_insert_str_utf8 :: (unk0: *nk_str, pos: s32, unk1: *s8) -> s32 #foreign nuklear;
+nk_str_insert_str_utf8 :: (unk0: *nk_str, pos: s32, unk1: *u8) -> s32 #foreign nuklear;
 
 nk_str_insert_text_runes :: (unk0: *nk_str, pos: s32, unk1: *nk_rune, unk2: s32) -> s32 #foreign nuklear;
 
@@ -1238,19 +1238,19 @@ nk_str_delete_chars :: (unk0: *nk_str, pos: s32, len: s32) -> void #foreign nukl
 
 nk_str_delete_runes :: (unk0: *nk_str, pos: s32, len: s32) -> void #foreign nuklear;
 
-nk_str_at_char :: (unk0: *nk_str, pos: s32) -> *s8 #foreign nuklear;
+nk_str_at_char :: (unk0: *nk_str, pos: s32) -> *u8 #foreign nuklear;
 
-nk_str_at_rune :: (unk0: *nk_str, pos: s32, unicode: *nk_rune, len: *s32) -> *s8 #foreign nuklear;
+nk_str_at_rune :: (unk0: *nk_str, pos: s32, unicode: *nk_rune, len: *s32) -> *u8 #foreign nuklear;
 
 nk_str_rune_at :: (unk0: *nk_str, pos: s32) -> nk_rune #foreign nuklear;
 
-nk_str_at_char_const :: (unk0: *nk_str, pos: s32) -> *s8 #foreign nuklear;
+nk_str_at_char_const :: (unk0: *nk_str, pos: s32) -> *u8 #foreign nuklear;
 
-nk_str_at_const :: (unk0: *nk_str, pos: s32, unicode: *nk_rune, len: *s32) -> *s8 #foreign nuklear;
+nk_str_at_const :: (unk0: *nk_str, pos: s32, unicode: *nk_rune, len: *s32) -> *u8 #foreign nuklear;
 
-nk_str_get :: (unk0: *nk_str) -> *s8 #foreign nuklear;
+nk_str_get :: (unk0: *nk_str) -> *u8 #foreign nuklear;
 
-nk_str_get_const :: (unk0: *nk_str) -> *s8 #foreign nuklear;
+nk_str_get_const :: (unk0: *nk_str) -> *u8 #foreign nuklear;
 
 nk_str_len :: (unk0: *nk_str) -> s32 #foreign nuklear;
 
@@ -1328,7 +1328,7 @@ nk_textedit_init_fixed :: (unk0: *nk_text_edit, memory: *void, size: nk_size) ->
 
 nk_textedit_free :: (unk0: *nk_text_edit) -> void #foreign nuklear;
 
-nk_textedit_text :: (unk0: *nk_text_edit, unk1: *s8, total_len: s32) -> void #foreign nuklear;
+nk_textedit_text :: (unk0: *nk_text_edit, unk1: *u8, total_len: s32) -> void #foreign nuklear;
 
 nk_textedit_delete :: (unk0: *nk_text_edit, where: s32, len: s32) -> void #foreign nuklear;
 
@@ -1338,7 +1338,7 @@ nk_textedit_select_all :: (unk0: *nk_text_edit) -> void #foreign nuklear;
 
 nk_textedit_cut :: (unk0: *nk_text_edit) -> s32 #foreign nuklear;
 
-nk_textedit_paste :: (unk0: *nk_text_edit, unk1: *s8, len: s32) -> s32 #foreign nuklear;
+nk_textedit_paste :: (unk0: *nk_text_edit, unk1: *u8, len: s32) -> s32 #foreign nuklear;
 
 nk_textedit_undo :: (unk0: *nk_text_edit) -> void #foreign nuklear;
 
@@ -1540,7 +1540,7 @@ nk_command_text :: struct {
     h: u16;
     height: float32;
     length: s32;
-    string: [1] s8;
+    string: [1] u8;
 }
 
 using nk_command_clipping :: enum s32 {
@@ -1588,7 +1588,7 @@ nk_fill_polygon :: (unk0: *nk_command_buffer, unk1: *float32, point_count: s32, 
 
 nk_draw_image :: (unk0: *nk_command_buffer, unk1: nk_rect, unk2: *nk_image, unk3: nk_color) -> void #foreign nuklear;
 
-nk_draw_text :: (unk0: *nk_command_buffer, unk1: nk_rect, text: *s8, len: s32, unk2: *nk_user_font, unk3: nk_color, unk4: nk_color) -> void #foreign nuklear;
+nk_draw_text :: (unk0: *nk_command_buffer, unk1: nk_rect, text: *u8, len: s32, unk2: *nk_user_font, unk3: nk_color, unk4: nk_color) -> void #foreign nuklear;
 
 nk_push_scissor :: (unk0: *nk_command_buffer, unk1: nk_rect) -> void #foreign nuklear;
 
@@ -1618,7 +1618,7 @@ nk_key :: struct {
 
 nk_keyboard :: struct {
     keys: [30] nk_key;
-    text: [16] s8;
+    text: [16] u8;
     text_len: s32;
 }
 
@@ -2140,7 +2140,7 @@ nk_edit_state :: struct {
 nk_property_state :: struct {
     active: s32;
     prev: s32;
-    buffer: [64] s8;
+    buffer: [64] u8;
     length: s32;
     cursor: s32;
     select_start: s32;
@@ -2154,7 +2154,7 @@ nk_property_state :: struct {
 nk_window :: struct {
     seq: u32;
     name: nk_hash;
-    name_string: [64] s8;
+    name_string: [64] u8;
     flags: nk_flags;
     bounds: nk_rect;
     scrollbar: nk_scroll;
