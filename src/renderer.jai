@@ -716,6 +716,86 @@ draw_circle :: (using rdr: GL_Renderer, x: float, y: float, radius: float, color
     glDisable(GL_BLEND);
 }
 
+draw_line :: (using rdr: GL_Renderer, v1: Vector2, v2: Vector2, color: Color, thickness := 1.0) {
+    draw_line(rdr, v1.x, v1.y, v2.x, v2.y, color, thickness);
+}
+
+draw_line :: (using rdr: GL_Renderer, x1: float, y1: float, x2: float, y2: float, color: Color, thickness := 1.0) {
+    glLineWidth(thickness);
+
+    glUseProgram(render_rect.id);
+    update_matrices(rdr, matrix_identity(), render_rect);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    arr: [2] Vector2;
+    arr[0] = make_Vector2(x1,  y1);
+    arr[1] = make_Vector2(x2, y2);
+
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vector2), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttrib4f(1, color.r, color.g, color.b, color.a);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, null);
+
+    glDrawArrays(GL_LINES, 0, xx arr.count);
+    
+    glDisableVertexAttribArray(0);
+    glDeleteBuffers(1, *buf);
+
+    glDisable(GL_BLEND);
+}
+
+draw_rect_outline :: (using rdr: GL_Renderer, rect: Rectangle, color: Color) {
+    x := rect.x;
+    y := rect.y;
+    width := rect.width;
+    height := rect.height;
+
+    draw_rect(rdr, x, y, width, height, color);
+}
+
+draw_rect_outline :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color) {
+    glUseProgram(render_rect.id);
+    update_matrices(rdr, matrix_identity(), render_rect);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    xw := x+width;
+    yh := y+height;
+
+    arr: [4] Vector2;
+    arr[0] = make_Vector2(x,  y);
+    arr[1] = make_Vector2(xw, y);    
+    arr[2] = make_Vector2(xw, yh);
+    arr[3] = make_Vector2(x, yh);
+
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vector2), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttrib4f(1, color.r, color.g, color.b, color.a);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, null);
+
+    glDrawArrays(GL_LINE_LOOP, 0, xx arr.count);
+    
+    glDisableVertexAttribArray(0);
+    glDeleteBuffers(1, *buf);
+
+    glDisable(GL_BLEND);
+}
+
 draw_rect :: (using rdr: GL_Renderer, rect: Rectangle, color: Color) {
     x := rect.x;
     y := rect.y;
@@ -723,6 +803,89 @@ draw_rect :: (using rdr: GL_Renderer, rect: Rectangle, color: Color) {
     height := rect.height;
 
     draw_rect(rdr, x, y, width, height, color);
+}
+
+draw_rect_multi_color :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, left: Color, right: Color, top: Color, bottom: Color) {
+    glUseProgram(render_rect.id);
+    update_matrices(rdr, matrix_identity(), render_rect);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    operator* :: (a: Color, value: float) -> Color {
+        o: Color = ---;
+        o.r = a.r * value;
+        o.g = a.g * value;
+        o.b = a.b * value;
+        o.a = a.a * value;
+        return o;
+    }
+    operator+ :: (a: Color, b: Color) -> Color {
+        o: Color = ---;
+        o.r = a.r + b.r;
+        o.g = a.g + b.g;
+        o.b = a.b + b.b;
+        o.a = a.a + b.a;
+        return o;
+    }
+    mix :: (a: Color, b: Color, v := 0.5) -> Color {
+        return (a + b) * 0.5;
+    }
+
+    // top_left := mix(top, left);
+    // bottom_left := mix(bottom, left);
+    // top_right := mix(top, right);
+    // bottom_right := mix(bottom, right);
+
+    top_left := bottom;
+    bottom_left := left;
+    top_right := right;
+    bottom_right := top;
+
+    xw := x+width;
+    yh := y+height;
+
+    Vertex :: struct {
+        p: Vector2;
+        color: Color;
+    }
+
+    arr: [6] Vertex;
+    arr[0].p = make_Vector2(xw, yh);    
+    arr[1].p = make_Vector2(xw, y);
+    arr[2].p = make_Vector2(x,  y);
+    arr[3].p = make_Vector2(xw, yh);
+    arr[4].p = make_Vector2(x,  y);
+    arr[5].p = make_Vector2(x,  yh);
+
+    arr[0].color = top_right;    
+    arr[1].color = bottom_right;
+    arr[2].color = bottom_left;
+    arr[3].color = top_right;
+    arr[4].color = bottom_left;
+    arr[5].color = top_left;
+
+    // for *arr it.color.a = 1.0; 
+
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vertex), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(Vertex), null);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, size_of(Vertex), cast(*void) size_of(Vector2));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    glDeleteBuffers(1, *buf);
+
+    glDisable(GL_BLEND);
 }
 
 draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color) {

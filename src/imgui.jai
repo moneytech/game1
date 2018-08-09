@@ -20,16 +20,15 @@ iterator_get_value :: (i: *Nk_Command_Iterator) -> *nk_command, bool {
     return cmd, cmd != null;
 }
 
+make_Color :: (col: nk_colorf) -> Color {
+    r := col.r;
+    g := col.g;
+    b := col.b;
+    a := col.a;
+    return make_Color(r, g, b, a);
+}
 
 render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
-    make_Color :: (col: nk_colorf) -> Color {
-        r := col.r;
-        g := col.g;
-        b := col.b;
-        a := col.a;
-        return make_Color(r, g, b, a);
-    }
-
     for ctx {
         if it.type == {
             case NK_COMMAND_RECT_FILLED;
@@ -37,6 +36,25 @@ render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
                 c := nk_color_cf(rect.color);
                 color := make_Color(c);
                 draw_rect(<<renderer, cast(float) rect.x, cast(float) rect.y, cast(float) rect.w, cast(float) rect.h, color);
+            case NK_COMMAND_RECT_MULTI_COLOR;
+                rect := cast(*nk_command_rect_multi_color) it;
+                left := make_Color(nk_color_cf(rect.left));
+                right := make_Color(nk_color_cf(rect.right));
+                bottom := make_Color(nk_color_cf(rect.bottom));
+                top := make_Color(nk_color_cf(rect.top));
+
+                // print("left: %\n", left);
+                // print("right: %\n", right);
+                // print("top: %\n", top);
+                // print("bottom: %\n", bottom);
+                // if bottom.r == 0 && bottom.g == 0 && bottom.b == 0 then assert(false);
+
+                draw_rect_multi_color(<<renderer, cast(float) rect.x, cast(float) rect.y, cast(float) rect.w, cast(float) rect.h, left, right, top, bottom);
+            case NK_COMMAND_RECT;
+                rect := cast(*nk_command_rect) it;
+                c := nk_color_cf(rect.color);
+                color := make_Color(c);
+                draw_rect_outline(<<renderer, cast(float) rect.x, cast(float) rect.y, cast(float) rect.w, cast(float) rect.h, color);
             case NK_COMMAND_TEXT;
                 tex := cast(*nk_command_text) it;
                 color := make_Color(nk_color_cf(tex.foreground));
@@ -50,6 +68,27 @@ render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
                 assert(circ.w == circ.h);
                 c := nk_color_cf(circ.color);
                 draw_circle(<<renderer, cast(float) circ.x, cast(float) circ.y, cast(float) circ.w / 2, make_Color(c));
+            case NK_COMMAND_LINE;
+                line := cast(*nk_command_line) it;
+                make_Vector2 :: (v: nk_vec2i) -> Vector2 {
+                    return make_Vector2(cast(float) v.x, cast(float) v.y);
+                }
+                v1 := make_Vector2(line.begin);
+                v2 := make_Vector2(line.end);
+                c := nk_color_cf(line.color);
+                draw_line(<<renderer, v1, v2, make_Color(c), cast(float) line.line_thickness);
+            case NK_COMMAND_SCISSOR;
+                sci := cast(*nk_command_scissor) it;
+                v := make_Viewport(sci.x, sci.y, sci.w, sci.h);
+                if sci.x == -8192 then
+                    disable_scissor();
+                else {
+                    off := v.y + cast(s32) v.h;
+                    if renderer.current_frame_buffer then v.y = cast(s32) renderer.current_frame_buffer.viewport.h - off;
+                    else v.y = cast(s32) renderer.game.window.height - off;
+
+                    enable_scissor(v);
+                }
             case;
                 print("cmd: %\n", it.type);
         }

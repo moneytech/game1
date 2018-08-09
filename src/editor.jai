@@ -128,6 +128,34 @@ draw_scene_with_pick_id :: (rdr: *GL_Renderer, sc: Scene) {
 
 
 update_editor :: (game: *Game, dt: float) {
+    input_intercepted := false;
+    if selected_game_object {
+        using game;
+        actor := cast(*Actor) selected_game_object;
+
+        if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 220, 220), xx
+            (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+            /* fixed widget pixel width */
+            nk_layout_row_dynamic(*nuklear, 100, 1);
+            to_nk_colorf :: (c: Color) -> nk_colorf {
+                out: nk_colorf;
+                out.r = c.r;
+                out.g = c.g;
+                out.b = c.b;
+                out.a = c.a;
+                return out;
+            }
+            col := nk_color_picker(*nuklear, to_nk_colorf(actor.model.meshes[0].material.diffuse), NK_RGB);
+            actor.model.meshes[0].material.diffuse = make_Color(col);
+        }
+        if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
+            input_intercepted = true;
+        }
+        nk_end(*nuklear);
+    }
+
+    if input_intercepted return;
+
     game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
     x, y, success := get_mouse_pointer_position(true);
     if !success return;
@@ -395,18 +423,7 @@ render_editor :: (using game: *Game) {
     // draw_textured_rect(<<renderer, water_refract_frame_buffer.color_texture, 0, 0.25, 0.25, 0.25);
 
     renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
-    // draw_rect(<<renderer, 0, 0, 500, font.char_height*6, make_Color(0.2, 0.2, 0.2), 0.5);
-    
-    // h := font.char_height*0.75;
-    // draw_text(<<renderer, <<font, 0, h+font.char_height*0, "Current Tool: %", current_tool_mode);
-    // draw_text(<<renderer, <<font, 0, h+font.char_height*1, "Brush Radius: %", tool_brush_radius);
-    // draw_text(<<renderer, <<font, 0, h+font.char_height*2, "Add/Sub Vector: %", tool_brush_add_sub_vector);
-    // draw_text(<<renderer, <<font, 0, h+font.char_height*3, "Show line mesh: %", draw_line_overlay);
 
-    // r := texture_paint_color & 0xFF;
-    // g := (texture_paint_color >> 8) & 0xFF;
-    // b := (texture_paint_color >> 16) & 0xFF;
-    // a := (texture_paint_color >> 24) & 0xFF;
-    // draw_text(<<renderer, <<font, 0, h+font.char_height*4, "Texture Paint Color: %,%,%,%", r, g, b, a);
-    // draw_text(<<renderer, <<font, 0, h+font.char_height*5, "Under cursor: %", under_cursor);
+    render_imgui(game.renderer, *nuklear);
+    nk_clear(*nuklear);
 }

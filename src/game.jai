@@ -11,6 +11,8 @@ Game :: struct {
     current_scene: *Scene;
     text_strings: [..] string;
 
+    nuklear: nk_context;
+
     fov: float = 60;
 
     water_dudv_texture: *Texture;
@@ -349,6 +351,24 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     // os_set_vsync(game.vr.session == null);
     os_set_vsync(false);
 
+
+    nuklear_text_width_calc :: (handle: nk_handle, height: float, text: *u8, len: s32) -> float #c_callback {
+        ft := cast(*Font) handle.ptr;
+        str := to_string(text, len);
+
+        ctx: Context;
+        push_context ctx {
+            return font_get_length(<<ft, str);
+        }
+    }
+
+    nuklear_font := New(nk_user_font);
+    nuklear_font.userdata.ptr = font;
+    nuklear_font.height = font.char_height;
+    nuklear_font.width = nuklear_text_width_calc;
+
+    MAX_MEMORY :: 0x1000000;
+    nk_init_fixed(*game.nuklear, alloc(MAX_MEMORY), MAX_MEMORY, nuklear_font);
     return game;
 }
 
