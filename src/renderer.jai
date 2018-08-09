@@ -166,13 +166,15 @@ Color :: struct {
     r: float;
     g: float;
     b: float;
+    a: float;
 };
 
-make_Color :: (r: float, g: float, b: float) -> Color {
+make_Color :: (r: float, g: float, b: float, a := 1.0) -> Color {
     c: Color = ---;
     c.r = r;
     c.g = g;
     c.b = b;
+    c.a = a;
     return c;
 }
 
@@ -670,21 +672,62 @@ disable_scissor :: () {
     glDisable(GL_SCISSOR_TEST);
 }
 
-draw_rect :: (using rdr: GL_Renderer, rect: Rectangle, color: Color, alpha := 1.0) {
+draw_circle :: (using rdr: GL_Renderer, x: float, y: float, radius: float, color: Color) {
+    glUseProgram(render_rect.id);
+    update_matrices(rdr, matrix_identity(), render_rect);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    arr: [..] Vector2;
+    defer array_reset(*arr);
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+
+    NUM_PIECES :: 60;
+    step := TAU / cast(float) NUM_PIECES;
+    for 0..NUM_PIECES-1 {
+        current := it * step;
+        x2, y2 := sin(current) * radius + x, cos(current) * radius + y;
+        next := current + step;
+        x3, y3 := sin(next) * radius + x, cos(next) * radius + y;
+
+        array_add(*arr, make_Vector2(x  + radius, y  + radius));
+        array_add(*arr, make_Vector2(x2 + radius, y2 + radius));
+        array_add(*arr, make_Vector2(x3 + radius, y3 + radius));
+    }
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vector2), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttrib4f(1, color.r, color.g, color.b, color.a);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, null);
+
+    glDrawArrays(GL_TRIANGLES, 0, xx arr.count);
+    
+    glDisableVertexAttribArray(0);
+    glDeleteBuffers(1, *buf);
+
+    glDisable(GL_BLEND);
+}
+
+draw_rect :: (using rdr: GL_Renderer, rect: Rectangle, color: Color) {
     x := rect.x;
     y := rect.y;
     width := rect.width;
     height := rect.height;
 
-    draw_rect(rdr, x, y, width, height, color, alpha);
+    draw_rect(rdr, x, y, width, height, color);
 }
 
-draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color, alpha := 1.0) {
+draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color) {
     glUseProgram(render_rect.id);
     update_matrices(rdr, matrix_identity(), render_rect);
-
-    al := glGetUniformLocation(render_rect.id, "alpha");
-    glUniform1f(al, alpha);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -707,7 +750,7 @@ draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: 
     glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vector2), arr.data, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttrib3f(1, color.r, color.g, color.b);
+    glVertexAttrib4f(1, color.r, color.g, color.b, color.a);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, null);
 
@@ -895,7 +938,7 @@ draw_text :: (using rdr: GL_Renderer, font: Font, x: float, y: float, text: stri
 
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-    glVertexAttrib3f(2, color.r, color.g, color.b);
+    glVertexAttrib4f(2, color.r, color.g, color.b, color.a);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, size_of(Temp_Vertex_Array), null);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, size_of(Temp_Vertex_Array), cast(*void) size_of(Vector2));
@@ -1172,7 +1215,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
 
     if m.colors.count && !mat.disable_vertex_colors {
         glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size+tangent_size));
     } else {
         glVertexAttrib3f(4, 1, 1, 1); // this will just get multiplied by the material color
     }

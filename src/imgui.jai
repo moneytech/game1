@@ -27,7 +27,7 @@ render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
         g := col.g;
         b := col.b;
         a := col.a;
-        return make_Color(r, g, b);
+        return make_Color(r, g, b, a);
     }
 
     for ctx {
@@ -36,7 +36,7 @@ render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
                 rect := cast(*nk_command_rect_filled) it;
                 c := nk_color_cf(rect.color);
                 color := make_Color(c);
-                draw_rect(<<renderer, cast(float) rect.x, cast(float) rect.y, cast(float) rect.w, cast(float) rect.h, color, c.a);
+                draw_rect(<<renderer, cast(float) rect.x, cast(float) rect.y, cast(float) rect.w, cast(float) rect.h, color);
             case NK_COMMAND_TEXT;
                 tex := cast(*nk_command_text) it;
                 color := make_Color(nk_color_cf(tex.foreground));
@@ -45,6 +45,11 @@ render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
                 text.count = tex.length;
                 text.data = tex.string.data;
                 draw_text(<<renderer, <<font, cast(float) tex.x, cast(float) tex.y + (font.char_height * 3) / 4, text, color=color);
+            case NK_COMMAND_CIRCLE_FILLED;
+                circ := cast(*nk_command_circle_filled) it;
+                assert(circ.w == circ.h);
+                c := nk_color_cf(circ.color);
+                draw_circle(<<renderer, cast(float) circ.x, cast(float) circ.y, cast(float) circ.w / 2, make_Color(c));
             case;
                 print("cmd: %\n", it.type);
         }
