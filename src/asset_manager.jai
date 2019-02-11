@@ -1,5 +1,6 @@
 #import "Basic";
 #import "File";
+#import "String";
 
 Asset_Manager :: struct {
     textures: Hash_Map(#type *Texture);
@@ -17,7 +18,7 @@ Shader_Info :: struct {
 };
 
 Material_Lib :: struct {
-    using map: Hash_Map(#type *Material);
+    using _map: Hash_Map(#type *Material);
 }
 // Material_Lib :: Hash_Map(#type (*Material));
 
@@ -187,7 +188,7 @@ maybe_calc_tangent_normals :: (using m: *Mesh) {
 }
 
 path_of :: (filepath: string) -> string {
-    return strip_path_filename(filepath);
+    return path_strip_filename(filepath);
 }
 
 ml_get_signed_float :: (st: *ML_State, tok: *ML_Token) -> float {

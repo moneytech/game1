@@ -3,11 +3,14 @@
 #import "GL";
 #import "Compiler";
 #import "Window_Creation";
+#import "Input";
 
 #scope_file
 User32   :: #foreign_system_library "user32";
 Kernel32 :: #foreign_system_library "kernel32";
 crt :: #foreign_system_library "msvcrt";
+
+#import "Windows";
 
 GetOverlappedResult :: (hFile: HANDLE, lpOverlapped: *OVERLAPPED, lpNumberOfBytesTrasferred: *s32, bWait: BOOL) -> BOOL #foreign Kernel32;
 LoadLibraryA :: (lpFileName: *u8) -> HMODULE #foreign Kernel32;

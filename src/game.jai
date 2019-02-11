@@ -279,13 +279,13 @@ init_game :: (window_title: string, options: ..string) -> *Game {
 
     orig_wd: string;
     if running_at_compile_time() {
-        orig_wd = get_current_directory(); // @Leak ?
+        orig_wd = get_working_directory(); // @Leak ?
         opts := get_build_options();
-        setcwd(opts.output_path);
+        set_working_directory(opts.output_path);
     } else {
         path := get_path_of_running_executable();
-        final_path := strip_path_filename(path);
-        setcwd(final_path);
+        final_path := path_strip_filename(path);
+        set_working_directory(final_path);
     }
     os_watch_dir("assets");
     os_watch_dir("assets/shaders");
@@ -597,7 +597,9 @@ hash_key :: (str: string) -> u32 {
     return hash;
 }
 
-contains_key :: (using map: *Hash_Map, str: string) -> bool {
+// @TODO @FixMe remove the dollar signs here once bug261 is fixed.
+
+contains_key :: (using map: *$Hash_Map, str: string) -> bool {
     slot := hash_key(str) & (table_size-1);
     e := *table[slot];
 
@@ -613,7 +615,7 @@ contains_key :: (using map: *Hash_Map, str: string) -> bool {
     return e.key.count != 0;
 }
 
-get_slot :: (using map: *Hash_Map, str: string) -> map.Value_Type {
+get_slot :: (using map: *$Hash_Map, str: string) -> map.Value_Type {
     slot := hash_key(str) & (table_size-1);
     e := *table[slot];
 
@@ -640,7 +642,7 @@ get_slot :: (using map: *Hash_Map, str: string) -> map.Value_Type {
     return e.value;
 }
 
-set_slot :: (using map: *Hash_Map, str: string, val: map.Value_Type) {
+set_slot :: (using map: *$Hash_Map, str: string, val: map.Value_Type) {
     slot := hash_key(str) & (table_size-1);
     e := *table[slot];
 

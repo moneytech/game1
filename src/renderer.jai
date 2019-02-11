@@ -1,6 +1,5 @@
 
 #load "stb.jai";
-#load "math.jai";
 #import "GL";
 
 #scope_file

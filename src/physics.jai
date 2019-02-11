@@ -1,6 +1,4 @@
 
-#load "math.jai";
-
 Rigid_Body :: struct {
     inverse_mass: float;
 

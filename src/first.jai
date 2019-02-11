@@ -3,6 +3,8 @@
 #import "Compiler";
 #import "File";
 #import "File_Utilities";
+#import "String";
+#import "Windows";
 
 ENGINE_SRC_PATH :: #filepath;
 
@@ -18,7 +20,7 @@ copy_engine_assets_to :: (path: string) {
         advance(*relative_path, paths[0].count);
         out_path := concatenate(paths[1], "/", relative_path);
         // print("out: %\n", out_path);
-        make_directory_if_it_does_not_exist(strip_path_filename(out_path));
+        make_directory_if_it_does_not_exist(path_strip_filename(out_path));
         copy_file(full_name, out_path);
     }
 
@@ -67,12 +69,21 @@ setup_build :: (output_path: string) -> Build_Options {
     C_compiler_build_target(<< miniz_lib);
     C_compiler_build_target(<< nuklear_lib);
 
-    compiler_add_library_search_directory(options.output_path);
+    // compiler_add_library_search_directory(options.output_path);
 
     return options;
 };
 
 add_engine_to_workspace :: (w: Workspace) {
+    LIBS :: #string DONE
+    libnuklear :: #foreign_library "/run_tree/nuklear";
+    LibOVR :: #foreign_library "/run_tree/libOVR_out";
+    stb :: #foreign_library "/run_tree/stb";
+    miniz :: #foreign_library "/run_tree/miniz";
+DONE
+    
+    add_build_string(LIBS, w);
+
     add_build_file("physics.jai", w);
     add_build_file("renderer.jai", w);
     add_build_file("asset_manager.jai", w);
@@ -81,6 +92,7 @@ add_engine_to_workspace :: (w: Workspace) {
     add_build_file("os_api.jai", w);
     add_build_file("game.jai", w);
     add_build_file("nuklear.jai", w);
+    add_build_file("math.jai", w);
 }
 
 build_workspace :: (name: string, output_path: string) -> Workspace, Build_Options {

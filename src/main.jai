@@ -309,7 +309,7 @@ _logger :: (message: string, ident: string, mode: Log_Mode, data: *void) {
 
 main :: () {
     context.logger = _logger;
-    orig_wd := getcwd();
+    orig_wd := get_working_directory();
     game := init_game("game1");
 
     init_editor(game);
@@ -441,7 +441,7 @@ main :: () {
     os_close_window(game.window.handle);
 
     if running_at_compile_time() {
-        setcwd(orig_wd);
+        set_working_directory(orig_wd);
     }
 }
 

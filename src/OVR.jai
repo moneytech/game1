@@ -1,5 +1,6 @@
 
-LibOVR :: #foreign_library "LibOVR_out";
+// LibOVR :: #foreign_library "LibOVR_out";
+// #placeholder LibOVR;
 
 // C API
 

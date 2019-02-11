@@ -3,7 +3,8 @@
 // @Note @Requires zlib-type decompression in order to decompress data array streams from the input FBX.
 // @Requires uncompress :: (*u8, *u64, *u8, u64) -> int 
 
-miniz :: #foreign_library "miniz";
+// miniz :: #foreign_library "miniz";
+// #placeholder miniz;
 uncompress :: (dst: *u8, dst_size: *u64, src: *u8, src_size: u64) -> int #foreign miniz "mz_uncompress";
 
 FBX_Node_Property :: struct {
