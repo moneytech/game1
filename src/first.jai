@@ -4,10 +4,32 @@
 #import "File";
 #import "File_Utilities";
 #import "String";
-#import "Windows";
+
+#if OS_WINDOWS {
+    #import "Windows";
+} else #if OS_LINUX {
+    #import "POSIX";
+    DLL_EXT :: ".so";
+} else #if OS_MACOSX {
+    #import "POSIX";
+    DLL_EXT :: ".dylib";
+}
 
 ENGINE_SRC_PATH :: #filepath;
 
+make_directory_tree :: (_path: string) {
+    path := _path;
+    if path.count && path[path.count-1] == #char "/" {
+        path.count -= 1;
+    }
+
+    base_name := basename(path);
+    if base_name == "assets" return;
+
+    parent := path_strip_filename(path);
+    make_directory_tree(parent);
+    make_directory_if_it_does_not_exist(path);
+}
 
 copy_engine_assets_to :: (path: string) {
     engine_path := concatenate(#filepath, "../run_tree/assets");
@@ -20,7 +42,7 @@ copy_engine_assets_to :: (path: string) {
         advance(*relative_path, paths[0].count);
         out_path := concatenate(paths[1], "/", relative_path);
         // print("out: %\n", out_path);
-        make_directory_if_it_does_not_exist(path_strip_filename(out_path));
+        make_directory_tree(path_strip_filename(out_path));
         copy_file(full_name, out_path);
     }
 
@@ -52,13 +74,13 @@ setup_build :: (output_path: string) -> Build_Options {
         miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/miniz.dll"), true, miniz_src);
         nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/nuklear.dll"), true, nuklear_src);
     } else {
-        stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/libstb.so"), true, stb_src);
-        miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/libminiz.so"), true, miniz_src);
-        nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/libnuklear.so"), true, nuklear_src);
+        stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/stb", DLL_EXT), true, stb_src);
+        miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/miniz", DLL_EXT), true, miniz_src);
+        nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/nuklear", DLL_EXT), true, nuklear_src);
 
-        stb_stat := C_compiler_make_lib(concatenate(options.output_path, "/libstb.a"), false,  C_compiler_make_object(concatenate(options.output_path, "/stb.o"), stb_src));
-        miniz_stat := C_compiler_make_lib(concatenate(options.output_path, "/libminiz.a"), false, C_compiler_make_object(concatenate(options.output_path, "/miniz.o"), miniz_src));
-        nuklear_stat := C_compiler_make_lib(concatenate(options.output_path, "/libnuklear.a"), false, C_compiler_make_object(concatenate(options.output_path, "/nuklear.o"), nuklear_src));
+        stb_stat := C_compiler_make_lib(concatenate(options.output_path, "/stb.a"), false,  C_compiler_make_object(concatenate(options.output_path, "/stb.o"), stb_src));
+        miniz_stat := C_compiler_make_lib(concatenate(options.output_path, "/miniz.a"), false, C_compiler_make_object(concatenate(options.output_path, "/miniz.o"), miniz_src));
+        nuklear_stat := C_compiler_make_lib(concatenate(options.output_path, "/nuklear.a"), false, C_compiler_make_object(concatenate(options.output_path, "/nuklear.o"), nuklear_src));
 
         C_compiler_build_target(<< stb_stat);
         C_compiler_build_target(<< miniz_stat);
@@ -71,15 +93,26 @@ setup_build :: (output_path: string) -> Build_Options {
 
     // compiler_add_library_search_directory(options.output_path);
 
+    #if OS_MACOSX {
+        process_start("install_name_tool -id \"@rpath/stb.dylib\" stb.dylib");
+        process_start("install_name_tool -id \"@rpath/miniz.dylib\" miniz.dylib");
+        process_start("install_name_tool -id \"@rpath/nuklear.dylib\" nuklear.dylib");
+    }
+
     return options;
 };
 
 add_engine_to_workspace :: (w: Workspace) {
-    LIBS :: #string DONE
+LIBS :: #string DONE
     libnuklear :: #foreign_library "/run_tree/nuklear";
-    LibOVR :: #foreign_library "/run_tree/libOVR_out";
     stb :: #foreign_library "/run_tree/stb";
     miniz :: #foreign_library "/run_tree/miniz";
+DONE
+
+VR_LIBS :: #string DONE
+#if SUPPORTS_OCULUS {
+    LibOVR :: #foreign_library "/run_tree/libOVR_out";
+}
 DONE
     
     add_build_string(LIBS, w);
@@ -157,7 +190,7 @@ C_Target :: struct {
 C_LIB_MATH :: ""; // cl seems to link in the math lib by default
 
 COMPILER_FLAG_PIC_STRING :: "";
-COMPILER_STRING_OBJ :: "cl /nologo /INCREMENTAL:NO /c /Fo:";
+COMPILER_STRING_OBJ :: "cl /nologo /INCREMENTAL:NO /DWINDOWS /c /Fo:";
 COMPILER_STRING_DLL :: "cl /nologo /INCREMENTAL:NO /LD /Fe:";
 COMPILER_STRING_STATIC :: "ar rcs ";
 
@@ -174,7 +207,7 @@ get_file_timestamp :: (path: string) -> u64 {
 
 }
 
-#if OS_LINUX {
+#if OS_LINUX || OS_MACOSX {
 
 C_LIB_MATH :: "m";
 
@@ -294,7 +327,7 @@ C_compiler_build_target :: (target: C_Target, flag_string: string = "") -> strin
     }
 
     for target.libs {
-        #if OS_LINUX {
+        #if OS_LINUX || OS_MACOSX {
             old := cmd_string.data;
             cmd_string = concatenate(cmd_string, "-l ", it, " ");
             if old free(old);

@@ -27,7 +27,11 @@ ceil :: (x: float) -> float #foreign crt "ceilf";                   // x64 & arm
 floor :: (x: float) -> float #foreign crt "floorf";                 // x64 & arm only.
 fmod :: (x: float, divisor: float) -> float #foreign crt;           // x64 & arm only.
 
-crt :: #foreign_system_library "msvcrt";
+#if OS_WINDOWS {
+    crt :: #foreign_system_library "msvcrt";
+} else {
+    crt :: #foreign_system_library "libc";
+}
 
 TAU : float : 6.283147;
 TAU64 : float64 : 6.28318530717958647;

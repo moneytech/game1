@@ -1,4 +1,9 @@
-#load "OVR.jai";
+
+SUPPORTS_OCULUS :: OS_WINDOWS;
+
+#if SUPPORTS_OCULUS {
+    #load "OVR.jai";
+}
 #load "editor.jai";
 
 WATER_HEIGHT :: 0.05;
@@ -19,26 +24,28 @@ Game :: struct {
 
     enable_vr := false;
 
-    vr: struct {
-        session: ovrSession;
-        luid: ovrGraphicsLuid;
-        hmd_desc: ovrHmdDesc;
+    #if SUPPORTS_OCULUS {
+        vr: struct {
+            session: ovrSession;
+            luid: ovrGraphicsLuid;
+            hmd_desc: ovrHmdDesc;
 
-        eyeRenderDesc: [2] ovrEyeRenderDesc;
-        hmdToEyeViewPose: [2] ovrPosef;
-        layer: ovrLayerEyeFovDepth;
-        color_texture: *Texture;
-        depth_texture: *Texture;
-        vr_frame_buffer: Frame_Buffer;
-        temp_fb: Frame_Buffer;
+            eyeRenderDesc: [2] ovrEyeRenderDesc;
+            hmdToEyeViewPose: [2] ovrPosef;
+            layer: ovrLayerEyeFovDepth;
+            color_texture: *Texture;
+            depth_texture: *Texture;
+            vr_frame_buffer: Frame_Buffer;
+            temp_fb: Frame_Buffer;
 
-        buffer_size: ovrSizei;
-        color_swap_chain: ovrTextureSwapChain;
-        depth_swap_chain: ovrTextureSwapChain;
+            buffer_size: ovrSizei;
+            color_swap_chain: ovrTextureSwapChain;
+            depth_swap_chain: ovrTextureSwapChain;
 
-        mirror_texture_id: u32;
-        mirror_texture: ovrMirrorTexture;
-    };
+            mirror_texture_id: u32;
+            mirror_texture: ovrMirrorTexture;
+        };
+    }
 
     frame_index := 0;
 }
@@ -169,106 +176,6 @@ update_camera :: (game: *Game, dt: float) {
 
 }
 
-initialize_vr :: (using game: *Game) {
-    if game_vr_mode_active(game) return;
-
-    params: ovrInitParams;
-    params.Flags = xx (ovrInit_RequestVersion);
-    params.RequestedMinorVersion = OVR_MINOR_VERSION;
-    res := ovr_Initialize(*params);
-    if OVR_FAILURE(res) {
-        logprint("VR", "ovr_Initialize failed with %\n", res);
-        return;
-    }
-
-    res = ovr_Create(*vr.session, *vr.luid);
-
-    if OVR_FAILURE(res) {
-        ovr_Shutdown();
-        logprint("VR", "ovr_Create failed with %\n", res);
-        return;
-    }
-
-    using game.vr;
-    hmd_desc = ovr_GetHmdDesc(vr.session);
-    tex0size := ovr_GetFovTextureSize(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0], 1.0);
-    tex1size := ovr_GetFovTextureSize(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1], 1.0);
-
-    vr.buffer_size.w = tex0size.w + tex1size.w;
-    vr.buffer_size.h = max(tex0size.h, tex1size.h);
-
-    logprint("VR", "buffer size: %\n", vr.buffer_size);
-
-    {
-        desc: ovrTextureSwapChainDesc;
-        desc.Type = ovrTexture_2D;
-        desc.ArraySize = 1;
-        desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
-        desc.Width = vr.buffer_size.w;
-        desc.Height = vr.buffer_size.h;
-        desc.MipLevels = 1;
-        desc.SampleCount = 1;
-        desc.StaticImage = ovrFalse;
-
-
-        if ovr_CreateTextureSwapChainGL(vr.session, *desc, *vr.color_swap_chain) == 0 {
-        }
-
-        desc.Format = OVR_FORMAT_D32_FLOAT;
-
-        if ovr_CreateTextureSwapChainGL(vr.session, *desc, *vr.depth_swap_chain) == 0 {
-        }
-    }
-
-    mirror_desc: ovrMirrorTextureDesc;
-
-    mirror_desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
-    mirror_desc.Width = xx game.window.width;
-    mirror_desc.Height = xx game.window.height;
-    mirror_desc.MiscFlags = 0;
-    mirror_desc.MirrorOptions = xx ovrMirrorOption_PostDistortion;
-
-    ovr_CreateMirrorTextureWithOptionsGL(vr.session, *mirror_desc, *vr.mirror_texture);
-    ovr_GetMirrorTextureBufferGL(vr.session, vr.mirror_texture, *vr.mirror_texture_id);
-
-    eyeRenderDesc[0] = ovr_GetRenderDesc(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0]);
-    eyeRenderDesc[1] = ovr_GetRenderDesc(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1]);
-    hmdToEyeViewPose[0] = eyeRenderDesc[0].HmdToEyePose;
-    hmdToEyeViewPose[1] = eyeRenderDesc[1].HmdToEyePose;
-
-    
-    layer.Header.Type = ovrLayerType_EyeFovDepth;
-    layer.Header.Flags = 0;
-    layer.ColorTexture[0] = vr.color_swap_chain;
-    layer.ColorTexture[1] = vr.color_swap_chain;
-    layer.DepthTexture[0] = vr.depth_swap_chain;
-    layer.DepthTexture[1] = vr.depth_swap_chain;
-    layer.Fov[0] = eyeRenderDesc[0].Fov;
-    layer.Fov[1] = eyeRenderDesc[1].Fov;
-    layer.Viewport[0] = make_Recti(0, 0, vr.buffer_size.w / 2, vr.buffer_size.h);
-    layer.Viewport[1] = make_Recti(vr.buffer_size.w / 2, 0, vr.buffer_size.w / 2, vr.buffer_size.h);
-
-    color_texture = New(Texture);
-    depth_texture = New(Texture);
-
-    set_texture(color_texture, xx vr.buffer_size.w, xx vr.buffer_size.h, 0, Texture.RGBA);
-    set_texture(depth_texture, xx vr.buffer_size.w, xx vr.buffer_size.h, 0, Texture.DEPTH);
-
-    vr_frame_buffer = create_frame_buffer_from_textures(renderer, null, null);
-    temp_fb = create_frame_buffer(game.renderer, xx vr.buffer_size.w, xx vr.buffer_size.h);
-
-    enable_vr = true;
-}
-
-shutdown_vr :: (using game: *Game) {
-    ovr_Destroy(vr.session);
-    ovr_Shutdown();
-}
-
-game_vr_mode_active :: inline (using game: *Game) -> bool {
-    return vr.session != null;
-}
-
 game_logger :: (message: string, ident: string, mode: Log_Mode, data: *void) -> void {
     print("[%] %", ident, message);
 }
@@ -279,6 +186,7 @@ init_game :: (window_title: string, options: ..string) -> *Game {
 
     orig_wd: string;
     if running_at_compile_time() {
+        #import "Compiler";
         orig_wd = get_working_directory(); // @Leak ?
         opts := get_build_options();
         set_working_directory(opts.output_path);
@@ -376,7 +284,7 @@ ttf_buffer: [1<<20] u8;
 temp_bitmap: [512*512] u8;
 
 my_stbtt_initfont :: (font: *Font) {
-    f, success := file_open("c:/windows/fonts/times.ttf");
+    f, success := file_open("assets/fonts/Skytree/Skytree.ttf");
     if !success assert(false);
     file_read(f, ttf_buffer.data, ttf_buffer.count);
     font.char_height = 16.0;
@@ -459,8 +367,8 @@ render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
     draw_geometry(game, true);
 }
 
-render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
-    if game.enable_vr && game_vr_mode_active(game) {
+#if SUPPORTS_OCULUS {
+    render_game_ovr :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
         using game.vr;
 
         _proj := renderer.projection_matrix;
@@ -543,6 +451,124 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
         // is_visible = (result == xx ovrSuccess);
 
         ovr_GetMirrorTextureBufferGL(vr.session, vr.mirror_texture, *vr.mirror_texture_id);
+    }
+
+    initialize_vr :: (using game: *Game) {
+        if game_vr_mode_active(game) return;
+
+        params: ovrInitParams;
+        params.Flags = xx (ovrInit_RequestVersion);
+        params.RequestedMinorVersion = OVR_MINOR_VERSION;
+        res := ovr_Initialize(*params);
+        if OVR_FAILURE(res) {
+            logprint("VR", "ovr_Initialize failed with %\n", res);
+            return;
+        }
+
+        res = ovr_Create(*vr.session, *vr.luid);
+
+        if OVR_FAILURE(res) {
+            ovr_Shutdown();
+            logprint("VR", "ovr_Create failed with %\n", res);
+            return;
+        }
+
+        using game.vr;
+        hmd_desc = ovr_GetHmdDesc(vr.session);
+        tex0size := ovr_GetFovTextureSize(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0], 1.0);
+        tex1size := ovr_GetFovTextureSize(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1], 1.0);
+
+        vr.buffer_size.w = tex0size.w + tex1size.w;
+        vr.buffer_size.h = max(tex0size.h, tex1size.h);
+
+        logprint("VR", "buffer size: %\n", vr.buffer_size);
+
+        {
+            desc: ovrTextureSwapChainDesc;
+            desc.Type = ovrTexture_2D;
+            desc.ArraySize = 1;
+            desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
+            desc.Width = vr.buffer_size.w;
+            desc.Height = vr.buffer_size.h;
+            desc.MipLevels = 1;
+            desc.SampleCount = 1;
+            desc.StaticImage = ovrFalse;
+
+
+            if ovr_CreateTextureSwapChainGL(vr.session, *desc, *vr.color_swap_chain) == 0 {
+            }
+
+            desc.Format = OVR_FORMAT_D32_FLOAT;
+
+            if ovr_CreateTextureSwapChainGL(vr.session, *desc, *vr.depth_swap_chain) == 0 {
+            }
+        }
+
+        mirror_desc: ovrMirrorTextureDesc;
+
+        mirror_desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
+        mirror_desc.Width = xx game.window.width;
+        mirror_desc.Height = xx game.window.height;
+        mirror_desc.MiscFlags = 0;
+        mirror_desc.MirrorOptions = xx ovrMirrorOption_PostDistortion;
+
+        ovr_CreateMirrorTextureWithOptionsGL(vr.session, *mirror_desc, *vr.mirror_texture);
+        ovr_GetMirrorTextureBufferGL(vr.session, vr.mirror_texture, *vr.mirror_texture_id);
+
+        eyeRenderDesc[0] = ovr_GetRenderDesc(vr.session, ovrEye_Left, hmd_desc.DefaultEyeFov[0]);
+        eyeRenderDesc[1] = ovr_GetRenderDesc(vr.session, ovrEye_Right, hmd_desc.DefaultEyeFov[1]);
+        hmdToEyeViewPose[0] = eyeRenderDesc[0].HmdToEyePose;
+        hmdToEyeViewPose[1] = eyeRenderDesc[1].HmdToEyePose;
+
+        
+        layer.Header.Type = ovrLayerType_EyeFovDepth;
+        layer.Header.Flags = 0;
+        layer.ColorTexture[0] = vr.color_swap_chain;
+        layer.ColorTexture[1] = vr.color_swap_chain;
+        layer.DepthTexture[0] = vr.depth_swap_chain;
+        layer.DepthTexture[1] = vr.depth_swap_chain;
+        layer.Fov[0] = eyeRenderDesc[0].Fov;
+        layer.Fov[1] = eyeRenderDesc[1].Fov;
+        layer.Viewport[0] = make_Recti(0, 0, vr.buffer_size.w / 2, vr.buffer_size.h);
+        layer.Viewport[1] = make_Recti(vr.buffer_size.w / 2, 0, vr.buffer_size.w / 2, vr.buffer_size.h);
+
+        color_texture = New(Texture);
+        depth_texture = New(Texture);
+
+        set_texture(color_texture, xx vr.buffer_size.w, xx vr.buffer_size.h, 0, Texture.RGBA);
+        set_texture(depth_texture, xx vr.buffer_size.w, xx vr.buffer_size.h, 0, Texture.DEPTH);
+
+        vr_frame_buffer = create_frame_buffer_from_textures(renderer, null, null);
+        temp_fb = create_frame_buffer(game.renderer, xx vr.buffer_size.w, xx vr.buffer_size.h);
+
+        enable_vr = true;
+    }
+
+    shutdown_vr :: (using game: *Game) {
+        ovr_Destroy(vr.session);
+        ovr_Shutdown();
+    }
+
+    game_vr_mode_active :: inline (using game: *Game) -> bool {
+        return vr.session != null;
+    }
+} else {
+    render_game_ovr :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
+        assert(false);
+    }
+
+    initialize_vr :: (using game: *Game) { }
+
+    shutdown_vr :: (using game: *Game) { }
+
+    game_vr_mode_active :: inline (using game: *Game) -> bool {
+        return false;
+    }
+}
+
+render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
+    if game.enable_vr && game_vr_mode_active(game) {
+        render_game_ovr(game, target_frame_buffer);
     } else {
         width := game.window.width;
         height := game.window.height;

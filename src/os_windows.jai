@@ -1,9 +1,7 @@
 
 #import "Basic";
-#import "GL";
 #import "Compiler";
 #import "Window_Creation";
-#import "Input";
 
 #scope_file
 User32   :: #foreign_system_library "user32";
@@ -156,13 +154,9 @@ XInputSetStateStub :: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #c_ca
 __XInputGetState: (dwUserIndex: s32, pState: *XINPUT_STATE) -> s32 #foreign;
 __XInputSetState: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #foreign;
 
-os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
-    return create_window(width, height, title);
-}
-
 os_get_window_dimensions :: (win: OS_Window) -> s32, s32 {
     r: RECT;
-    GetClientRect(win, *r);
+    GetClientAreaRect(win, *r);
     return r.right-r.left, r.bottom-r.top;
 }
 

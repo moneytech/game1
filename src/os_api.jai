@@ -1,4 +1,11 @@
 
+#import "Input";
+#import "GL";
+
+Window_Creation :: #import "Window_Creation";
+
+os_create_window :: Window_Creation.create_window;
+
 JOYSTICK_BUTTON_A       :: (1 << 0);
 JOYSTICK_BUTTON_B       :: (1 << 1);
 JOYSTICK_BUTTON_X       :: (1 << 2);
@@ -51,11 +58,13 @@ strtod :: (start: *u8, endptr: **u8) -> float64 #foreign crt;
     strtoull :: (start: *u8, endptr: **u8, base: s32) -> u64 #foreign crt;
 
     #scope_file
-    crt :: #foreign_system_library "c";
+    crt :: #foreign_system_library "libc";
 }
 
 #if OS_WINDOWS {
     #load "os_windows.jai";
 } else #if OS_LINUX {
     #load "os_linux.jai";
+} else #if OS_MACOSX {
+    #load "os_macosx.jai";
 }

@@ -54,10 +54,6 @@ os_init_platform :: () {
     os_close_window(dummy);
 }
 
-os_create_window :: (width: s32, height: s32, title: string) -> OS_Window {
-	return create_window(width, height, title);
-}
-
 os_create_gl_context :: (win: Window) -> OS_GL_Context {
 	XLockDisplay(x_global_display);
 
@@ -76,7 +72,7 @@ os_create_gl_context :: (win: Window) -> OS_GL_Context {
 	return glc;
 }
 
-os_make_current :: (win: Window, glc: OS_GL_Context) {
+os_make_current :: (win: OS_Window, glc: OS_GL_Context) {
 	glXMakeCurrent(x_global_display, win, glc);
 }
 
@@ -93,6 +89,10 @@ os_close_window :: (win: OS_Window) {
 
     array_reset(*joysticks);
     // @TODO joysticks
+}
+
+os_watch_dir :: (path: string)  {
+
 }
 
 os_pump_file_notifications :: (callback: FILE_NOTIF_FUNC, userdata: *void) {

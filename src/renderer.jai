@@ -393,7 +393,7 @@ resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_depth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
 
     resize_frame_buffer(*water_reflect_frame_buffer, w, h);
     resize_frame_buffer(*water_refract_frame_buffer, w, h);
@@ -438,7 +438,11 @@ current_model_matrix :: (using rdr: GL_Renderer) -> Matrix4 {
 
 init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     print("rdr: %\n", rdr);
-    glDebugMessageCallback(debug_callback, *context);
+    if GL_VERSION_4_3 {
+        glDebugMessageCallback(debug_callback, *context);
+    } else if GL_ARB_debug_output {
+        glDebugMessageCallbackARB(debug_callback, *context);
+    }   
     
     push_model_matrix(rdr, matrix_identity());
     // glBegin(GL_TRIANGLES);
@@ -473,7 +477,7 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     attach: [3] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attach.data);
 
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
 
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 
@@ -1135,6 +1139,7 @@ finish_scene :: (using rdr: *GL_Renderer) {
     
     clear_screen(0, 0, 0, 1);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer_framebuffer);
+    assert(current_frame_buffer != null);
     if !current_frame_buffer then glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     else glBindFramebuffer(GL_DRAW_FRAMEBUFFER, current_frame_buffer.id);
 
@@ -1168,9 +1173,10 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glCullFace(GL_BACK);
     glDisable(GL_STENCIL_TEST);
     // simple global ambient contribution
-    /*
+
     glDisable(GL_DEPTH_TEST);
 
+    /*
     UseShader(AmbientBaseShader);
     RenderQuad(-1, -1, 2, 2);
     */
@@ -1205,6 +1211,7 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glUniform1i(tex_albedo, 2);
     glUniform4f(vp, cast(float) dst_vp.x, cast(float) dst_vp.y, cast(float) dst_vp.w, cast(float) dst_vp.h);
     draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
+
 
     for lights {
 
