@@ -124,6 +124,8 @@ update_scene :: (game: *Game, sc: *Scene, dt: float) {
 Scene_Object :: struct {
     object_id: s32 = -1;
     object_type: Type;
+
+    position: Vector3;
 }
 
 Actor :: struct {
@@ -132,7 +134,7 @@ Actor :: struct {
     model: *Model;
     body: *Rigid_Body;
 
-    position: Vector3;
+    // position: Vector3;
     orientation: Quaternion; // orientiation around Y axis
 
     update_callback: (game: *Game, actor: *Actor, dt: float);
@@ -237,6 +239,7 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     game.renderer.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
     game.renderer.render_gamma_correction = load_shader_pair(asset_man, "assets/shaders/render_plain_texture.vert", "assets/shaders/gamma_correction.frag");
     game.renderer.null_shader = load_shader_pair(asset_man, "assets/shaders/null_shader.vert", "assets/shaders/null_shader.frag");
+    game.renderer.light_entity_texture = load_image(asset_man, "assets/lightbulb.png");
 
     // @Temporary
     game.text_strings = load_text_strings(asset_man);
@@ -349,6 +352,8 @@ update_game :: (game: *Game, dt: float) {
 }
 
 render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
+    game.renderer.lights = game.current_scene.lights;
+
     // game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
     // gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
     use_frame_buffer(game.renderer, target_frame_buffer);
@@ -596,6 +601,7 @@ render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
 }
 
 render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
+
     if game.enable_vr && game_vr_mode_active(game) {
         render_game_ovr(game, target_frame_buffer);
     } else {

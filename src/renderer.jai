@@ -17,6 +17,7 @@ Rectangle :: struct {
 Texture :: struct {
     Texture_Type :: enum #complete {
         RGBA;
+        RGBA32F;
         DEPTH;
     }
     using Texture_Type;
@@ -295,7 +296,8 @@ Light :: struct {
     using object: Scene_Object;
 
     type: Light_Type;
-    position: Vector3;
+    direction: Vector3; // used if directional light
+    
     radiance: Color;
 
     radius: float;
@@ -312,7 +314,7 @@ Shader :: struct {
 Camera :: struct {
     using object: Scene_Object;
 
-    position: Vector3;
+    // position: Vector3;
     rotation: Quaternion;
 
     dual_lens := false;
@@ -324,7 +326,7 @@ Camera :: struct {
 GL_Renderer :: struct {
     game: *Game;
 
-    lights: [] Light;
+    lights: [] *Light;
 
     VertexArrayID: u32;
     gbuffer_framebuffer: u32;
@@ -352,6 +354,8 @@ GL_Renderer :: struct {
 
     wireframe_material: *Material;
     light_sphere: *Model;
+
+    light_entity_texture: *Texture;
 
     enable_clip_plane: bool;
     clip_plane: Vector4;
@@ -384,7 +388,7 @@ resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
 
 
     glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, xx w, xx h, 0, GL_RGBA, GL_UNSIGNED_BYTE, null);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, xx w, xx h, 0, GL_RGBA, GL_FLOAT, null);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -478,7 +482,7 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
 
     water_reflect_frame_buffer = create_frame_buffer(rdr, width, height);
     water_refract_frame_buffer = create_frame_buffer(rdr, width, height);
-    scratch_frame_buffer = create_frame_buffer(rdr, width, height);
+    scratch_frame_buffer = create_frame_buffer_from_textures(rdr, create_texture(width, height, null, Texture.RGBA32F), create_texture(width, height, null, Texture.DEPTH));
 
     glGenFramebuffers(1, *gbuffer_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
@@ -542,8 +546,8 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     light_material.disable_backface_culling = false;
     light_material.disable_depth_test = true;
 
-    light_sphere = create_sphere(1, 50, 50);
-    light_sphere.model_matrix = matrix_scale(10, 10, 10);
+    light_sphere = create_sphere(1, 180, 180);
+    light_sphere.model_matrix = matrix_identity();
     for light_sphere.meshes
         it.material = light_material;
 }
@@ -585,6 +589,10 @@ resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
             interal_format = GL_DEPTH24_STENCIL8;
             format = GL_DEPTH_STENCIL;
             ty = GL_UNSIGNED_INT_24_8;
+        case Texture.RGBA32F;
+            interal_format = GL_RGBA32F;
+            format = GL_RGBA;
+            ty = GL_FLOAT;
         case;
             print("Unhandled texture type: %\n", type);
     }
@@ -605,6 +613,12 @@ create_texture :: (tex: *Texture, width: u32, height: u32, data: *void, type := 
     resize_texture(tex, width, height, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Filtering
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Filtering
+}
+
+create_texture :: (width: u32, height: u32, data: *void, type := Texture.RGBA) -> *Texture {
+    tex := New(Texture);
+    create_texture(tex, width, height, data, type);
+    return tex;
 }
 
 set_texture_wrap :: (tex: *Texture, clamp_to_edge: bool) {
@@ -915,9 +929,10 @@ draw_rect_multi_color :: (using rdr: GL_Renderer, x: float, y: float, width: flo
     glDisable(GL_BLEND);
 }
 
-draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color) {
+draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color, model_matrix: *Matrix4 = null) {
     glUseProgram(render_rect.id);
-    update_matrices(rdr, matrix_identity(), render_rect);
+    if !model_matrix then update_matrices(rdr, matrix_identity(), render_rect);
+    else update_matrices(rdr, <<model_matrix, render_rect);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -952,7 +967,7 @@ draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: 
     glDisable(GL_BLEND);
 }
 
-draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float, shader: *Shader = null) {
+draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float, shader: *Shader = null, model_matrix: *Matrix4 = null) {
     if tex {
         if !shader then shader = render_plain_texture;
 
@@ -962,7 +977,8 @@ draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float
 
         in_texture := glGetUniformLocation(shader.id, "in_texture");
         glUniform1i(in_texture, 0);
-        update_matrices(rdr, matrix_identity(), shader);
+        if !model_matrix then update_matrices(rdr, matrix_identity(), shader);
+        else update_matrices(rdr, <<model_matrix, shader);
     }
 
     xw := x+width;
@@ -1191,7 +1207,16 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
 
     // render lights stencils
-    draw_model(rdr, <<light_sphere, null_shader);
+    for lights {
+        if it.type == Light_Type.DIRECTIONAL {
+
+        } else {
+            model_matrix := light_sphere.model_matrix;
+            light_sphere.model_matrix = matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_scale(it.radius, it.radius, it.radius);
+            draw_model(rdr, <<light_sphere, null_shader);
+            light_sphere.model_matrix = model_matrix;
+        }
+    }
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
@@ -1236,6 +1261,12 @@ finish_scene :: (using rdr: *GL_Renderer) {
     tex_roughness := glGetUniformLocation(render_light_using_gbuffer.id, "g_roughness");
     tex_metallic := glGetUniformLocation(render_light_using_gbuffer.id, "g_metallic");
     vp := glGetUniformLocation(render_light_using_gbuffer.id, "viewport");
+
+    light_is_directional     := glGetUniformLocation(render_light_using_gbuffer.id, "light.is_directional");
+    light_position_direction := glGetUniformLocation(render_light_using_gbuffer.id, "light.position");
+    light_radius             := glGetUniformLocation(render_light_using_gbuffer.id, "light.radius");
+    light_radiance_color     := glGetUniformLocation(render_light_using_gbuffer.id, "light.radiance_color");
+
     assert(tex_normal != -1);
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniform1i(tex_pos, 0);
@@ -1246,9 +1277,22 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glUniform4f(vp, cast(float) dst_vp.x, cast(float) dst_vp.y, cast(float) dst_vp.w, cast(float) dst_vp.h);
 
     // render lights directly
-    draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
     for lights {
+         if it.type == Light_Type.DIRECTIONAL {
 
+        } else {
+            model_matrix := light_sphere.model_matrix;
+            
+            glUniform1i(light_is_directional, 0);
+            glUniform3f(light_position_direction, it.position.x, it.position.y, it.position.z);
+            glUniform3f(light_radiance_color,     it.radiance.r, it.radiance.g, it.radiance.b);
+            glUniform1f(light_radius,             it.radius);
+            
+            light_sphere.model_matrix = matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_scale(it.radius, it.radius, it.radius);
+            draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
+
+            light_sphere.model_matrix = model_matrix;
+        }
     }
 
     // glUseProgram(0);
@@ -1259,6 +1303,26 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glDepthMask(GL_TRUE);
     glCullFace(GL_BACK);
     glDisable(GL_BLEND);
+
+    #if DEVELOPER {
+        for lights {
+            if it.type == Light_Type.DIRECTIONAL {
+                // @TODO
+            } else {
+                mat := matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_rotate((camera.rotation)) * matrix_scale(1, -1, 1);
+                // draw_textured_rect(rdr, null, it.position.x, it.position.y, 1.0, 1.0, null, *mat);
+                white := make_Color(1, 1, 1);
+                // glDisable(GL_DEPTH_TEST);
+                glDisable(GL_CULL_FACE);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                draw_textured_rect(<<rdr, rdr.light_entity_texture, -0.5, -0.5, 1.0, 1.0, null, *mat);
+
+                glDisable(GL_BLEND);
+                glEnable(GL_CULL_FACE);
+            }
+        }
+    }
 }
 
 draw_cube :: (x: float, y: float, z: float, size: float) {
@@ -1553,7 +1617,7 @@ use_viewport :: (v: Viewport) {
     }
 
 
-    draw_picking_mesh :: (using rdr: GL_Renderer, m:Mesh, sh: *Shader, pick_id: s32 = -1) {
+    draw_picking_mesh :: (using rdr: GL_Renderer, m: Mesh, sh: *Shader, pick_id: s32 = -1) {
         glEnable(GL_DEPTH_TEST);
 
         update_matrices(rdr, m.model_matrix, sh);

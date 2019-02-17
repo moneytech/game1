@@ -65,6 +65,10 @@ vec3 microfacet_brdf(vec3 N, vec3 L, vec3 H, vec3 V, float Roughness, vec3 F0) {
     return numer / max(denom, 0.001);
 }
 
+float saturate(float value) {
+    return clamp(value, 0.0, 1.0);
+}
+
 void main() {
     vec2 tex_coords = get_ndc_position();
 
@@ -74,7 +78,6 @@ void main() {
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
     float Roughness = texture(g_roughness, tex_coords).r;
     float Metallic = texture(g_metallic, tex_coords).r;
-    // float Metallic = 1.0;
 
     if (length(normal) < 0.5) {
         frag_color = vec4(in_diffuse, 1);
@@ -90,25 +93,34 @@ void main() {
     // vec3 ambient = vec3(0.01) * in_diffuse;
 
     vec3 L = vec3(0);
-    // if (light.is_directional) {
-    //     L = normalize(-light.position);
-    // } else {
-    //     L = normalize(light.position-frag_pos)
-    // }
-
-    vec3 light_pos = vec3(-20, 20, 10);
-    L = normalize(light_pos-frag_pos);
+    if (light.is_directional != 0) {
+        L = normalize(-light.position);
+    } else {
+        L = normalize(light.position-frag_pos);
+    }
 
     vec3 V = normalize(camera_position-frag_pos);
     vec3 H = normalize((L + V));
     vec3 ks = microfacet_brdf(N, L, H, V, Roughness, F0);
     vec3 kd = vec3(1.0) - ks;
 
-    // vec3 radiance = light.radiance_color;
-    vec3 radiance = vec3(1, 1, 1);
+    kd *= 1.0 - Metallic;
+
+    vec3 radiance = light.radiance_color * light.radius;
+    float falloff = 1.0;
+    // calculate falloff
+    if (light.is_directional == 0) {
+        float dist = length(light.position - frag_pos);
+        float sat = saturate(1.0 - pow(dist / light.radius, 4.0));
+        float numer = pow(sat, 2.0);
+        float denom = dist*dist + 1;
+        falloff = numer / denom;
+        // radiance *= falloff;
+    }
+
     float n_dot_l = max(0.0, dot(N, L));
 
     vec3 diff = (in_diffuse / PI) * kd;
-    vec3 Lo = (diff + ks) * radiance * n_dot_l;
+    vec3 Lo = (diff + ks) * radiance * n_dot_l * falloff;
     frag_color = vec4(Lo, 1.0);
 }

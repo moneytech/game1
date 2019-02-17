@@ -121,6 +121,13 @@ draw_scene_with_pick_id :: (rdr: *GL_Renderer, sc: Scene) {
         }
     }
 
+    light_sphere_mat := rdr.light_sphere.model_matrix;
+    defer rdr.light_sphere.model_matrix = light_sphere_mat;
+    for sc.lights {
+        rdr.light_sphere.model_matrix = matrix_translate(it.position.x, it.position.y, it.position.z);
+        draw_picking_model(rdr, <<rdr.light_sphere, it.object_id);
+    }
+
     // @TODO lights and light picking mesh
     // @OTOD cameras and camera meshes
     // for sc.models draw_picking_model(rdr, <<it, cast(s32) (it_index+1));
@@ -131,32 +138,64 @@ update_editor :: (game: *Game, dt: float) {
     input_intercepted := false;
     if selected_game_object {
         using game;
-        actor := cast(*Actor) selected_game_object;
 
-        if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 300, 400), xx
-            (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
-            /* fixed widget pixel width */
-            nk_layout_row_dynamic(*nuklear, 200, 1);
-            to_nk_colorf :: (c: Color) -> nk_colorf {
-                out: nk_colorf;
-                out.r = c.r;
-                out.g = c.g;
-                out.b = c.b;
-                out.a = c.a;
-                return out;
+        to_nk_colorf :: (c: Color) -> nk_colorf {
+            out: nk_colorf;
+            out.r = c.r;
+            out.g = c.g;
+            out.b = c.b;
+            out.a = c.a;
+            return out;
+        }
+
+        if selected_game_object.object_type == Actor {
+            actor := cast(*Actor) selected_game_object;
+
+            if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 300, 400), xx
+                (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+                /* fixed widget pixel width */
+                nk_layout_row_dynamic(*nuklear, 200, 1);
+                
+                col := nk_color_picker(*nuklear, to_nk_colorf(actor.model.meshes[0].material.diffuse), NK_RGB);
+                actor.model.meshes[0].material.diffuse = make_Color(col);
+
+                nk_layout_row_dynamic(*nuklear, 50, 1);
+                nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.roughness, 1.0, 0.01);
+                nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.metallic, 1.0, 0.01);
             }
-            col := nk_color_picker(*nuklear, to_nk_colorf(actor.model.meshes[0].material.diffuse), NK_RGB);
-            actor.model.meshes[0].material.diffuse = make_Color(col);
 
-            nk_layout_row_dynamic(*nuklear, 50, 1);
-            nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.roughness, 1.0, 0.01);
-            nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.metallic, 1.0, 0.01);
-        }
+            if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
+                input_intercepted = true;
+            }
+            nk_end(*nuklear);
+        } else if selected_game_object.object_type == Light {
+            light := cast(*Light) selected_game_object;
 
-        if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
-            input_intercepted = true;
+            if (nk_begin(*nuklear, "Light", _nk_rect(50, 50, 300, 400), xx
+                (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+                /* fixed widget pixel width */
+                nk_layout_row_dynamic(*nuklear, 200, 1);
+                to_nk_colorf :: (c: Color) -> nk_colorf {
+                    out: nk_colorf;
+                    out.r = c.r;
+                    out.g = c.g;
+                    out.b = c.b;
+                    out.a = c.a;
+                    return out;
+                }
+                col := nk_color_picker(*nuklear, to_nk_colorf(light.radiance), NK_RGB);
+                light.radiance = make_Color(col);
+
+                nk_layout_row_dynamic(*nuklear, 50, 1);
+                nk_slider_float(*nuklear, 0.0, *light.radius, 100.0, 0.01);
+                // nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.metallic, 1.0, 0.01);
+            }
+
+            if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
+                input_intercepted = true;
+            }
+            nk_end(*nuklear);
         }
-        nk_end(*nuklear);
     }
 
     if input_intercepted return;
@@ -305,13 +344,12 @@ update_editor :: (game: *Game, dt: float) {
     
 
     if selected_game_object {
-        assert(selected_game_object.object_type == Actor);
-        actor := cast(*Actor) selected_game_object;
+        obj := selected_game_object;
 
         if input_button_states[#char "G"] & START && editor_action != Action.DRAG {
             editor_action = Action.DRAG;
             action_info.drag.xyz_lock = make_Vector3(1, 1, 1);
-            action_info.drag.target_position = actor.position;
+            action_info.drag.target_position = obj.position;
         }
 
         if editor_action == Action.DRAG {
@@ -319,9 +357,13 @@ update_editor :: (game: *Game, dt: float) {
             if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
                 // apply the action
                 editor_action = Action.NONE;
-                if actor.body then actor.body.position = action_info.drag.target_position;
 
-                actor.position = action_info.drag.target_position;
+                if obj.object_type == Actor {
+                    actor := cast(*Actor) obj;
+                    if actor.body then actor.body.position = action_info.drag.target_position;
+                }
+
+                obj.position = action_info.drag.target_position;
 
                 return;
             }
@@ -335,17 +377,17 @@ update_editor :: (game: *Game, dt: float) {
             // that way preserving the movement along the desired axis that has already been done
             if input_button_states[#char "X"] & START {
                 action_info.drag.xyz_lock = make_Vector3(1, 0, 0);
-                action_info.drag.target_position = actor.position;
+                action_info.drag.target_position = obj.position;
             }
 
             if input_button_states[#char "Y"] & START {
                 action_info.drag.xyz_lock = make_Vector3(0, 1, 0);
-                action_info.drag.target_position = actor.position;
+                action_info.drag.target_position = obj.position;
             }
 
             if input_button_states[#char "Z"] & START {
                 action_info.drag.xyz_lock = make_Vector3(0, 0, 1);
-                action_info.drag.target_position = actor.position;
+                action_info.drag.target_position = obj.position;
             }
 
             delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
@@ -353,7 +395,7 @@ update_editor :: (game: *Game, dt: float) {
             // sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
             // delta = mul(delta, make_Vector3(sx, sy, 1));
 
-            len := length(actor.position - game.renderer.camera.position);
+            len := length(obj.position - game.renderer.camera.position);
             delta *= len;
 
             q := game.renderer.camera.rotation;
@@ -411,24 +453,49 @@ render_editor_scene :: (using game: *Game, water := false) {
 
 render_editor :: (using game: *Game) {
 
-    if selected_game_object then assert(selected_game_object.object_type == Actor);
-    actor := cast(*Actor) selected_game_object;
+    if selected_game_object {
+        if selected_game_object.object_type == Actor {
+            actor := cast(*Actor) selected_game_object;
 
-    if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
+            if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
 
-    old_position: Vector3;
-    if editor_action == Action.DRAG {
-        old_position = actor.position;
-        actor.position = action_info.drag.target_position;
+            old_position: Vector3;
+            if editor_action == Action.DRAG {
+                old_position = actor.position;
+                actor.position = action_info.drag.target_position;
+            }
+
+            render_game(game);
+
+            if editor_action == Action.DRAG {
+                actor.position = old_position;
+            }
+
+            if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID;
+        } else if selected_game_object.object_type == Light {
+            light := cast(*Light) selected_game_object;
+
+            // light_model := game.renderer.light_model;
+
+            // if selected_game_object then light_model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
+
+            old_position: Vector3;
+            if editor_action == Action.DRAG {
+                old_position = light.position;
+                light.position = action_info.drag.target_position;
+            }
+
+            render_game(game);
+
+            if editor_action == Action.DRAG {
+                light.position = old_position;
+            }
+
+            // if selected_game_object then light_model.draw_mode = DRAW_MODE_SOLID;
+        }
+    } else {
+        render_game(game);
     }
-
-    render_game(game);
-
-    if editor_action == Action.DRAG {
-        actor.position = old_position;
-    }
-
-    if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID;
 
     // renderer.projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
     // draw_textured_rect(<<renderer, water_reflect_frame_buffer.color_texture, 0, 0, 0.25, 0.25);
