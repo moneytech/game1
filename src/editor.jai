@@ -133,10 +133,10 @@ update_editor :: (game: *Game, dt: float) {
         using game;
         actor := cast(*Actor) selected_game_object;
 
-        if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 220, 220), xx
+        if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 300, 400), xx
             (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
             /* fixed widget pixel width */
-            nk_layout_row_dynamic(*nuklear, 100, 1);
+            nk_layout_row_dynamic(*nuklear, 200, 1);
             to_nk_colorf :: (c: Color) -> nk_colorf {
                 out: nk_colorf;
                 out.r = c.r;
@@ -147,7 +147,12 @@ update_editor :: (game: *Game, dt: float) {
             }
             col := nk_color_picker(*nuklear, to_nk_colorf(actor.model.meshes[0].material.diffuse), NK_RGB);
             actor.model.meshes[0].material.diffuse = make_Color(col);
+
+            nk_layout_row_dynamic(*nuklear, 50, 1);
+            nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.roughness, 1.0, 0.01);
+            nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.metallic, 1.0, 0.01);
         }
+
         if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
             input_intercepted = true;
         }
@@ -163,12 +168,6 @@ update_editor :: (game: *Game, dt: float) {
     update_camera(game, dt);
 
     renderer := game.renderer;
-    start_picking(renderer);
-    draw_scene_with_pick_id(renderer, <<game.current_scene);
-    finish_picking(renderer);
-    get_picking_position_data(<<renderer, picking_position_buf.data);
-
-    in := (y * game.window.width) + x;
 
     using Key_Current_State;
 
@@ -303,7 +302,7 @@ update_editor :: (game: *Game, dt: float) {
     under_cursor = -1;
     if !(x >= 0 && x < game.window.width) return;
     if !(y >= 0 && y < game.window.height) return;
-    under_cursor = picking_position_buf[in];
+    
 
     if selected_game_object {
         assert(selected_game_object.object_type == Actor);
@@ -368,6 +367,19 @@ update_editor :: (game: *Game, dt: float) {
     }
 
     if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
+        if picking_position_buf.count != game.window.width*game.window.height {
+            free(picking_position_buf.data);
+            picking_position_buf.count = game.window.width * game.window.height;
+            picking_position_buf.data = alloc(picking_position_buf.count*size_of(s32));
+        }
+
+        start_picking(renderer);
+        draw_scene_with_pick_id(renderer, <<game.current_scene);
+        finish_picking(renderer);
+        get_picking_position_data(<<renderer, picking_position_buf.data);
+
+        in := (y * game.window.width) + x;
+        under_cursor = picking_position_buf[in];
         if under_cursor != -1 {
             selected_game_object = find_object_by_id(game.current_scene, under_cursor);
         } else {

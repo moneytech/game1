@@ -184,12 +184,10 @@ TEXTURE_SPECULAR_INDEX :: 2;
 
 Material :: struct {
     textures: [MAX_TEXTURES_PER_MESH] *Texture;
-    specular_exp: float;
-    ambient: Color;
     diffuse: Color;
-    specular: Color;
-    emissive: Color;
-    transparency: float;
+    roughness: float = 0.4;
+    metallic: float = 0;
+    transparency: float = 1.0;
 
     // maybe these should be Mesh properties since they're rendering options as opposed to rendering attributes ?
     disable_lighting := false;
@@ -198,7 +196,6 @@ Material :: struct {
     disable_depth_test := false;
 
     #constructor (using m: *Material) {
-        ambient = make_Color(0.2, 0.2, 0.2);
         diffuse = make_Color(1.0, 1.0, 1.0);
     }
 };
@@ -299,12 +296,9 @@ Light :: struct {
 
     type: Light_Type;
     position: Vector3;
-    ambient: Color;
-    diffuse: Color;
-    specular: Color;
+    radiance: Color;
 
-    linear: float;
-    quadratic: float;
+    radius: float;
 };
 
 Shader :: struct {
@@ -337,6 +331,8 @@ GL_Renderer :: struct {
     gbuffer_position: u32;
     gbuffer_normal: u32;
     gbuffer_albedo_spec: u32;
+    gbuffer_roughness: u32;
+    gbuffer_metallic: u32;
     gbuffer_depth: u32;
     gbuffer_viewport: Viewport;
 
@@ -392,12 +388,36 @@ resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+    glBindTexture(GL_TEXTURE_2D, gbuffer_roughness);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, xx w, xx h, 0, GL_RED, GL_FLOAT, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glBindTexture(GL_TEXTURE_2D, gbuffer_metallic);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, xx w, xx h, 0, GL_RED, GL_FLOAT, null);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
     glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_depth);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
 
     resize_frame_buffer(*water_reflect_frame_buffer, w, h);
     resize_frame_buffer(*water_refract_frame_buffer, w, h);
     resize_frame_buffer(*scratch_frame_buffer, w, h);
+
+    #if DEVELOPER {
+        if picking_pos_texture {
+            glBindTexture(GL_TEXTURE_2D, picking_pos_texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, xx w, xx h, 0, GL_RED_INTEGER, GL_INT, null);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
+
+        if picking_depth {
+            glBindRenderbuffer(GL_RENDERBUFFER, picking_depth);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+        }
+    }
 }
 
 resize_frame_buffer :: (fb: *Frame_Buffer, w: u32, h: u32) {
@@ -466,6 +486,8 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     glGenTextures(1, *gbuffer_position);
     glGenTextures(1, *gbuffer_normal);
     glGenTextures(1, *gbuffer_albedo_spec);
+    glGenTextures(1, *gbuffer_roughness);
+    glGenTextures(1, *gbuffer_metallic);    
     glGenRenderbuffers(1, *gbuffer_depth);
 
     resize_rendering_buffers(rdr, width, height);
@@ -473,9 +495,11 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gbuffer_position, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gbuffer_normal, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gbuffer_albedo_spec, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, gbuffer_roughness, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, gbuffer_metallic, 0);
 
-    attach: [3] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attach.data);
+    attach: [] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+    glDrawBuffers(xx attach.count, attach.data);
 
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
 
@@ -1195,6 +1219,12 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, gbuffer_albedo_spec);
+    
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, gbuffer_roughness);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, gbuffer_metallic);
+    
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuffer_position);
 
@@ -1203,16 +1233,20 @@ finish_scene :: (using rdr: *GL_Renderer) {
     tex_normal := glGetUniformLocation(render_light_using_gbuffer.id, "g_normal");
     tex_pos := glGetUniformLocation(render_light_using_gbuffer.id, "g_position");
     tex_albedo := glGetUniformLocation(render_light_using_gbuffer.id, "g_albedospec");
+    tex_roughness := glGetUniformLocation(render_light_using_gbuffer.id, "g_roughness");
+    tex_metallic := glGetUniformLocation(render_light_using_gbuffer.id, "g_metallic");
     vp := glGetUniformLocation(render_light_using_gbuffer.id, "viewport");
     assert(tex_normal != -1);
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniform1i(tex_pos, 0);
     glUniform1i(tex_normal, 1);
     glUniform1i(tex_albedo, 2);
+    glUniform1i(tex_roughness, 3);
+    glUniform1i(tex_metallic, 4);
     glUniform4f(vp, cast(float) dst_vp.x, cast(float) dst_vp.y, cast(float) dst_vp.w, cast(float) dst_vp.h);
+
+    // render lights directly
     draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
-
-
     for lights {
 
     }
@@ -1300,13 +1334,12 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
 
     // material
     mat_diffuse := glGetUniformLocation(shader.id, "material.diffuse");
-    mat_spec_exp := glGetUniformLocation(shader.id, "material.specular_exp");
     use_diffuse_map := glGetUniformLocation(shader.id, "use_diffuse_map");
     use_normal_map := glGetUniformLocation(shader.id, "use_normal_map");
-    use_specular_map := glGetUniformLocation(shader.id, "use_specular_map");
     diffuse_map := glGetUniformLocation(shader.id, "diffuse_map");
     normal_map := glGetUniformLocation(shader.id, "normal_map");
-    specular_map := glGetUniformLocation(shader.id, "specular_map");
+    mat_roughness := glGetUniformLocation(shader.id, "material.roughness");
+    mat_metallic  := glGetUniformLocation(shader.id, "material.metallic");
 
     assert(m.material != null);
 
@@ -1319,7 +1352,6 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
 
     diffuse_tex :=  mat.textures[TEXTURE_DIFFUSE_INDEX];
     normal_tex := mat.textures[TEXTURE_NORMAL_INDEX];
-    spec_tex := mat.textures[TEXTURE_SPECULAR_INDEX];
 
     glUniform1i(use_diffuse_map, xx (diffuse_tex != null));
     if (diffuse_tex) {
@@ -1335,13 +1367,6 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
         glUniform1i(normal_map, 1);
     }
 
-    glUniform1i(use_specular_map, xx (spec_tex != null));
-    if (spec_tex) {
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, spec_tex.id);
-        glUniform1i(specular_map, 2);
-    }
-
     if rdr.enable_clip_plane {
         glEnable(GL_CLIP_DISTANCE0);
         cp := glGetUniformLocation(shader.id, "clip_plane");
@@ -1352,7 +1377,8 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
 
     diffuse := *mat.diffuse;
     glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
-    glUniform1f(mat_spec_exp, mat.specular_exp);
+    glUniform1f(mat_roughness, mat.roughness);
+    glUniform1f(mat_metallic,  mat.metallic);
 
     glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
 
@@ -1363,7 +1389,7 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
     
-    if (tex_size && (diffuse_tex || normal_tex || spec_tex)) {
+    if (tex_size && (diffuse_tex || normal_tex)) {
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size));
     }

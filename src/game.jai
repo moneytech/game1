@@ -325,6 +325,17 @@ draw_geometry :: (using game: *Game, water := false) {
 }
 
 update_game :: (game: *Game, dt: float) {
+
+    was_resized, record := is_a_window_resized();
+    while was_resized {
+        if record.window == game.window.handle {
+            game.window.width = cast(u32) record.width;
+            game.window.height = cast(u32) record.height;
+        }
+
+        was_resized, record = is_a_window_resized();
+    }
+
     if (joysticks.count) {
         game.joy = *joysticks[0];
     } else {

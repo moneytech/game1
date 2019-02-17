@@ -3,6 +3,8 @@
 layout (location = 0) out vec3 g_position;
 layout (location = 1) out vec3 g_normal;
 layout (location = 2) out vec4 g_albedospec;
+layout (location = 3) out float g_roughness;
+layout (location = 4) out float g_metallic;
 
 in vec2 tex_coords;
 in vec3 frag_pos;
@@ -12,11 +14,11 @@ in mat3 TBN;
 
 uniform sampler2D diffuse_map;
 uniform sampler2D normal_map;
-uniform sampler2D specular_map;
 
 struct Material {
     vec3 diffuse;
-    float specular_exp;
+    float roughness;
+    float metallic;
 };
 
 uniform Material material;
@@ -43,12 +45,10 @@ void main() {
         g_albedospec.rgb = material.diffuse.rgb * texture(diffuse_map, tex_coords).rgb * vertex_color;
     } else {
     	g_albedospec.rgb = material.diffuse.rgb * vertex_color;
-        g_albedospec.a = 1;
     }
 
-    if (use_specular_map) {
-        g_albedospec.a = texture(specular_map, tex_coords).r;
-    } else {
-        g_albedospec.a = material.specular_exp;
-    }
+    g_albedospec.a = 1; // @Cleanup really shouldnt need to set this at all
+
+    g_roughness = material.roughness;
+    g_metallic  = material.metallic;
 }

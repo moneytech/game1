@@ -236,10 +236,10 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
             } else if (name == "Ns") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT || tok.type == ML_TOKEN_INTEGER);
-                if (tok.type == ML_TOKEN_FLOAT)
-                    mat.specular_exp = cast(float) tok._float;
-                else if (tok.type == ML_TOKEN_INTEGER)
-                    mat.specular_exp = cast(float) tok.integer;
+                // if (tok.type == ML_TOKEN_FLOAT)
+                //     mat.specular_exp = cast(float) tok._float;
+                // else if (tok.type == ML_TOKEN_INTEGER)
+                //     mat.specular_exp = cast(float) tok.integer;
                 ml_get_token(*st, *tok);
             } else if (name == "Ka") {
                 ml_get_token(*st, *tok);
@@ -254,11 +254,11 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
                 assert(tok.type == ML_TOKEN_FLOAT);
                 b := cast(float) tok._float;
 
-                c: Color;
-                c.r = r;
-                c.g = g;
-                c.b = b;
-                mat.ambient = c;
+                // c: Color;
+                // c.r = r;
+                // c.g = g;
+                // c.b = b;
+                // mat.ambient = c;
 
                 ml_get_token(*st, *tok);
             } else if (name == "Kd") {
@@ -294,11 +294,11 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
                 assert(tok.type == ML_TOKEN_FLOAT);
                 b := cast(float) tok._float;
 
-                c: Color;
-                c.r = r;
-                c.g = g;
-                c.b = b;
-                mat.specular = c;
+                // c: Color;
+                // c.r = r;
+                // c.g = g;
+                // c.b = b;
+                // mat.specular = c;
 
                 ml_get_token(*st, *tok);
             } else if (name == "Ke") {
@@ -314,11 +314,11 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
                 assert(tok.type == ML_TOKEN_FLOAT);
                 b := cast(float) tok._float;
 
-                c: Color;
-                c.r = r;
-                c.g = g;
-                c.b = b;
-                mat.emissive = c;
+                // c: Color;
+                // c.r = r;
+                // c.g = g;
+                // c.b = b;
+                // mat.emissive = c;
 
                 ml_get_token(*st, *tok);
             } else if (name == "Ni") {
@@ -773,11 +773,11 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
                     in := material.instance;
 
                     mat := New(Material);
-                    mat.specular_exp = in.shininess;
-                    mat.ambient = make_Color(in.ambient[0], in.ambient[1], in.ambient[2]);
+                    // mat.specular_exp = in.shininess;
+                    // mat.ambient = make_Color(in.ambient[0], in.ambient[1], in.ambient[2]);
                     mat.diffuse = make_Color(in.diffuse[0], in.diffuse[1], in.diffuse[2]);
-                    mat.specular = make_Color(in.specular[0], in.specular[1], in.specular[2]);
-                    mat.emissive = make_Color(in.emission[0], in.emission[1], in.emission[2]);
+                    // mat.specular = make_Color(in.specular[0], in.specular[1], in.specular[2]);
+                    // mat.emissive = make_Color(in.emission[0], in.emission[1], in.emission[2]);
 
                     if material.textures[material.bump_index] mat.textures[TEXTURE_NORMAL_INDEX] = load_image(asset_man, concatenate(path_of(path), "/", material.textures[material.bump_index].filepath));
 
