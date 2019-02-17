@@ -156,7 +156,7 @@ __XInputSetState: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #foreign;
 
 os_get_window_dimensions :: (win: OS_Window) -> s32, s32 {
     r: RECT;
-    GetClientAreaRect(win, *r);
+    GetClientRect(win, *r);
     return r.right-r.left, r.bottom-r.top;
 }
 

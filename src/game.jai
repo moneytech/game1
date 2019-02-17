@@ -24,6 +24,8 @@ Game :: struct {
 
     enable_vr := false;
 
+    font: *Font;
+
     #if SUPPORTS_OCULUS {
         vr: struct {
             session: ovrSession;
@@ -242,7 +244,7 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     fnt := New(Font);
     my_stbtt_initfont(fnt);
     create_font(fnt, 512, 512, temp_bitmap.data);
-    font = fnt;
+    game.font = fnt;
 
     
 
@@ -271,8 +273,9 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     }
 
     nuklear_font := New(nk_user_font);
-    nuklear_font.userdata.ptr = font;
-    nuklear_font.height = font.char_height;
+    nuklear_font.userdata.ptr = game.font;
+    // nuklear_font.userdata.id = 0;
+    nuklear_font.height = game.font.char_height;
     nuklear_font.width = nuklear_text_width_calc;
 
     MAX_MEMORY :: 0x1000000;
@@ -291,8 +294,6 @@ my_stbtt_initfont :: (font: *Font) {
     stbtt_BakeFontBitmap(ttf_buffer.data,0, 16.0, temp_bitmap.data,512,512, 32,96, font.cdata.data); // no guarantee this fits!
     file_close(*f);
 }
-
-font: *Font;
 
 file_update_callback :: (notif: *File_Notification, userdata: *void) {
     g := cast(*Game) userdata;
@@ -551,6 +552,23 @@ render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
 
     game_vr_mode_active :: inline (using game: *Game) -> bool {
         return vr.session != null;
+    }
+
+    to_quaternion :: (ovrq: ovrQuatf) -> Quaternion {
+        q: Quaternion = ---;
+        q.x = ovrq.x;
+        q.y = ovrq.y;
+        q.z = ovrq.z;
+        q.w = ovrq.w;
+        return q;
+    }
+
+    to_vector3 :: (ovrv3: ovrVector3f) -> Vector3 {
+        v: Vector3 = ---;
+        v.x = ovrv3.x;
+        v.y = ovrv3.y;
+        v.z = ovrv3.z;
+        return v;
     }
 } else {
     render_game_ovr :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {

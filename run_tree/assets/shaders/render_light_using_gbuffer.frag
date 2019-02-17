@@ -35,7 +35,7 @@ vec3 schlick_fresnel(vec3 F0, float v_dot_h) {
 #define PI 3.14159265358979323846264338327950288
 float distrubtion_ggx(float n_dot_h, float a) {
     float a2 = a*a;
-    float factor = ((n_dot_h*n_dot_h)*(a2 - 1) + 1);
+    float factor = (n_dot_h*n_dot_h)*(a2 - 1) + 1;
     float denom = PI * factor*factor;
     return a2 / denom;
 }
@@ -61,7 +61,7 @@ vec3 microfacet_brdf(vec3 N, vec3 L, vec3 H, vec3 V, float Roughness, vec3 F0) {
                     schlick_fresnel(F0, v_dot_h) *
                     geometric_ggx(n_dot_l, n_dot_v, Roughness);
     float denom = 4 * n_dot_l * n_dot_v;
-    return numer / denom;
+    return numer / max(denom, 0.001);
 }
 
 void main() {
@@ -76,26 +76,27 @@ void main() {
         return;
     }
 
-    normal = normalize(normal);
+    vec3 N = normalize(normal);
 
     vec3 F0 = vec3(0.04);
     float metallic = 0;
     F0 = mix(F0, in_diffuse, vec3(metallic));
 
-    vec3 ambient = vec3(0.03) * in_diffuse;
+    vec3 ambient = vec3(0.01) * in_diffuse;
     
     // @Temporary
     vec3 light_pos = vec3(-20, 20, 10);
 
-    vec3 light_dir = normalize(light_pos-frag_pos);
-    vec3 view_dir = normalize(camera_position-frag_pos);
-    vec3 halfway_dir = normalize((light_dir + view_dir));
-    vec3 ks = microfacet_brdf(normal, light_dir, halfway_dir, view_dir, 0.5, F0);
-    vec3 kd = 1.0 - ks;
+    vec3 L = normalize(light_pos-frag_pos);
+    vec3 V = normalize(camera_position-frag_pos);
+    vec3 H = normalize((L + V));
+    vec3 ks = microfacet_brdf(N, L, H, V, 0.4, F0);
+    vec3 kd = vec3(1.0) - ks;
 
-    vec3 light_specular = vec3(1.0, 1.0, 1.0);
-    vec3 specular = light_specular * ks;
+    vec3 radiance = vec3(1.0, 1.0, 1.0);
+    float n_dot_l = max(0.0, dot(N, L));
 
     vec3 diff = (in_diffuse / PI) * kd;
-    frag_color = vec4(diff + specular + ambient, 1.0);
+    vec3 Lo = (diff + ks + ambient) * radiance * n_dot_l;
+    frag_color = vec4(Lo, 1.0);
 }

@@ -116,6 +116,7 @@ VR_LIBS :: #string DONE
 DONE
     
     add_build_string(LIBS, w);
+    add_build_string(VR_LIBS, w);
 
     add_build_file("physics.jai", w);
     add_build_file("renderer.jai", w);
@@ -189,10 +190,34 @@ C_Target :: struct {
 
 C_LIB_MATH :: ""; // cl seems to link in the math lib by default
 
-COMPILER_FLAG_PIC_STRING :: "";
-COMPILER_STRING_OBJ :: "cl /nologo /INCREMENTAL:NO /DWINDOWS /c /Fo:";
-COMPILER_STRING_DLL :: "cl /nologo /INCREMENTAL:NO /LD /Fe:";
-COMPILER_STRING_STATIC :: "ar rcs ";
+COMPILER_FLAG_PIC_STRING :: {:string:
+    "",
+};
+
+COMPILER_STRING_OBJ :: {:string:
+    "cl",
+    "/nologo",
+    "/INCREMENTAL:NO",
+    "/DWINDOWS",
+    "/Z7",
+    "/c",
+    "/Fo:",
+};
+
+COMPILER_STRING_DLL :: {:string:
+    "cl",
+    "/nologo",
+    "/INCREMENTAL:NO",
+    "/DWINDOWS",
+    "/Z7",
+    "/LD",
+    "/Fe:",
+};
+
+COMPILER_STRING_STATIC :: {:string:
+    "ar",
+    "rcs",
+};
 
 get_file_timestamp :: (path: string) -> u64 {
     ft: FILETIME;
@@ -290,21 +315,32 @@ C_compiler_is_target_outdated :: (target: C_Target) -> bool {
 
 #import "Process";
 
+EMPTY_FLAGS :: {:string:
+    "as",
+};
+
 // builds the target and returns a path to its output
-C_compiler_build_target :: (target: C_Target, flag_string: string = "") -> string {
+C_compiler_build_target :: (target: C_Target, flag_string: ..string) -> string {
     if (!C_compiler_is_target_outdated(target)) return target.output_path;
 
     print("Building %...\n", target.output_path);
-    cmd_string: string;
+    cmd_strings: [..] string;
 
     if target.output_type == {
         case C_Output_Type.NO_OUTPUT; // for hand written files (read: source files)
         case C_Output_Type.OBJECT;
-            cmd_string = concatenate(COMPILER_STRING_OBJ, target.output_path, " ", flag_string, " ");
+            // cmd_string = concatenate(COMPILER_STRING_OBJ, target.output_path, " ", flag_string, " ");
+            array_append(*cmd_strings, ..COMPILER_STRING_OBJ);
+            array_add(*cmd_strings, target.output_path);
+            array_append(*cmd_strings, ..flag_string);
         case C_Output_Type.DYNAMIC_LIBRARY;
-            cmd_string = concatenate(COMPILER_STRING_DLL, target.output_path, " ", flag_string, " ");
+            // cmd_string = concatenate(COMPILER_STRING_DLL, target.output_path, " ", flag_string, " ");
+            array_append(*cmd_strings, ..COMPILER_STRING_DLL);
+            array_add(*cmd_strings, target.output_path);
+            array_append(*cmd_strings, ..flag_string);
         case C_Output_Type.STATIC_LIBRARY;
-            cmd_string = concatenate(COMPILER_STRING_STATIC, target.output_path, " ", flag_string, " ");
+            // cmd_string = concatenate(COMPILER_STRING_STATIC, target.output_path, " ", flag_string, " ");
+            array_append(*cmd_strings, ..COMPILER_STRING_STATIC);
         case C_Output_Type.COPY_FILE;
             assert(target.dependencies.count == 1);
             in := target.dependencies[0];
@@ -316,28 +352,37 @@ C_compiler_build_target :: (target: C_Target, flag_string: string = "") -> strin
             return target.output_path;
     }
 
-    flags := "";
+    flags: [] string;
     if target.output_type == C_Output_Type.DYNAMIC_LIBRARY {
         flags = COMPILER_FLAG_PIC_STRING;
     }
     for target.dependencies {
-        data := cmd_string.data;
-        cmd_string = concatenate(cmd_string, C_compiler_build_target(<< it, flags), " ");
-        if data free(data);
+        array_add(*cmd_strings, C_compiler_build_target(<< it, ..flags));
     }
 
     for target.libs {
         #if OS_LINUX || OS_MACOSX {
-            old := cmd_string.data;
-            cmd_string = concatenate(cmd_string, "-l ", it, " ");
-            if old free(old);
+            array_add(*cmd_strings, copy_string("-l"));
+            array_add(*cmd_strings, copy_string(it));
         }
     }
 
-    if (cmd_string.count) {
-        print("Running command: %\n", cmd_string);
-        process_start(cmd_string);
-        free(cmd_string.data);
+    if (cmd_strings.count) {
+        cmd_string := concatenate(..cmd_strings, " ");
+        print("Running C compiler: %\n", cmd_string);
+        success, exit_code, output_string, error_string := os_run_command(..cmd_strings, capture_and_return_output=true);
+
+        if !success || exit_code != 0 {
+            if !success {
+                print("Could not invoke the command\n");
+            }
+            print("%\n%\n", output_string, error_string);
+            exit(1);
+        }
+
+        free(cmd_string);
+        // @Leak free each element?
+        array_reset(*cmd_strings);
     }
 
     print("Built %.\n", target.output_path);

@@ -54,10 +54,8 @@ nk_draw_vertex_layout_element :: struct {
 nk_style_slide :: struct {
 }
 
-using anon_enum_0 :: enum s32 {
-        nk_false :: 0;
-        nk_true :: 1;
-}
+nk_false :: 0;
+nk_true :: 1;
 
 nk_color :: struct {
     r: nk_byte;
@@ -99,12 +97,10 @@ nk_recti :: struct {
 
 nk_glyph :: [4] u8;
 
-anon_struct_1 :: union {
+nk_handle :: union {
     ptr: *void;
     id: s32;
 }
-
-nk_handle :: anon_struct_1;
 
 nk_image :: struct {
     handle: nk_handle;
@@ -125,66 +121,66 @@ nk_scroll :: struct {
 }
 
 using nk_heading :: enum s32 {
-        NK_UP :: 0;
-        NK_RIGHT :: 1;
-        NK_DOWN :: 2;
-        NK_LEFT :: 3;
+    NK_UP :: 0;
+    NK_RIGHT :: 1;
+    NK_DOWN :: 2;
+    NK_LEFT :: 3;
 }
 
 using nk_button_behavior :: enum s32 {
-        NK_BUTTON_DEFAULT :: 0;
-        NK_BUTTON_REPEATER :: 1;
+    NK_BUTTON_DEFAULT :: 0;
+    NK_BUTTON_REPEATER :: 1;
 }
 
 using nk_modify :: enum s32 {
-        NK_FIXED :: 0;
-        NK_MODIFIABLE :: 1;
+    NK_FIXED :: 0;
+    NK_MODIFIABLE :: 1;
 }
 
 using nk_orientation :: enum s32 {
-        NK_VERTICAL :: 0;
-        NK_HORIZONTAL :: 1;
+    NK_VERTICAL :: 0;
+    NK_HORIZONTAL :: 1;
 }
 
 using nk_collapse_states :: enum s32 {
-        NK_MINIMIZED :: 0;
-        NK_MAXIMIZED :: 1;
+    NK_MINIMIZED :: 0;
+    NK_MAXIMIZED :: 1;
 }
 
 using nk_show_states :: enum s32 {
-        NK_HIDDEN :: 0;
-        NK_SHOWN :: 1;
+    NK_HIDDEN :: 0;
+    NK_SHOWN :: 1;
 }
 
 using nk_chart_type :: enum s32 {
-        NK_CHART_LINES :: 0;
-        NK_CHART_COLUMN :: 1;
-        NK_CHART_MAX :: 2;
+    NK_CHART_LINES :: 0;
+    NK_CHART_COLUMN :: 1;
+    NK_CHART_MAX :: 2;
 }
 
 using nk_chart_event :: enum s32 {
-        NK_CHART_HOVERING :: 1;
-        NK_CHART_CLICKED :: 2;
+    NK_CHART_HOVERING :: 1;
+    NK_CHART_CLICKED :: 2;
 }
 
 using nk_color_format :: enum s32 {
-        NK_RGB :: 0;
-        NK_RGBA :: 1;
+    NK_RGB :: 0;
+    NK_RGBA :: 1;
 }
 
 using nk_popup_type :: enum s32 {
-        NK_POPUP_STATIC :: 0;
-        NK_POPUP_DYNAMIC :: 1;
+    NK_POPUP_STATIC :: 0;
+    NK_POPUP_DYNAMIC :: 1;
 }
 
 using nk_layout_format :: enum s32 {
-        NK_DYNAMIC :: 0;
-        NK_STATIC :: 1;
+    NK_DYNAMIC :: 0;
+    NK_STATIC :: 1;
 }
 
 using nk_tree_type :: enum s32 {
-        NK_TREE_NODE :: 0;
-        NK_TREE_TAB :: 1;
+    NK_TREE_NODE :: 0;
+    NK_TREE_TAB :: 1;
 }
 
 nk_plugin_alloc :: #type (a0: nk_handle, a1: *void, a2: nk_size) -> *void #c_callback;
@@ -204,20 +200,20 @@ nk_allocator :: struct {
 }
 
 using nk_symbol_type :: enum s32 {
-        NK_SYMBOL_NONE :: 0;
-        NK_SYMBOL_X :: 1;
-        NK_SYMBOL_UNDERSCORE :: 2;
-        NK_SYMBOL_CIRCLE_SOLID :: 3;
-        NK_SYMBOL_CIRCLE_OUTLINE :: 4;
-        NK_SYMBOL_RECT_SOLID :: 5;
-        NK_SYMBOL_RECT_OUTLINE :: 6;
-        NK_SYMBOL_TRIANGLE_UP :: 7;
-        NK_SYMBOL_TRIANGLE_DOWN :: 8;
-        NK_SYMBOL_TRIANGLE_LEFT :: 9;
-        NK_SYMBOL_TRIANGLE_RIGHT :: 10;
-        NK_SYMBOL_PLUS :: 11;
-        NK_SYMBOL_MINUS :: 12;
-        NK_SYMBOL_MAX :: 13;
+    NK_SYMBOL_NONE :: 0;
+    NK_SYMBOL_X :: 1;
+    NK_SYMBOL_UNDERSCORE :: 2;
+    NK_SYMBOL_CIRCLE_SOLID :: 3;
+    NK_SYMBOL_CIRCLE_OUTLINE :: 4;
+    NK_SYMBOL_RECT_SOLID :: 5;
+    NK_SYMBOL_RECT_OUTLINE :: 6;
+    NK_SYMBOL_TRIANGLE_UP :: 7;
+    NK_SYMBOL_TRIANGLE_DOWN :: 8;
+    NK_SYMBOL_TRIANGLE_LEFT :: 9;
+    NK_SYMBOL_TRIANGLE_RIGHT :: 10;
+    NK_SYMBOL_PLUS :: 11;
+    NK_SYMBOL_MINUS :: 12;
+    NK_SYMBOL_MAX :: 13;
 }
 
 nk_init_fixed :: (unk0: *nk_context, memory: *void, size: nk_size, unk1: *nk_user_font) -> s32 #foreign libnuklear;
@@ -231,45 +227,45 @@ nk_clear :: (unk0: *nk_context) -> void #foreign libnuklear;
 nk_free :: (unk0: *nk_context) -> void #foreign libnuklear;
 
 using nk_keys :: enum s32 {
-        NK_KEY_NONE :: 0;
-        NK_KEY_SHIFT :: 1;
-        NK_KEY_CTRL :: 2;
-        NK_KEY_DEL :: 3;
-        NK_KEY_ENTER :: 4;
-        NK_KEY_TAB :: 5;
-        NK_KEY_BACKSPACE :: 6;
-        NK_KEY_COPY :: 7;
-        NK_KEY_CUT :: 8;
-        NK_KEY_PASTE :: 9;
-        NK_KEY_UP :: 10;
-        NK_KEY_DOWN :: 11;
-        NK_KEY_LEFT :: 12;
-        NK_KEY_RIGHT :: 13;
-        NK_KEY_TEXT_INSERT_MODE :: 14;
-        NK_KEY_TEXT_REPLACE_MODE :: 15;
-        NK_KEY_TEXT_RESET_MODE :: 16;
-        NK_KEY_TEXT_LINE_START :: 17;
-        NK_KEY_TEXT_LINE_END :: 18;
-        NK_KEY_TEXT_START :: 19;
-        NK_KEY_TEXT_END :: 20;
-        NK_KEY_TEXT_UNDO :: 21;
-        NK_KEY_TEXT_REDO :: 22;
-        NK_KEY_TEXT_SELECT_ALL :: 23;
-        NK_KEY_TEXT_WORD_LEFT :: 24;
-        NK_KEY_TEXT_WORD_RIGHT :: 25;
-        NK_KEY_SCROLL_START :: 26;
-        NK_KEY_SCROLL_END :: 27;
-        NK_KEY_SCROLL_DOWN :: 28;
-        NK_KEY_SCROLL_UP :: 29;
-        NK_KEY_MAX :: 30;
+    NK_KEY_NONE :: 0;
+    NK_KEY_SHIFT :: 1;
+    NK_KEY_CTRL :: 2;
+    NK_KEY_DEL :: 3;
+    NK_KEY_ENTER :: 4;
+    NK_KEY_TAB :: 5;
+    NK_KEY_BACKSPACE :: 6;
+    NK_KEY_COPY :: 7;
+    NK_KEY_CUT :: 8;
+    NK_KEY_PASTE :: 9;
+    NK_KEY_UP :: 10;
+    NK_KEY_DOWN :: 11;
+    NK_KEY_LEFT :: 12;
+    NK_KEY_RIGHT :: 13;
+    NK_KEY_TEXT_INSERT_MODE :: 14;
+    NK_KEY_TEXT_REPLACE_MODE :: 15;
+    NK_KEY_TEXT_RESET_MODE :: 16;
+    NK_KEY_TEXT_LINE_START :: 17;
+    NK_KEY_TEXT_LINE_END :: 18;
+    NK_KEY_TEXT_START :: 19;
+    NK_KEY_TEXT_END :: 20;
+    NK_KEY_TEXT_UNDO :: 21;
+    NK_KEY_TEXT_REDO :: 22;
+    NK_KEY_TEXT_SELECT_ALL :: 23;
+    NK_KEY_TEXT_WORD_LEFT :: 24;
+    NK_KEY_TEXT_WORD_RIGHT :: 25;
+    NK_KEY_SCROLL_START :: 26;
+    NK_KEY_SCROLL_END :: 27;
+    NK_KEY_SCROLL_DOWN :: 28;
+    NK_KEY_SCROLL_UP :: 29;
+    NK_KEY_MAX :: 30;
 }
 
 using nk_buttons :: enum s32 {
-        NK_BUTTON_LEFT :: 0;
-        NK_BUTTON_MIDDLE :: 1;
-        NK_BUTTON_RIGHT :: 2;
-        NK_BUTTON_DOUBLE :: 3;
-        NK_BUTTON_MAX :: 4;
+    NK_BUTTON_LEFT :: 0;
+    NK_BUTTON_MIDDLE :: 1;
+    NK_BUTTON_RIGHT :: 2;
+    NK_BUTTON_DOUBLE :: 3;
+    NK_BUTTON_MAX :: 4;
 }
 
 nk_input_begin :: (unk0: *nk_context) -> void #foreign libnuklear;
@@ -291,16 +287,16 @@ nk_input_unicode :: (unk0: *nk_context, unk1: nk_rune) -> void #foreign libnukle
 nk_input_end :: (unk0: *nk_context) -> void #foreign libnuklear;
 
 using nk_anti_aliasing :: enum s32 {
-        NK_ANTI_ALIASING_OFF :: 0;
-        NK_ANTI_ALIASING_ON :: 1;
+    NK_ANTI_ALIASING_OFF :: 0;
+    NK_ANTI_ALIASING_ON :: 1;
 }
 
 using nk_convert_result :: enum s32 {
-        NK_CONVERT_SUCCESS :: 0;
-        NK_CONVERT_INVALID_PARAM :: 1;
-        NK_CONVERT_COMMAND_BUFFER_FULL :: 2;
-        NK_CONVERT_VERTEX_BUFFER_FULL :: 4;
-        NK_CONVERT_ELEMENT_BUFFER_FULL :: 8;
+    NK_CONVERT_SUCCESS :: 0;
+    NK_CONVERT_INVALID_PARAM :: 1;
+    NK_CONVERT_COMMAND_BUFFER_FULL :: 2;
+    NK_CONVERT_VERTEX_BUFFER_FULL :: 4;
+    NK_CONVERT_ELEMENT_BUFFER_FULL :: 8;
 }
 
 nk_draw_null_texture :: struct {
@@ -326,17 +322,17 @@ nk__begin :: (unk0: *nk_context) -> *nk_command #foreign libnuklear;
 nk__next :: (unk0: *nk_context, unk1: *nk_command) -> *nk_command #foreign libnuklear;
 
 using nk_panel_flags :: enum s32 {
-        NK_WINDOW_BORDER :: 1;
-        NK_WINDOW_MOVABLE :: 2;
-        NK_WINDOW_SCALABLE :: 4;
-        NK_WINDOW_CLOSABLE :: 8;
-        NK_WINDOW_MINIMIZABLE :: 16;
-        NK_WINDOW_NO_SCROLLBAR :: 32;
-        NK_WINDOW_TITLE :: 64;
-        NK_WINDOW_SCROLL_AUTO_HIDE :: 128;
-        NK_WINDOW_BACKGROUND :: 256;
-        NK_WINDOW_SCALE_LEFT :: 512;
-        NK_WINDOW_NO_INPUT :: 1024;
+    NK_WINDOW_BORDER :: 1;
+    NK_WINDOW_MOVABLE :: 2;
+    NK_WINDOW_SCALABLE :: 4;
+    NK_WINDOW_CLOSABLE :: 8;
+    NK_WINDOW_MINIMIZABLE :: 16;
+    NK_WINDOW_NO_SCROLLBAR :: 32;
+    NK_WINDOW_TITLE :: 64;
+    NK_WINDOW_SCROLL_AUTO_HIDE :: 128;
+    NK_WINDOW_BACKGROUND :: 256;
+    NK_WINDOW_SCALE_LEFT :: 512;
+    NK_WINDOW_NO_INPUT :: 1024;
 }
 
 nk_begin :: (ctx: *nk_context, title: *u8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign libnuklear;
@@ -494,20 +490,20 @@ nk_list_view_begin :: (unk0: *nk_context, out: *nk_list_view, id: *u8, unk1: nk_
 nk_list_view_end :: (unk0: *nk_list_view) -> void #foreign libnuklear;
 
 using nk_widget_layout_states :: enum s32 {
-        NK_WIDGET_INVALID :: 0;
-        NK_WIDGET_VALID :: 1;
-        NK_WIDGET_ROM :: 2;
+    NK_WIDGET_INVALID :: 0;
+    NK_WIDGET_VALID :: 1;
+    NK_WIDGET_ROM :: 2;
 }
 
 using nk_widget_states :: enum s32 {
-        NK_WIDGET_STATE_MODIFIED :: 2;
-        NK_WIDGET_STATE_INACTIVE :: 4;
-        NK_WIDGET_STATE_ENTERED :: 8;
-        NK_WIDGET_STATE_HOVER :: 16;
-        NK_WIDGET_STATE_ACTIVED :: 32;
-        NK_WIDGET_STATE_LEFT :: 64;
-        NK_WIDGET_STATE_HOVERED :: 18;
-        NK_WIDGET_STATE_ACTIVE :: 34;
+    NK_WIDGET_STATE_MODIFIED :: 2;
+    NK_WIDGET_STATE_INACTIVE :: 4;
+    NK_WIDGET_STATE_ENTERED :: 8;
+    NK_WIDGET_STATE_HOVER :: 16;
+    NK_WIDGET_STATE_ACTIVED :: 32;
+    NK_WIDGET_STATE_LEFT :: 64;
+    NK_WIDGET_STATE_HOVERED :: 18;
+    NK_WIDGET_STATE_ACTIVE :: 34;
 }
 
 nk_widget :: (unk0: *nk_rect, unk1: *nk_context) -> nk_widget_layout_states #foreign libnuklear;
@@ -533,18 +529,18 @@ nk_widget_has_mouse_click_down :: (unk0: *nk_context, unk1: nk_buttons, down: s3
 nk_spacing :: (unk0: *nk_context, cols: s32) -> void #foreign libnuklear;
 
 using nk_text_align :: enum s32 {
-        NK_TEXT_ALIGN_LEFT :: 1;
-        NK_TEXT_ALIGN_CENTERED :: 2;
-        NK_TEXT_ALIGN_RIGHT :: 4;
-        NK_TEXT_ALIGN_TOP :: 8;
-        NK_TEXT_ALIGN_MIDDLE :: 16;
-        NK_TEXT_ALIGN_BOTTOM :: 32;
+    NK_TEXT_ALIGN_LEFT :: 1;
+    NK_TEXT_ALIGN_CENTERED :: 2;
+    NK_TEXT_ALIGN_RIGHT :: 4;
+    NK_TEXT_ALIGN_TOP :: 8;
+    NK_TEXT_ALIGN_MIDDLE :: 16;
+    NK_TEXT_ALIGN_BOTTOM :: 32;
 }
 
 using nk_text_alignment :: enum s32 {
-        NK_TEXT_LEFT :: 17;
-        NK_TEXT_CENTERED :: 18;
-        NK_TEXT_RIGHT :: 20;
+    NK_TEXT_LEFT :: 17;
+    NK_TEXT_CENTERED :: 18;
+    NK_TEXT_RIGHT :: 20;
 }
 
 nk_text :: (unk0: *nk_context, unk1: *u8, unk2: s32, unk3: nk_flags) -> void #foreign libnuklear;
@@ -684,34 +680,34 @@ nk_propertyf :: (unk0: *nk_context, name: *u8, min: float32, val: float32, max: 
 nk_propertyd :: (unk0: *nk_context, name: *u8, min: float64, val: float64, max: float64, step: float64, inc_per_pixel: float32) -> float64 #foreign libnuklear;
 
 using nk_edit_flags :: enum s32 {
-        NK_EDIT_DEFAULT :: 0;
-        NK_EDIT_READ_ONLY :: 1;
-        NK_EDIT_AUTO_SELECT :: 2;
-        NK_EDIT_SIG_ENTER :: 4;
-        NK_EDIT_ALLOW_TAB :: 8;
-        NK_EDIT_NO_CURSOR :: 16;
-        NK_EDIT_SELECTABLE :: 32;
-        NK_EDIT_CLIPBOARD :: 64;
-        NK_EDIT_CTRL_ENTER_NEWLINE :: 128;
-        NK_EDIT_NO_HORIZONTAL_SCROLL :: 256;
-        NK_EDIT_ALWAYS_INSERT_MODE :: 512;
-        NK_EDIT_MULTILINE :: 1024;
-        NK_EDIT_GOTO_END_ON_ACTIVATE :: 2048;
+    NK_EDIT_DEFAULT :: 0;
+    NK_EDIT_READ_ONLY :: 1;
+    NK_EDIT_AUTO_SELECT :: 2;
+    NK_EDIT_SIG_ENTER :: 4;
+    NK_EDIT_ALLOW_TAB :: 8;
+    NK_EDIT_NO_CURSOR :: 16;
+    NK_EDIT_SELECTABLE :: 32;
+    NK_EDIT_CLIPBOARD :: 64;
+    NK_EDIT_CTRL_ENTER_NEWLINE :: 128;
+    NK_EDIT_NO_HORIZONTAL_SCROLL :: 256;
+    NK_EDIT_ALWAYS_INSERT_MODE :: 512;
+    NK_EDIT_MULTILINE :: 1024;
+    NK_EDIT_GOTO_END_ON_ACTIVATE :: 2048;
 }
 
 using nk_edit_types :: enum s32 {
-        NK_EDIT_SIMPLE :: 512;
-        NK_EDIT_FIELD :: 608;
-        NK_EDIT_BOX :: 1640;
-        NK_EDIT_EDITOR :: 1128;
+    NK_EDIT_SIMPLE :: 512;
+    NK_EDIT_FIELD :: 608;
+    NK_EDIT_BOX :: 1640;
+    NK_EDIT_EDITOR :: 1128;
 }
 
 using nk_edit_events :: enum s32 {
-        NK_EDIT_ACTIVE :: 1;
-        NK_EDIT_INACTIVE :: 2;
-        NK_EDIT_ACTIVATED :: 4;
-        NK_EDIT_DEACTIVATED :: 8;
-        NK_EDIT_COMMITED :: 16;
+    NK_EDIT_ACTIVE :: 1;
+    NK_EDIT_INACTIVE :: 2;
+    NK_EDIT_ACTIVATED :: 4;
+    NK_EDIT_DEACTIVATED :: 8;
+    NK_EDIT_COMMITED :: 16;
 }
 
 nk_edit_string :: (unk0: *nk_context, unk1: nk_flags, buffer: *u8, len: *s32, max: s32, unk2: nk_plugin_filter) -> nk_flags #foreign libnuklear;
@@ -859,46 +855,46 @@ nk_menu_close :: (unk0: *nk_context) -> void #foreign libnuklear;
 nk_menu_end :: (unk0: *nk_context) -> void #foreign libnuklear;
 
 using nk_style_colors :: enum s32 {
-        NK_COLOR_TEXT :: 0;
-        NK_COLOR_WINDOW :: 1;
-        NK_COLOR_HEADER :: 2;
-        NK_COLOR_BORDER :: 3;
-        NK_COLOR_BUTTON :: 4;
-        NK_COLOR_BUTTON_HOVER :: 5;
-        NK_COLOR_BUTTON_ACTIVE :: 6;
-        NK_COLOR_TOGGLE :: 7;
-        NK_COLOR_TOGGLE_HOVER :: 8;
-        NK_COLOR_TOGGLE_CURSOR :: 9;
-        NK_COLOR_SELECT :: 10;
-        NK_COLOR_SELECT_ACTIVE :: 11;
-        NK_COLOR_SLIDER :: 12;
-        NK_COLOR_SLIDER_CURSOR :: 13;
-        NK_COLOR_SLIDER_CURSOR_HOVER :: 14;
-        NK_COLOR_SLIDER_CURSOR_ACTIVE :: 15;
-        NK_COLOR_PROPERTY :: 16;
-        NK_COLOR_EDIT :: 17;
-        NK_COLOR_EDIT_CURSOR :: 18;
-        NK_COLOR_COMBO :: 19;
-        NK_COLOR_CHART :: 20;
-        NK_COLOR_CHART_COLOR :: 21;
-        NK_COLOR_CHART_COLOR_HIGHLIGHT :: 22;
-        NK_COLOR_SCROLLBAR :: 23;
-        NK_COLOR_SCROLLBAR_CURSOR :: 24;
-        NK_COLOR_SCROLLBAR_CURSOR_HOVER :: 25;
-        NK_COLOR_SCROLLBAR_CURSOR_ACTIVE :: 26;
-        NK_COLOR_TAB_HEADER :: 27;
-        NK_COLOR_COUNT :: 28;
+    NK_COLOR_TEXT :: 0;
+    NK_COLOR_WINDOW :: 1;
+    NK_COLOR_HEADER :: 2;
+    NK_COLOR_BORDER :: 3;
+    NK_COLOR_BUTTON :: 4;
+    NK_COLOR_BUTTON_HOVER :: 5;
+    NK_COLOR_BUTTON_ACTIVE :: 6;
+    NK_COLOR_TOGGLE :: 7;
+    NK_COLOR_TOGGLE_HOVER :: 8;
+    NK_COLOR_TOGGLE_CURSOR :: 9;
+    NK_COLOR_SELECT :: 10;
+    NK_COLOR_SELECT_ACTIVE :: 11;
+    NK_COLOR_SLIDER :: 12;
+    NK_COLOR_SLIDER_CURSOR :: 13;
+    NK_COLOR_SLIDER_CURSOR_HOVER :: 14;
+    NK_COLOR_SLIDER_CURSOR_ACTIVE :: 15;
+    NK_COLOR_PROPERTY :: 16;
+    NK_COLOR_EDIT :: 17;
+    NK_COLOR_EDIT_CURSOR :: 18;
+    NK_COLOR_COMBO :: 19;
+    NK_COLOR_CHART :: 20;
+    NK_COLOR_CHART_COLOR :: 21;
+    NK_COLOR_CHART_COLOR_HIGHLIGHT :: 22;
+    NK_COLOR_SCROLLBAR :: 23;
+    NK_COLOR_SCROLLBAR_CURSOR :: 24;
+    NK_COLOR_SCROLLBAR_CURSOR_HOVER :: 25;
+    NK_COLOR_SCROLLBAR_CURSOR_ACTIVE :: 26;
+    NK_COLOR_TAB_HEADER :: 27;
+    NK_COLOR_COUNT :: 28;
 }
 
 using nk_style_cursor :: enum s32 {
-        NK_CURSOR_ARROW :: 0;
-        NK_CURSOR_TEXT :: 1;
-        NK_CURSOR_MOVE :: 2;
-        NK_CURSOR_RESIZE_VERTICAL :: 3;
-        NK_CURSOR_RESIZE_HORIZONTAL :: 4;
-        NK_CURSOR_RESIZE_TOP_LEFT_DOWN_RIGHT :: 5;
-        NK_CURSOR_RESIZE_TOP_RIGHT_DOWN_LEFT :: 6;
-        NK_CURSOR_COUNT :: 7;
+    NK_CURSOR_ARROW :: 0;
+    NK_CURSOR_TEXT :: 1;
+    NK_CURSOR_MOVE :: 2;
+    NK_CURSOR_RESIZE_VERTICAL :: 3;
+    NK_CURSOR_RESIZE_HORIZONTAL :: 4;
+    NK_CURSOR_RESIZE_TOP_LEFT_DOWN_RIGHT :: 5;
+    NK_CURSOR_RESIZE_TOP_RIGHT_DOWN_LEFT :: 6;
+    NK_CURSOR_COUNT :: 7;
 }
 
 nk_style_default :: (unk0: *nk_context) -> void #foreign libnuklear;
@@ -1136,14 +1132,14 @@ nk_memory_status :: struct {
 }
 
 using nk_allocation_type :: enum s32 {
-        NK_BUFFER_FIXED :: 0;
-        NK_BUFFER_DYNAMIC :: 1;
+    NK_BUFFER_FIXED :: 0;
+    NK_BUFFER_DYNAMIC :: 1;
 }
 
 using nk_buffer_allocation_type :: enum s32 {
-        NK_BUFFER_FRONT :: 0;
-        NK_BUFFER_BACK :: 1;
-        NK_BUFFER_MAX :: 2;
+    NK_BUFFER_FRONT :: 0;
+    NK_BUFFER_BACK :: 1;
+    NK_BUFFER_MAX :: 2;
 }
 
 nk_buffer_marker :: struct {
@@ -1280,14 +1276,14 @@ nk_text_undo_state :: struct {
 }
 
 using nk_text_edit_type :: enum s32 {
-        NK_TEXT_EDIT_SINGLE_LINE :: 0;
-        NK_TEXT_EDIT_MULTI_LINE :: 1;
+    NK_TEXT_EDIT_SINGLE_LINE :: 0;
+    NK_TEXT_EDIT_MULTI_LINE :: 1;
 }
 
 using nk_text_edit_mode :: enum s32 {
-        NK_TEXT_EDIT_MODE_VIEW :: 0;
-        NK_TEXT_EDIT_MODE_INSERT :: 1;
-        NK_TEXT_EDIT_MODE_REPLACE :: 2;
+    NK_TEXT_EDIT_MODE_VIEW :: 0;
+    NK_TEXT_EDIT_MODE_INSERT :: 1;
+    NK_TEXT_EDIT_MODE_REPLACE :: 2;
 }
 
 nk_text_edit :: struct {
@@ -1346,25 +1342,25 @@ nk_textedit_undo :: (unk0: *nk_text_edit) -> void #foreign libnuklear;
 nk_textedit_redo :: (unk0: *nk_text_edit) -> void #foreign libnuklear;
 
 using nk_command_type :: enum s32 {
-        NK_COMMAND_NOP :: 0;
-        NK_COMMAND_SCISSOR :: 1;
-        NK_COMMAND_LINE :: 2;
-        NK_COMMAND_CURVE :: 3;
-        NK_COMMAND_RECT :: 4;
-        NK_COMMAND_RECT_FILLED :: 5;
-        NK_COMMAND_RECT_MULTI_COLOR :: 6;
-        NK_COMMAND_CIRCLE :: 7;
-        NK_COMMAND_CIRCLE_FILLED :: 8;
-        NK_COMMAND_ARC :: 9;
-        NK_COMMAND_ARC_FILLED :: 10;
-        NK_COMMAND_TRIANGLE :: 11;
-        NK_COMMAND_TRIANGLE_FILLED :: 12;
-        NK_COMMAND_POLYGON :: 13;
-        NK_COMMAND_POLYGON_FILLED :: 14;
-        NK_COMMAND_POLYLINE :: 15;
-        NK_COMMAND_TEXT :: 16;
-        NK_COMMAND_IMAGE :: 17;
-        NK_COMMAND_CUSTOM :: 18;
+    NK_COMMAND_NOP :: 0;
+    NK_COMMAND_SCISSOR :: 1;
+    NK_COMMAND_LINE :: 2;
+    NK_COMMAND_CURVE :: 3;
+    NK_COMMAND_RECT :: 4;
+    NK_COMMAND_RECT_FILLED :: 5;
+    NK_COMMAND_RECT_MULTI_COLOR :: 6;
+    NK_COMMAND_CIRCLE :: 7;
+    NK_COMMAND_CIRCLE_FILLED :: 8;
+    NK_COMMAND_ARC :: 9;
+    NK_COMMAND_ARC_FILLED :: 10;
+    NK_COMMAND_TRIANGLE :: 11;
+    NK_COMMAND_TRIANGLE_FILLED :: 12;
+    NK_COMMAND_POLYGON :: 13;
+    NK_COMMAND_POLYGON_FILLED :: 14;
+    NK_COMMAND_POLYLINE :: 15;
+    NK_COMMAND_TEXT :: 16;
+    NK_COMMAND_IMAGE :: 17;
+    NK_COMMAND_CUSTOM :: 18;
 }
 
 nk_command :: struct {
@@ -1545,8 +1541,8 @@ nk_command_text :: struct {
 }
 
 using nk_command_clipping :: enum s32 {
-        NK_CLIPPING_OFF :: 0;
-        NK_CLIPPING_ON :: 1;
+    NK_CLIPPING_OFF :: 0;
+    NK_CLIPPING_ON :: 1;
 }
 
 nk_command_buffer :: struct {
@@ -1659,8 +1655,8 @@ nk_input_is_key_released :: (unk0: *nk_input, unk1: nk_keys) -> s32 #foreign lib
 nk_input_is_key_down :: (unk0: *nk_input, unk1: nk_keys) -> s32 #foreign libnuklear;
 
 using nk_style_item_type :: enum s32 {
-        NK_STYLE_ITEM_COLOR :: 0;
-        NK_STYLE_ITEM_IMAGE :: 1;
+    NK_STYLE_ITEM_COLOR :: 0;
+    NK_STYLE_ITEM_IMAGE :: 1;
 }
 
 nk_style_item_data :: union {
@@ -1910,8 +1906,8 @@ nk_style_tab :: struct {
 }
 
 using nk_style_header_align :: enum s32 {
-        NK_HEADER_LEFT :: 0;
-        NK_HEADER_RIGHT :: 1;
+    NK_HEADER_LEFT :: 0;
+    NK_HEADER_RIGHT :: 1;
 }
 
 nk_style_window_header :: struct {
@@ -1997,20 +1993,20 @@ nk_style_item_color :: (unk0: nk_color) -> nk_style_item #foreign libnuklear;
 nk_style_item_hide :: () -> nk_style_item #foreign libnuklear;
 
 using nk_panel_type :: enum s32 {
-        NK_PANEL_NONE :: 0;
-        NK_PANEL_WINDOW :: 1;
-        NK_PANEL_GROUP :: 2;
-        NK_PANEL_POPUP :: 4;
-        NK_PANEL_CONTEXTUAL :: 16;
-        NK_PANEL_COMBO :: 32;
-        NK_PANEL_MENU :: 64;
-        NK_PANEL_TOOLTIP :: 128;
+    NK_PANEL_NONE :: 0;
+    NK_PANEL_WINDOW :: 1;
+    NK_PANEL_GROUP :: 2;
+    NK_PANEL_POPUP :: 4;
+    NK_PANEL_CONTEXTUAL :: 16;
+    NK_PANEL_COMBO :: 32;
+    NK_PANEL_MENU :: 64;
+    NK_PANEL_TOOLTIP :: 128;
 }
 
 using nk_panel_set :: enum s32 {
-        NK_PANEL_SET_NONBLOCK :: 240;
-        NK_PANEL_SET_POPUP :: 244;
-        NK_PANEL_SET_SUB :: 246;
+    NK_PANEL_SET_NONBLOCK :: 240;
+    NK_PANEL_SET_POPUP :: 244;
+    NK_PANEL_SET_SUB :: 246;
 }
 
 nk_chart_slot :: struct {
@@ -2035,16 +2031,16 @@ nk_chart :: struct {
 }
 
 using nk_panel_row_layout_type :: enum s32 {
-        NK_LAYOUT_DYNAMIC_FIXED :: 0;
-        NK_LAYOUT_DYNAMIC_ROW :: 1;
-        NK_LAYOUT_DYNAMIC_FREE :: 2;
-        NK_LAYOUT_DYNAMIC :: 3;
-        NK_LAYOUT_STATIC_FIXED :: 4;
-        NK_LAYOUT_STATIC_ROW :: 5;
-        NK_LAYOUT_STATIC_FREE :: 6;
-        NK_LAYOUT_STATIC :: 7;
-        NK_LAYOUT_TEMPLATE :: 8;
-        NK_LAYOUT_COUNT :: 9;
+    NK_LAYOUT_DYNAMIC_FIXED :: 0;
+    NK_LAYOUT_DYNAMIC_ROW :: 1;
+    NK_LAYOUT_DYNAMIC_FREE :: 2;
+    NK_LAYOUT_DYNAMIC :: 3;
+    NK_LAYOUT_STATIC_FIXED :: 4;
+    NK_LAYOUT_STATIC_ROW :: 5;
+    NK_LAYOUT_STATIC_FREE :: 6;
+    NK_LAYOUT_STATIC :: 7;
+    NK_LAYOUT_TEMPLATE :: 8;
+    NK_LAYOUT_COUNT :: 9;
 }
 
 nk_row_layout :: struct {
@@ -2101,14 +2097,14 @@ nk_panel :: struct {
 }
 
 using nk_window_flags :: enum s32 {
-        NK_WINDOW_PRIVATE :: 2048;
-        NK_WINDOW_DYNAMIC :: 2048;
-        NK_WINDOW_ROM :: 4096;
-        NK_WINDOW_NOT_INTERACTIVE :: 5120;
-        NK_WINDOW_HIDDEN :: 8192;
-        NK_WINDOW_CLOSED :: 16384;
-        NK_WINDOW_MINIMIZED :: 32768;
-        NK_WINDOW_REMOVE_ROM :: 65536;
+    NK_WINDOW_PRIVATE :: 2048;
+    NK_WINDOW_DYNAMIC :: 2048;
+    NK_WINDOW_ROM :: 4096;
+    NK_WINDOW_NOT_INTERACTIVE :: 5120;
+    NK_WINDOW_HIDDEN :: 8192;
+    NK_WINDOW_CLOSED :: 16384;
+    NK_WINDOW_MINIMIZED :: 32768;
+    NK_WINDOW_REMOVE_ROM :: 65536;
 }
 
 nk_popup_state :: struct {
