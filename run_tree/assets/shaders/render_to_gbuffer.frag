@@ -8,6 +8,7 @@ layout (location = 4) out float g_metallic;
 
 in vec2 tex_coords;
 in vec3 frag_pos;
+in vec4 view_space_frag_pos;
 in vec3 normal;
 in vec3 vertex_color;
 in mat3 TBN;
@@ -51,4 +52,6 @@ void main() {
 
     g_roughness = material.roughness;
     g_metallic  = material.metallic;
+
+    // gl_FragDepth = length(view_space_frag_pos.xyz) / 100.0;
 }

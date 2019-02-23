@@ -21,6 +21,9 @@ struct Light {
     vec3 radiance_color;
     float radius;
 
+    // int use_shadow_cubemap;
+    // samplerCube shadow_cube_map;
+
     // @TODO we probably want information on things like spherical lights and area lights
 };
 
@@ -83,6 +86,14 @@ void main() {
         frag_color = vec4(in_diffuse, 1);
         return;
     }
+
+    // if (light.use_shadow_cubemap != 0) {
+    //     float dist = texture(light.shadow_cube_map, (frag_pos-light.position)).r * 100.0;
+    //     if ((dist + 0.10) < (length(frag_pos-light.position))) {
+    //         frag_color = vec4(0);
+    //         return;
+    //     }
+    // }
 
     vec3 N = normalize(normal);
 

@@ -27,9 +27,59 @@ Texture :: struct {
     height: u32;
 
     id: u32;
+    gl_binding: u32;
 
     #destructor delete_texture;
 };
+
+// Right now if you want a Cube_Map, you can only have either depth or color per face, not both.
+// The reason for this is that I dont currently see a need for referencing both color and texture after
+// the map is generated. If a face is a color-texture, a temporary depth buffer will be attached to the
+// framebuffer used to accomodate.
+Cube_Map :: struct {
+    id: u32;
+    left: Texture;
+    right: Texture;
+    up: Texture;
+    down: Texture;
+    front: Texture;
+    back: Texture;
+}
+
+create_cube_map :: (map: *Cube_Map, size: u32, type: Texture.Texture_Type) {
+    glGenTextures(1, *map.id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, map.id);
+
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    create_cube_map_face_texture :: (tex: *Texture, size: u32,  id: u32, gl_binding: u32, type: Texture.Texture_Type) {
+        tex.type = type;
+        tex.id = id;
+        tex.width = size;
+        tex.height = size;
+        tex.gl_binding = gl_binding;
+
+        internal_format, format, ty := get_internal_texture_infomation(type);
+
+        glTexImage2D(gl_binding, 0, internal_format, size, size, 0, format, ty, null);
+    }
+
+    id := map.id;
+    create_cube_map_face_texture(*map.left,  size=size, id=id, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, type);
+    create_cube_map_face_texture(*map.right, size=size, id=id, GL_TEXTURE_CUBE_MAP_POSITIVE_X, type);
+
+    create_cube_map_face_texture(*map.up,    size=size, id=id, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, type);
+    create_cube_map_face_texture(*map.down,  size=size, id=id, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, type);
+    
+    create_cube_map_face_texture(*map.front, size=size, id=id, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, type);
+    create_cube_map_face_texture(*map.back,  size=size, id=id, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, type);
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+}
 
 Viewport :: struct {
     x: s32;
@@ -62,23 +112,35 @@ set_frame_buffer_textures :: (fb: *Frame_Buffer, color_texture: *Texture, depth_
     glBindFramebuffer(GL_FRAMEBUFFER, fb.id);
 
     if fb.color_texture {
-        glBindTexture(GL_TEXTURE_2D, fb.color_texture.id);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fb.color_texture.id, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, fb.color_texture.gl_binding, fb.color_texture.id, 0);
+
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    } else {
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
     }
 
     if fb.depth_texture {
-        glBindTexture(GL_TEXTURE_2D, fb.depth_texture.id);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fb.depth_texture.id, 0);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, fb.depth_texture.id, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,   fb.depth_texture.gl_binding, fb.depth_texture.id, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, fb.depth_texture.gl_binding, fb.depth_texture.id, 0);
+    } else {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,   GL_TEXTURE_2D, 0, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
     }
 
-    if color_texture || depth_texture then assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+    if color_texture || depth_texture {
+        status := glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if status != GL_FRAMEBUFFER_COMPLETE {
+            print("Frame_Buffer status: %\n", status);
+        }
+    }
 
     tex: *Texture;
     if color_texture tex = color_texture;
     else tex = depth_texture;
     
-    if tex set_viewport(fb, make_Viewport(0, 0, tex.width, tex.height));
+    if tex then set_viewport(fb, make_Viewport(0, 0, tex.width, tex.height));
 }
 
 create_frame_buffer_from_textures :: (using rdr: *GL_Renderer, color_texture: *Texture, depth_texture: *Texture) -> Frame_Buffer {
@@ -105,9 +167,6 @@ create_frame_buffer :: (using rdr: *GL_Renderer, width: u32, height: u32) -> Fra
 
     glGenFramebuffers(1, *buf.id);
     glBindFramebuffer(GL_FRAMEBUFFER, buf.id);
-
-    attach: [1] u32 = {:u32: GL_COLOR_ATTACHMENT0 };
-    glDrawBuffers(xx attach.count, attach.data);
 
     set_frame_buffer_textures(*buf, buf.color_texture, buf.depth_texture);
 
@@ -301,6 +360,10 @@ Light :: struct {
     radiance: Color;
 
     radius: float;
+
+
+    // Hidden properties filled in by the engine
+    shadow_cube_map: Cube_Map;
 };
 
 Shader :: struct {
@@ -351,6 +414,8 @@ GL_Renderer :: struct {
     water_reflect_frame_buffer: Frame_Buffer;
     water_refract_frame_buffer: Frame_Buffer;
     scratch_frame_buffer: Frame_Buffer;
+
+    temp_frame_buffer: Frame_Buffer;
 
     wireframe_material: *Material;
     light_sphere: *Model;
@@ -443,7 +508,10 @@ debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, l
 			// print("length: %\n", length);
 			// print("message: %\n", message);
 			// print("userParam: %\n", userParam);
-			if type == GL_DEBUG_TYPE_ERROR print("GL Error:%\n", point_at_c_string(message));
+			if type == GL_DEBUG_TYPE_ERROR {
+                print("GL Error:%\n", point_at_c_string(message));
+                assert(false);
+            }
 		}
 	}
 }
@@ -483,6 +551,7 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     water_reflect_frame_buffer = create_frame_buffer(rdr, width, height);
     water_refract_frame_buffer = create_frame_buffer(rdr, width, height);
     scratch_frame_buffer = create_frame_buffer_from_textures(rdr, create_texture(width, height, null, Texture.RGBA32F), create_texture(width, height, null, Texture.DEPTH));
+    temp_frame_buffer = create_frame_buffer_from_textures(rdr, null, null);
 
     glGenFramebuffers(1, *gbuffer_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
@@ -573,10 +642,7 @@ update_texture :: (tex: *Texture, data: *void) {
     resize_texture(tex, tex.width, tex.height, data);
 }
 
-resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
-    glBindTexture(GL_TEXTURE_2D, tex.id);
-    type := tex.type;
-
+get_internal_texture_infomation :: (type: Texture.Texture_Type) -> (interal_format: GLint, format: GLenum, data_type: u32) {
     interal_format: GLint;
     format: GLenum;
     ty: u32 = GL_UNSIGNED_BYTE;
@@ -597,6 +663,13 @@ resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
             print("Unhandled texture type: %\n", type);
     }
 
+    return interal_format, format, ty;
+}
+
+resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
+    glBindTexture(GL_TEXTURE_2D, tex.id);
+    type := tex.type;
+    interal_format, format, ty := get_internal_texture_infomation(type);
     glTexImage2D(GL_TEXTURE_2D, 0, interal_format, width, height, 0, format, ty, data);
     tex.width = width;
     tex.height = height;
@@ -605,10 +678,12 @@ resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
 create_texture :: (tex: *Texture, width: u32, height: u32, data: *void, type := Texture.RGBA) {
     texId: GLuint;
     glGenTextures(1, *texId);
+    print("CREAT TEXTURE: %\n", texId);
     tex.type = type;
     tex.width = width;
     tex.height = height;
     tex.id = texId;
+    tex.gl_binding = GL_TEXTURE_2D;
 
     resize_texture(tex, width, height, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Filtering
@@ -924,6 +999,38 @@ draw_rect_multi_color :: (using rdr: GL_Renderer, x: float, y: float, width: flo
     
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
+    glDeleteBuffers(1, *buf);
+
+    glDisable(GL_BLEND);
+}
+
+draw_triangle :: (using rdr: GL_Renderer, a: Vector2, b: Vector2, c: Vector2, color: Color) {
+    glUseProgram(render_rect.id);
+    // if !model_matrix then
+    update_matrices(rdr, matrix_identity(), render_rect);
+    // else update_matrices(rdr, <<model_matrix, render_rect);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    arr: [3] Vector2;
+    arr[2] = a;   
+    arr[1] = b;
+    arr[0] = c;
+
+    buf: u32;
+    glGenBuffers(1, *buf);
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    glBufferData(GL_ARRAY_BUFFER, arr.count*size_of(Vector2), arr.data, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttrib4f(1, color.r, color.g, color.b, color.a);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, null);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    
+    glDisableVertexAttribArray(0);
     glDeleteBuffers(1, *buf);
 
     glDisable(GL_BLEND);
@@ -1266,6 +1373,9 @@ finish_scene :: (using rdr: *GL_Renderer) {
     light_position_direction := glGetUniformLocation(render_light_using_gbuffer.id, "light.position");
     light_radius             := glGetUniformLocation(render_light_using_gbuffer.id, "light.radius");
     light_radiance_color     := glGetUniformLocation(render_light_using_gbuffer.id, "light.radiance_color");
+    light_use_shadow_cubemap := glGetUniformLocation(render_light_using_gbuffer.id, "light.use_shadow_cubemap");
+    light_shadow_cubemap     := glGetUniformLocation(render_light_using_gbuffer.id, "light.shadow_cube_map");
+
 
     assert(tex_normal != -1);
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
@@ -1287,6 +1397,16 @@ finish_scene :: (using rdr: *GL_Renderer) {
             glUniform3f(light_position_direction, it.position.x, it.position.y, it.position.z);
             glUniform3f(light_radiance_color,     it.radiance.r, it.radiance.g, it.radiance.b);
             glUniform1f(light_radius,             it.radius);
+
+            // if it.shadow_cube_map.id {
+            //     glActiveTexture(GL_TEXTURE5);
+            //     glBindTexture(GL_TEXTURE_CUBE_MAP, it.shadow_cube_map.id);
+            //     glUniform1i(light_shadow_cubemap, 5);
+            //     glUniform1i(light_use_shadow_cubemap, 1);
+            //     glActiveTexture(GL_TEXTURE0);
+            // } else {
+            //     glUniform1i(light_use_shadow_cubemap, 0);
+            // }
             
             light_sphere.model_matrix = matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_scale(it.radius, it.radius, it.radius);
             draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
@@ -1601,6 +1721,10 @@ set_viewport :: (fb: *Frame_Buffer, v: Viewport) {
 use_viewport :: (v: Viewport) {
     glViewport(v.x, v.y, v.w, v.h);
     assert(v.w > 0 && v.h > 0);
+}
+
+render_light_csm :: (using rdr: GL_Renderer, light: *Light) {
+
 }
 
 #if DEVELOPER {

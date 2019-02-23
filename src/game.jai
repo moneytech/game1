@@ -327,6 +327,52 @@ draw_geometry :: (using game: *Game, water := false) {
     set_clip_plane(renderer, false);
 }
 
+render_geometry_cube_map :: (using game: *Game, map: *Cube_Map, point: Vector3) {
+    old_camera := renderer.camera;
+    defer renderer.camera = old_camera;
+
+    old_proj := renderer.projection_matrix;
+    defer renderer.projection_matrix = old_proj;
+
+    old_frame_buffer := renderer.current_frame_buffer;
+    defer use_frame_buffer(renderer, old_frame_buffer);
+
+    // @TODO what's a reasonable far plane distance for shadow mapping?
+    // @TODO what's a reasonable max radius of point lights ?
+    // @TODO maybe pass in the projection matrix from outside render_geometry_cube_map so that user code can use custom near/far ?
+    renderer.projection_matrix = matrix_perspective(90, 1, near=1.0, far=1000.0) * matrix_scale(1, -1, 1);
+    renderer.camera.position = point;
+    render_face :: (using game: *Game, texture: *Texture, orientation: Quaternion) {
+        renderer.camera.rotation = orientation;
+
+        color: *Texture;
+        depth: *Texture;
+
+        if texture.type == Texture.DEPTH {
+            depth = texture;
+        } else {
+            color = texture;
+        }
+        set_frame_buffer_textures(*renderer.temp_frame_buffer, color, depth);
+        use_frame_buffer(renderer, *renderer.temp_frame_buffer);
+
+        draw_geometry(game, water=false);
+    }
+
+    renderer.projection_matrix = matrix_perspective(90, 1, near=1.0, far=1000.0) * matrix_scale(1, 1, -1);
+    render_face(game, *map.up,     set_angle_vector( PI/2, 1, 0, 0));
+    renderer.projection_matrix = matrix_perspective(90, 1, near=1.0, far=1000.0) * matrix_scale(1, 1, 1);
+    render_face(game, *map.down,   set_angle_vector(-PI/2, 1, 0, 0));
+
+    renderer.projection_matrix = matrix_perspective(90, 1, near=1.0, far=1000.0) * matrix_scale(-1, -1, 1);
+    render_face(game, *map.front,  set_angle_vector(  0,   0, 1, 0));
+    render_face(game, *map.back,   set_angle_vector( PI,   0, 1, 0));
+
+    renderer.projection_matrix = matrix_perspective(90, 1, near=1.0, far=1000.0) * matrix_scale(1, -1, -1);
+    render_face(game, *map.left,   set_angle_vector(-PI/2, 0, 1, 0));
+    render_face(game, *map.right,  set_angle_vector( PI/2, 0, 1, 0));
+}
+
 update_game :: (game: *Game, dt: float) {
 
     was_resized, record := is_a_window_resized();
@@ -352,6 +398,19 @@ update_game :: (game: *Game, dt: float) {
 }
 
 render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
+    game.renderer.lights.count = 0;
+
+    for game.current_scene.lights {
+        if it.type == Light_Type.DIRECTIONAL {
+            // @TODO
+        } else {
+            // if it.shadow_cube_map.id == 0 {
+            //     create_cube_map(*it.shadow_cube_map, 1024, Texture.DEPTH);
+            // }
+            // render_geometry_cube_map(game, *it.shadow_cube_map, it.position);
+        }
+    }
+
     game.renderer.lights = game.current_scene.lights;
 
     // game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);

@@ -28,9 +28,23 @@ make_Color :: (col: nk_colorf) -> Color {
     return make_Color(r, g, b, a);
 }
 
+make_Vector2 :: (vec: nk_vec2i) -> Vector2 {
+    v: Vector2 = ---;
+    v.x = cast(float) vec.x;
+    v.y = cast(float) vec.y;
+    return v;
+}
+
 render_imgui :: (renderer: *GL_Renderer, ctx: *nk_context) {
     for ctx {
         if it.type == {
+            case NK_COMMAND_TRIANGLE_FILLED;
+                tri := cast(*nk_command_triangle_filled) it;
+                c := nk_color_cf(tri.color);
+                color := make_Color(c);
+                // draw_rect(<<renderer, cast(float) rect.x, cast(float) rect.y, cast(float) rect.w, cast(float) rect.h, color);
+                V2 :: make_Vector2;
+                draw_triangle(<<renderer, V2(tri.a), V2(tri.b), V2(tri.c), color);
             case NK_COMMAND_RECT_FILLED;
                 rect := cast(*nk_command_rect_filled) it;
                 c := nk_color_cf(rect.color);

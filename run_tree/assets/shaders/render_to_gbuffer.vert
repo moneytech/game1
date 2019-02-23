@@ -8,6 +8,7 @@ layout (location = 4) in vec3 in_color;
 
 out vec2 tex_coords;
 out vec3 frag_pos;
+// out vec4 view_space_frag_pos;
 out vec3 normal;
 out vec3 vertex_color;
 out mat3 TBN;
@@ -40,4 +41,5 @@ void main() {
 	}
 
     gl_Position = projection * view * model * vec4(in_pos, 1);
+    // view_space_frag_pos = view * model * vec4(in_pos, 1);
 }

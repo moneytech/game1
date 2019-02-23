@@ -620,12 +620,32 @@ matrix_scale :: (x: float, y: float, z: float) -> Matrix4 {
     return mat;
 }
 
-matrix_perspective :: (fov: float, aspect: float, _near: float, _far: float) -> Matrix4 {
-    t := cast(float) tan(fov * 3.14159 / 720.0) * _near;
+matrix_perspective :: (fov: float, aspect: float, near: float, far: float) -> Matrix4 {
+    t := cast(float) tan(fov * (TAU / 720.0)) * near;
     b := -t;
     l := aspect * b;
     r := aspect * t;
-    return matrix_frustum(l, r, b, t, _near, _far);
+    return matrix_frustum(l, r, b, t, near, far);
+}
+
+// Based on https://lxjk.github.io/2017/04/15/Calculate-Minimal-Bounding-Sphere-of-Frustum.html
+calculate_bounding_sphere_of_frustum :: (fov: float, width: float, height: float, near: float, far: float) -> (center: Vector3, radius: float) {
+    h2 := height*height;
+    w2 := width*width;
+    k := sqrt(1 + (h2 / w2)) * tan(fov / 2);
+
+    k2 := k*k;
+
+    a := far - near;
+    b := far + near;
+    if k2 >= (a / b) {
+        return center=make_Vector3(0, 0, -far), radius=(far * k);
+    } else {
+        C := make_Vector3(0, 0, -0.5 * b * (1 + k2));
+        R := 0.5 * sqrt(a*a + 2*(far*far + near*near)*k2 + b*b*k2*k2);
+
+        return center=C, radius=R;
+    }
 }
 
 viewport_scale :: (fov: float, aspect: float, _near: float) -> float, float {

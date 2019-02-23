@@ -133,69 +133,121 @@ draw_scene_with_pick_id :: (rdr: *GL_Renderer, sc: Scene) {
     // for sc.models draw_picking_model(rdr, <<it, cast(s32) (it_index+1));
 }
 
+#scope_file
+
+to_nk_colorf :: (c: Color) -> nk_colorf {
+    out: nk_colorf;
+    out.r = c.r;
+    out.g = c.g;
+    out.b = c.b;
+    out.a = c.a;
+    return out;
+}
+
+color_chooser_combo_box :: (nuklear: *nk_context, color_current: Color) -> Color {
+
+    combo_color2 := to_nk_colorf(color_current);
+    if (nk_combo_begin_color(nuklear, nk_rgb_cf(combo_color2), _nk_vec2(200,400))) {
+        using color_mode :: enum {
+            COL_RGB;
+            COL_HSV;
+        }
+        col_mode := COL_RGB;
+
+        nk_layout_row_dynamic(nuklear, 120, 1);
+        combo_color2 = nk_color_picker(nuklear, combo_color2, NK_RGBA);
+        
+        nk_layout_row_dynamic(nuklear, 25, 2);
+
+        // if nk_option_label(nuklear, "RGB", cast(s32) (col_mode == COL_RGB)) then col_mode = COL_RGB;
+        // if nk_option_label(nuklear, "HSV", cast(s32) (col_mode == COL_HSV)) then col_mode = COL_HSV;
+
+        nk_layout_row_dynamic(nuklear, 25, 1);
+        if (col_mode == COL_RGB) {
+            combo_color2.r = nk_propertyf(nuklear, "#R:", 0, combo_color2.r, 1.0, 0.01, 0.005);
+            combo_color2.g = nk_propertyf(nuklear, "#G:", 0, combo_color2.g, 1.0, 0.01, 0.005);
+            combo_color2.b = nk_propertyf(nuklear, "#B:", 0, combo_color2.b, 1.0, 0.01, 0.005);
+            combo_color2.a = nk_propertyf(nuklear, "#A:", 0, combo_color2.a, 1.0, 0.01, 0.005);
+        } else {
+            hsva: [4] float;
+            nk_colorf_hsva_fv(hsva.data, combo_color2);
+            hsva[0] = nk_propertyf(nuklear, "#H:", 0, hsva[0], 1.0, 0.01, 0.05);
+            hsva[1] = nk_propertyf(nuklear, "#S:", 0, hsva[1], 1.0, 0.01, 0.05);
+            hsva[2] = nk_propertyf(nuklear, "#V:", 0, hsva[2], 1.0, 0.01, 0.05);
+            hsva[3] = nk_propertyf(nuklear, "#A:", 0, hsva[3], 1.0, 0.01, 0.05);
+            combo_color2 = nk_hsva_colorfv(hsva.data);
+        }
+        nk_combo_end(nuklear);
+    }
+
+    return make_Color(combo_color2);
+}
+
+do_material_properties :: (nuklear: *nk_context, material: *Material) {
+    nk_layout_row_dynamic(nuklear, 30, 2);
+                
+    nk_label(nuklear, "Base Color:", NK_TEXT_LEFT);
+    material.diffuse = color_chooser_combo_box(nuklear, material.diffuse);
+
+    nk_layout_row_begin(nuklear, NK_STATIC, 50, 2);
+    nk_layout_row_push(nuklear, 100);
+    nk_label(nuklear, "Roughness:", NK_TEXT_LEFT);
+    nk_layout_row_push(nuklear, 200);
+    nk_slider_float(nuklear, 0.0, *material.roughness, 1.0, 0.01);
+    
+    nk_layout_row_push(nuklear, 100);
+    nk_label(nuklear, "Metallic:", NK_TEXT_LEFT);
+    nk_layout_row_push(nuklear, 200);
+    nk_slider_float(nuklear, 0.0, *material.metallic, 1.0, 0.01);
+}
+
+#scope_export
+
 
 update_editor :: (game: *Game, dt: float) {
     input_intercepted := false;
     if selected_game_object {
         using game;
 
-        to_nk_colorf :: (c: Color) -> nk_colorf {
-            out: nk_colorf;
-            out.r = c.r;
-            out.g = c.g;
-            out.b = c.b;
-            out.a = c.a;
-            return out;
-        }
+        // if nk_begin(*nuklear, "Scene", _nk_rect(50, 50, 300, 400), xx
+        //         (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) {
+
+        // }
+
+        // if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
+        //     input_intercepted = true;
+        // }
 
         if selected_game_object.object_type == Actor {
             actor := cast(*Actor) selected_game_object;
 
-            if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 300, 400), xx
-                (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
-                /* fixed widget pixel width */
-                nk_layout_row_dynamic(*nuklear, 200, 1);
-                
-                col := nk_color_picker(*nuklear, to_nk_colorf(actor.model.meshes[0].material.diffuse), NK_RGB);
-                actor.model.meshes[0].material.diffuse = make_Color(col);
-
-                nk_layout_row_dynamic(*nuklear, 50, 1);
-                nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.roughness, 1.0, 0.01);
-                nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.metallic, 1.0, 0.01);
+            if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 300, 400), (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+                do_material_properties(*nuklear, actor.model.meshes[0].material);
             }
 
-            if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
-                input_intercepted = true;
-            }
             nk_end(*nuklear);
         } else if selected_game_object.object_type == Light {
             light := cast(*Light) selected_game_object;
 
-            if (nk_begin(*nuklear, "Light", _nk_rect(50, 50, 300, 400), xx
-                (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+            if (nk_begin(*nuklear, "Light", _nk_rect(50, 50, 300, 400), (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
                 /* fixed widget pixel width */
                 nk_layout_row_dynamic(*nuklear, 200, 1);
-                to_nk_colorf :: (c: Color) -> nk_colorf {
-                    out: nk_colorf;
-                    out.r = c.r;
-                    out.g = c.g;
-                    out.b = c.b;
-                    out.a = c.a;
-                    return out;
-                }
+    
                 col := nk_color_picker(*nuklear, to_nk_colorf(light.radiance), NK_RGB);
                 light.radiance = make_Color(col);
 
+                // @OTOD not valid for directional lights
                 nk_layout_row_dynamic(*nuklear, 50, 1);
-                nk_slider_float(*nuklear, 0.0, *light.radius, 100.0, 0.01);
+                light.radius = nk_propertyf(*nuklear, "#Radius:", 0, light.radius, 100000.0, 0.1, 0.05);
                 // nk_slider_float(*nuklear, 0.0, *actor.model.meshes[0].material.metallic, 1.0, 0.01);
             }
 
-            if nk_input_is_mouse_hovering_rect(*nuklear.input, nk_window_get_bounds(*nuklear)) {
-                input_intercepted = true;
-            }
             nk_end(*nuklear);
         }
+    }
+
+    if nk_window_is_any_hovered(*game.nuklear) {
+        input_intercepted = true;
     }
 
     if input_intercepted return;

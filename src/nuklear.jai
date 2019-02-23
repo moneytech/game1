@@ -321,7 +321,7 @@ nk__begin :: (unk0: *nk_context) -> *nk_command #foreign libnuklear;
 
 nk__next :: (unk0: *nk_context, unk1: *nk_command) -> *nk_command #foreign libnuklear;
 
-using nk_panel_flags :: enum s32 {
+using nk_panel_flags :: enum_flags nk_flags {
     NK_WINDOW_BORDER :: 1;
     NK_WINDOW_MOVABLE :: 2;
     NK_WINDOW_SCALABLE :: 4;
@@ -335,9 +335,9 @@ using nk_panel_flags :: enum s32 {
     NK_WINDOW_NO_INPUT :: 1024;
 }
 
-nk_begin :: (ctx: *nk_context, title: *u8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign libnuklear;
+nk_begin :: (ctx: *nk_context, title: *u8, bounds: nk_rect, flags: nk_panel_flags) -> s32 #foreign libnuklear;
 
-nk_begin_titled :: (ctx: *nk_context, name: *u8, title: *u8, bounds: nk_rect, flags: nk_flags) -> s32 #foreign libnuklear;
+nk_begin_titled :: (ctx: *nk_context, name: *u8, title: *u8, bounds: nk_rect, flags: nk_panel_flags) -> s32 #foreign libnuklear;
 
 nk_end :: (ctx: *nk_context) -> void #foreign libnuklear;
 
@@ -537,7 +537,7 @@ using nk_text_align :: enum s32 {
     NK_TEXT_ALIGN_BOTTOM :: 32;
 }
 
-using nk_text_alignment :: enum s32 {
+using nk_text_alignment :: enum nk_flags {
     NK_TEXT_LEFT :: 17;
     NK_TEXT_CENTERED :: 18;
     NK_TEXT_RIGHT :: 20;
@@ -551,9 +551,9 @@ nk_text_wrap :: (unk0: *nk_context, unk1: *u8, unk2: s32) -> void #foreign libnu
 
 nk_text_wrap_colored :: (unk0: *nk_context, unk1: *u8, unk2: s32, unk3: nk_color) -> void #foreign libnuklear;
 
-nk_label :: (unk0: *nk_context, unk1: *u8, align: nk_flags) -> void #foreign libnuklear;
+nk_label :: (unk0: *nk_context, unk1: *u8, align: nk_text_alignment) -> void #foreign libnuklear;
 
-nk_label_colored :: (unk0: *nk_context, unk1: *u8, align: nk_flags, unk2: nk_color) -> void #foreign libnuklear;
+nk_label_colored :: (unk0: *nk_context, unk1: *u8, align: nk_text_alignment, unk2: nk_color) -> void #foreign libnuklear;
 
 nk_label_wrap :: (unk0: *nk_context, unk1: *u8) -> void #foreign libnuklear;
 
