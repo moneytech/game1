@@ -1,4 +1,12 @@
-#version 330 core
+#if FRAGMENT_SHADER
+
+void main() {
+
+}
+
+#endif // FRAGMENT_SHADER
+
+#if VERTEX_SHADER
 
 layout (location = 0) in vec3 in_pos;
 
@@ -14,3 +22,5 @@ uniform mat4 model;
 void main() {
     gl_Position = projection * view * model * vec4(in_pos, 1.0);
 }
+
+#endif // VERTEX_SHADER

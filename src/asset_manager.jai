@@ -136,26 +136,21 @@ load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
 reload_shader :: (using asset_man: *Asset_Manager, path: string) {
     deps := get_slot(*shader_catalog, path).dependencies;
     for deps {
-        // kind of wastefull, we can speed this up by detecting which shader it is early (extension check)
-        vsrc := read_entire_file(it.vert_path);
-        fsrc := read_entire_file(it.frag_path);
-        compile_shader_source(it, vsrc, fsrc);
-        free(vsrc);
-        free(fsrc);
+        // kind of wasteful, we can speed this up by detecting which shader it is early (extension check)
+        src := read_entire_file(it.source_path);
+        compile_shader_source(it, src, src);
+        free(src);
     }
 }
 
-// Load vert/frag pair as a new shader
-load_shader_pair :: (using asset_man: *Asset_Manager, vpath: string, fpath: string) -> *Shader {
-    vert := read_entire_file(vpath);
-    frag := read_entire_file(fpath);
-    sh := compile_shader_source(vert, frag);
-    array_add(*get_slot(*shader_catalog, vpath).dependencies, sh);
-    array_add(*get_slot(*shader_catalog, fpath).dependencies, sh);
-    sh.vert_path = copy_string(vpath);
-    sh.frag_path = copy_string(fpath);
-    free(vert);
-    free(frag);
+load_shader :: (using asset_man: *Asset_Manager, path: string) -> *Shader {
+    source, success := read_entire_file(path);
+    if !success then return null; // print error ?
+
+    sh := compile_shader_source(source);
+    array_add(*get_slot(*shader_catalog, path).dependencies, sh);
+    sh.source_path = copy_string(path);
+    free(source);
     return sh;
 }
 
@@ -406,7 +401,7 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
     normals: [..] Vector3;
     tex_coords: [..] Vector2;
     ml_get_token(*st, *tok);
-    while(tok.type != ML_TOKEN_END) {
+    while (tok.type != ML_TOKEN_END) {
         if (tok.type == xx #char "#") {
             current_line := tok.line_number;
             while (tok.line_number == current_line && tok.type != ML_TOKEN_END)

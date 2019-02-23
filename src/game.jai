@@ -230,15 +230,15 @@ init_game :: (window_title: string, options: ..string) -> *Game {
 
     game.water_dudv_texture = load_image(game.asset_man, "assets/water_dudv.png");
 
-    game.renderer.render_to_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_to_gbuffer.vert", "assets/shaders/render_to_gbuffer.frag");
-    game.renderer.render_light_using_gbuffer = load_shader_pair(asset_man, "assets/shaders/render_light_using_gbuffer.vert", "assets/shaders/render_light_using_gbuffer.frag");
-    game.renderer.render_plain_texture = load_shader_pair(asset_man, "assets/shaders/render_plain_texture.vert", "assets/shaders/render_plain_texture.frag");
-    game.renderer.picking_shader = load_shader_pair(asset_man, "assets/shaders/picking.vert", "assets/shaders/picking.frag");
-    game.renderer.render_text = load_shader_pair(asset_man, "assets/shaders/render_text.vert", "assets/shaders/render_text.frag");
-    game.renderer.render_rect = load_shader_pair(asset_man, "assets/shaders/render_rect.vert", "assets/shaders/render_rect.frag");
-    game.renderer.render_water = load_shader_pair(asset_man, "assets/shaders/render_water.vert", "assets/shaders/render_water.frag");
-    game.renderer.render_gamma_correction = load_shader_pair(asset_man, "assets/shaders/render_plain_texture.vert", "assets/shaders/gamma_correction.frag");
-    game.renderer.null_shader = load_shader_pair(asset_man, "assets/shaders/null_shader.vert", "assets/shaders/null_shader.frag");
+    game.renderer.render_to_gbuffer = load_shader(asset_man, "assets/shaders/render_to_gbuffer.glsl");
+    game.renderer.render_light_using_gbuffer = load_shader(asset_man, "assets/shaders/render_light_using_gbuffer.glsl");
+    game.renderer.render_plain_texture = load_shader(asset_man, "assets/shaders/render_plain_texture.glsl");
+    game.renderer.picking_shader = load_shader(asset_man, "assets/shaders/picking.glsl");
+    game.renderer.render_text = load_shader(asset_man, "assets/shaders/render_text.glsl");
+    game.renderer.render_rect = load_shader(asset_man, "assets/shaders/render_rect.glsl");
+    game.renderer.render_water = load_shader(asset_man, "assets/shaders/render_water.glsl");
+    game.renderer.render_gamma_correction = load_shader(asset_man, "assets/shaders/gamma_correction.glsl");
+    game.renderer.null_shader = load_shader(asset_man, "assets/shaders/null_shader.glsl");
     game.renderer.light_entity_texture = load_image(asset_man, "assets/lightbulb.png");
 
     // @Temporary

@@ -1,4 +1,6 @@
-#version 330 core
+#include "common.glh"
+
+#if FRAGMENT_SHADER
 
 out vec4 frag_color;
 
@@ -29,48 +31,6 @@ struct Light {
 
 uniform Light light;
 uniform vec3 camera_position;
-
-
-vec3 schlick_fresnel(vec3 F0, float v_dot_h) {
-    return F0 + (1.0 - F0) * pow(2, ((-5.55473 * v_dot_h)-6.98316) * v_dot_h);
-}
-
-
-#define PI 3.14159265358979323846264338327950288
-float distrubtion_ggx(float n_dot_h, float a) {
-    float a2 = a*a;
-    float factor = (n_dot_h*n_dot_h)*(a2 - 1) + 1;
-    float denom = PI * factor*factor;
-    return a2 / denom;
-}
-
-float geometric_ggx_sub(float n_dot_v, float k) {
-    float denom = n_dot_v * (1 - k) + k;
-    return n_dot_v / denom;
-}
-
-float geometric_ggx(float n_dot_l, float n_dot_v, float Roughness) {
-    float r = Roughness + 1;
-    float k = (r * r) / 8;
-    return geometric_ggx_sub(n_dot_l, k) * geometric_ggx_sub(n_dot_v, k);
-}
-
-vec3 microfacet_brdf(vec3 N, vec3 L, vec3 H, vec3 V, float Roughness, vec3 F0) {
-    float n_dot_v = max(0.0, dot(N, V));
-    float n_dot_l = max(0.0, dot(N, L));
-    float v_dot_h = max(0.0, dot(V, H));
-    float n_dot_h = max(0.0, dot(N, H));
-
-    vec3 numer = distrubtion_ggx(n_dot_h, Roughness*Roughness) *
-                    schlick_fresnel(F0, v_dot_h) *
-                    geometric_ggx(n_dot_l, n_dot_v, Roughness);
-    float denom = 4 * n_dot_l * n_dot_v;
-    return numer / max(denom, 0.001);
-}
-
-float saturate(float value) {
-    return clamp(value, 0.0, 1.0);
-}
 
 void main() {
     vec2 tex_coords = get_ndc_position();
@@ -135,3 +95,20 @@ void main() {
     vec3 Lo = (diff + ks) * radiance * n_dot_l * falloff;
     frag_color = vec4(Lo, 1.0);
 }
+
+#endif // FRAGMENT_SHADER
+
+#if VERTEX_SHADER
+
+layout (location = 0) in vec3 in_pos;
+layout (location = 1) in vec3 in_normal;
+layout (location = 2) in vec2 in_tex_coords;
+layout (location = 3) in vec3 in_tangent_normal;
+layout (location = 4) in vec3 in_color;
+
+void main() {
+    gl_Position = projection * view * model * vec4(in_pos, 1.0);
+}
+
+
+#endif // VERTEX_SHADER

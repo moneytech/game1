@@ -6,3 +6,5 @@
 // @TODO specify water height through uniform or vertex attrib
 
 // @FixMe the water reflection rotates dramatically when the camera is rolled (tilted) about the Z axis, breaking VR immersion
+
+// @TODO @FixMe remove the dollar signs here once bug261 is fixed.

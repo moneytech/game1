@@ -370,8 +370,7 @@ Shader :: struct {
     id: u32;
 
     // for hot reloading
-    vert_path: string;
-    frag_path: string;
+    source_path: string;
 };
 
 Camera :: struct {
@@ -678,7 +677,6 @@ resize_texture :: (tex: *Texture, width: u32, height: u32, data := null) {
 create_texture :: (tex: *Texture, width: u32, height: u32, data: *void, type := Texture.RGBA) {
     texId: GLuint;
     glGenTextures(1, *texId);
-    print("CREAT TEXTURE: %\n", texId);
     tex.type = type;
     tex.width = width;
     tex.height = height;
@@ -710,8 +708,11 @@ delete_texture :: (tex: *Texture) {
     tex.height = 0;
 }
 
-compile_shader :: (type: GLenum, source: string) -> u32 {
+compile_shader :: (type: GLenum, _source: string) -> u32 {
     v := glCreateShader(type);
+
+    source := preprocess_shader(_source, type == GL_VERTEX_SHADER);
+
     length: GLint = xx source.count;
     glShaderSource(v, 1, *source.data, *length);
     glCompileShader(v);
@@ -733,15 +734,93 @@ compile_shader :: (type: GLenum, source: string) -> u32 {
     return v;
 }
 
-compile_shader_source :: (vertex: string, pixel: string) -> *Shader {
+preprocess_shader :: (source: string, is_vertex: bool, add_standard_defines := true) -> string {
+    // print("ORIGINAL SOURCE: %\n", source);
+    st: ML_State;
+    // st.flags = ML_DOTS_IN_IDENTIFIERS;
+    init(*st, source);
+    tok: ML_Token;
+
+    using ML_Token_Type;
+
+    builder: String_Builder;
+    if add_standard_defines {
+        append(*builder, "#version 330 core\n");
+        if is_vertex {
+            append(*builder, "#define VERTEX_SHADER   1\n");
+            append(*builder, "#define FRAGMENT_SHADER 0\n");
+            append(*builder, "#define INOUT out\n");
+        } else {
+            append(*builder, "#define VERTEX_SHADER   0\n");
+            append(*builder, "#define FRAGMENT_SHADER 1\n");
+            append(*builder, "#define INOUT in\n");
+        }
+    }
+
+    last_line: u32;
+    ml_get_token(*st, *tok);
+    last_line = tok.line_number;
+    while tok.type != ML_TOKEN_END {
+        if last_line != tok.line_number {
+            append(*builder, "\n");
+            last_line = tok.line_number;
+        }
+        if tok.type == xx #char "#" {
+            ml_get_token(*st, *tok);
+
+            if tok.type == ML_TOKEN_IDENTIFIER && tok._string == "include" {
+                ml_get_token(*st, *tok);
+                path := tprint("assets/shaders/%", tok._string);
+                shader_source, success := read_entire_file(path);
+                if !success {
+                    logprint("Shader","Could not open file: %\n", path);
+                    return "";
+                }
+
+                // print("INCLUDING: %\n", shader_source);
+                preprocessed_source := preprocess_shader(shader_source, is_vertex, false);
+                free(shader_source);
+
+                print_to_builder(*builder, "// added from shader: %\n", path);
+                append(*builder, preprocessed_source);
+                append(*builder, "\n");
+
+                ml_get_token(*st, *tok);
+                continue;
+            } else {
+                append(*builder, "#");
+            }
+        }
+
+        {
+            // print("TOKEN: %\n", tok.type);
+            print_token_to_builder(*builder, tok);
+        }
+
+        ml_get_token(*st, *tok);
+    }
+
+    preprocessed := builder_to_string(*builder);
+    // print("PREPROCESSED: \n%\n", preprocessed);
+    return preprocessed;
+}
+
+compile_shader_source :: (shader_source: string) -> *Shader {
     out := New(Shader);
-    compile_shader_source(out, vertex, pixel);
+    compile_shader_source(out, shader_source, shader_source);
     return out;
 }
 
 compile_shader_source :: (out: *Shader, vertex: string, pixel: string) {
     vert := compile_shader(GL_VERTEX_SHADER, vertex);
     frag := compile_shader(GL_FRAGMENT_SHADER, pixel);
+    
+    if !vert || !frag {
+        glDeleteShader(vert);
+        glDeleteShader(frag);
+        return;
+    }
+
     program := glCreateProgram();
     glAttachShader(program, vert);
     glAttachShader(program, frag);
@@ -760,6 +839,8 @@ compile_shader_source :: (out: *Shader, vertex: string, pixel: string) {
         glDeleteProgram(program);
         glDeleteShader(vert);
         glDeleteShader(frag);
+
+        out.id = 0;
         return ;
     }
 
@@ -1376,8 +1457,6 @@ finish_scene :: (using rdr: *GL_Renderer) {
     light_use_shadow_cubemap := glGetUniformLocation(render_light_using_gbuffer.id, "light.use_shadow_cubemap");
     light_shadow_cubemap     := glGetUniformLocation(render_light_using_gbuffer.id, "light.shadow_cube_map");
 
-
-    assert(tex_normal != -1);
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniform1i(tex_pos, 0);
     glUniform1i(tex_normal, 1);
