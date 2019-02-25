@@ -3,6 +3,32 @@ uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
 
+struct Material {
+    vec3 diffuse;
+    float roughness;
+    float metallic;
+};
+
+// match Light in renderer.jai
+struct Light {
+    int is_directional;
+    vec3 position; // if this is a directional light, position is the direction the light is heading
+    vec3 radiance_color;
+    float radius;
+
+    int use_shadow_cubemap;
+    samplerCube shadow_cube_map;
+
+    int use_csm_shadow_map;
+    sampler2D csm_shadow_map;
+
+    mat4 csm_matrices[4];
+    float csm_parts[4];
+
+    // @TODO we probably want information on things like spherical lights and area lights
+};
+
+
 vec3 schlick_fresnel(vec3 F0, float v_dot_h) {
     return F0 + (1.0 - F0) * pow(2, ((-5.55473 * v_dot_h)-6.98316) * v_dot_h);
 }

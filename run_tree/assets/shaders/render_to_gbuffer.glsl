@@ -1,3 +1,5 @@
+#include "common.glh"
+
 #if FRAGMENT_SHADER
 layout (location = 0) out vec3 g_position;
 layout (location = 1) out vec3 g_normal;
@@ -24,7 +26,6 @@ struct Material {
 uniform Material material;
 uniform bool use_diffuse_map;
 uniform bool use_normal_map;
-uniform bool use_specular_map;
 
 void main() {
     g_position = frag_pos;
@@ -70,10 +71,6 @@ out vec3 frag_pos;
 out vec3 normal;
 out vec3 vertex_color;
 out mat3 TBN;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
 
 uniform bool use_normal_map;
 

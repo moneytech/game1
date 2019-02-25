@@ -240,7 +240,6 @@ make_Color :: (r: float, g: float, b: float, a := 1.0) -> Color {
 MAX_TEXTURES_PER_MESH  :: 4;
 TEXTURE_DIFFUSE_INDEX  :: 0;
 TEXTURE_NORMAL_INDEX   :: 1;
-TEXTURE_SPECULAR_INDEX :: 2;
 
 Material :: struct {
     textures: [MAX_TEXTURES_PER_MESH] *Texture;
@@ -363,8 +362,20 @@ Light :: struct {
 
 
     // Hidden properties filled in by the engine
-    shadow_cube_map: Cube_Map;
+    union {
+        shadow_cube_map: Cube_Map;
+        csm_shadow_map: Texture;
+    }
+
+    csm_matrices: [NUM_CSM_PARTITIONS] Matrix4;
+    csm_parts: [4] float;
+
+    #constructor (using light: *Light) {
+        memset(*shadow_cube_map, 0, size_of(Cube_Map));
+    }
 };
+
+NUM_CSM_PARTITIONS :: 4;
 
 Shader :: struct {
     id: u32;
@@ -400,6 +411,7 @@ GL_Renderer :: struct {
     gbuffer_depth: u32;
     gbuffer_viewport: Viewport;
 
+    current_global_shader: *Shader;
     render_to_gbuffer: *Shader;
     render_light_using_gbuffer: *Shader;
     render_plain_texture: *Shader;
@@ -530,6 +542,7 @@ current_model_matrix :: (using rdr: GL_Renderer) -> Matrix4 {
 init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     print("rdr: %\n", rdr);
     if GL_VERSION_4_3 {
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glDebugMessageCallback(debug_callback, *context);
     } else if GL_ARB_debug_output {
         glDebugMessageCallbackARB(debug_callback, *context);
@@ -602,6 +615,7 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
 
     use_frame_buffer(rdr, null);
 
+    current_global_shader = render_to_gbuffer;
 
     wireframe_material = New(Material);
     wireframe_material.diffuse = make_Color(1.0, 0.5, 0.0);
@@ -1117,13 +1131,12 @@ draw_triangle :: (using rdr: GL_Renderer, a: Vector2, b: Vector2, c: Vector2, co
     glDisable(GL_BLEND);
 }
 
-draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color, model_matrix: *Matrix4 = null) {
-    glUseProgram(render_rect.id);
-    if !model_matrix then update_matrices(rdr, matrix_identity(), render_rect);
-    else update_matrices(rdr, <<model_matrix, render_rect);
+draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: float, color: Color, model_matrix: *Matrix4 = null, shader: *Shader = null) {
+    if !shader then shader = render_rect;
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    use_shader(rdr, shader);
+    if !model_matrix then update_matrices(rdr, matrix_identity(), shader);
+    else update_matrices(rdr, <<model_matrix, shader);
 
     xw := x+width;
     yh := y+height;
@@ -1151,8 +1164,6 @@ draw_rect :: (using rdr: GL_Renderer, x: float, y: float, width: float, height: 
     
     glDisableVertexAttribArray(0);
     glDeleteBuffers(1, *buf);
-
-    glDisable(GL_BLEND);
 }
 
 draw_textured_rect :: (using rdr: GL_Renderer, tex: *Texture, x: float, y: float, width: float, height: float, shader: *Shader = null, model_matrix: *Matrix4 = null) {
@@ -1354,7 +1365,7 @@ start_scene :: (using rdr: *GL_Renderer) {
     glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_framebuffer);
     clear_screen(0, 0, 0, 1);
 
-    glUseProgram(render_to_gbuffer.id);
+    current_global_shader = render_to_gbuffer;
 
     pos := camera.position;
     view_matrix = matrix_rotate(inverse(camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
@@ -1397,7 +1408,7 @@ finish_scene :: (using rdr: *GL_Renderer) {
     // render lights stencils
     for lights {
         if it.type == Light_Type.DIRECTIONAL {
-
+            // intentionally blank
         } else {
             model_matrix := light_sphere.model_matrix;
             light_sphere.model_matrix = matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_scale(it.radius, it.radius, it.radius);
@@ -1450,13 +1461,6 @@ finish_scene :: (using rdr: *GL_Renderer) {
     tex_metallic := glGetUniformLocation(render_light_using_gbuffer.id, "g_metallic");
     vp := glGetUniformLocation(render_light_using_gbuffer.id, "viewport");
 
-    light_is_directional     := glGetUniformLocation(render_light_using_gbuffer.id, "light.is_directional");
-    light_position_direction := glGetUniformLocation(render_light_using_gbuffer.id, "light.position");
-    light_radius             := glGetUniformLocation(render_light_using_gbuffer.id, "light.radius");
-    light_radiance_color     := glGetUniformLocation(render_light_using_gbuffer.id, "light.radiance_color");
-    light_use_shadow_cubemap := glGetUniformLocation(render_light_using_gbuffer.id, "light.use_shadow_cubemap");
-    light_shadow_cubemap     := glGetUniformLocation(render_light_using_gbuffer.id, "light.shadow_cube_map");
-
     glUniformMatrix4fv(proj, 1, GL_TRUE, projection_matrix.flat.data);
     glUniform1i(tex_pos, 0);
     glUniform1i(tex_normal, 1);
@@ -1467,26 +1471,25 @@ finish_scene :: (using rdr: *GL_Renderer) {
 
     // render lights directly
     for lights {
-         if it.type == Light_Type.DIRECTIONAL {
+        update_light_uniforms(<<rdr, it, render_light_using_gbuffer);
 
+        if it.type == Light_Type.DIRECTIONAL {
+            old_proj := projection_matrix;
+            defer projection_matrix = old_proj;
+
+            old_view := view_matrix;
+            defer view_matrix = old_view;
+
+            glDisable(GL_STENCIL_TEST);
+
+            projection_matrix = matrix_ortho(0, 1, 0, 1, -1 ,1);
+            view_matrix = matrix_identity();
+            draw_rect(<<rdr, 0, 0, 1, 1, make_Color(1, 1, 1, 1), null, render_light_using_gbuffer);
+
+            glEnable(GL_STENCIL_TEST);
         } else {
             model_matrix := light_sphere.model_matrix;
-            
-            glUniform1i(light_is_directional, 0);
-            glUniform3f(light_position_direction, it.position.x, it.position.y, it.position.z);
-            glUniform3f(light_radiance_color,     it.radiance.r, it.radiance.g, it.radiance.b);
-            glUniform1f(light_radius,             it.radius);
-
-            // if it.shadow_cube_map.id {
-            //     glActiveTexture(GL_TEXTURE5);
-            //     glBindTexture(GL_TEXTURE_CUBE_MAP, it.shadow_cube_map.id);
-            //     glUniform1i(light_shadow_cubemap, 5);
-            //     glUniform1i(light_use_shadow_cubemap, 1);
-            //     glActiveTexture(GL_TEXTURE0);
-            // } else {
-            //     glUniform1i(light_use_shadow_cubemap, 0);
-            // }
-            
+        
             light_sphere.model_matrix = matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_scale(it.radius, it.radius, it.radius);
             draw_model(rdr, <<light_sphere, render_light_using_gbuffer);
 
@@ -1524,7 +1527,7 @@ finish_scene :: (using rdr: *GL_Renderer) {
     }
 }
 
-draw_cube :: (x: float, y: float, z: float, size: float) {
+_draw_cube :: (x: float, y: float, z: float, size: float) {
 
     glEnable(GL_DEPTH_TEST);
 
@@ -1585,17 +1588,59 @@ update_matrices :: (using rdr: GL_Renderer, model_matrix: Matrix4, sh: *Shader) 
     glUniformMatrix4fv(model, 1, GL_TRUE, t.flat.data);
 }
 
-draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
-    if !shader then shader = render_to_gbuffer;
-    glUseProgram(shader.id);
 
-    update_matrices(rdr, m.model_matrix, shader);
+update_light_uniforms :: (using rdr: GL_Renderer, light: *Light, sh: *Shader) {
+    glUseProgram(sh.id);
+    light_is_directional     := glGetUniformLocation(sh.id, "light.is_directional");
+    light_position_direction := glGetUniformLocation(sh.id, "light.position");
+    light_radius             := glGetUniformLocation(sh.id, "light.radius");
+    light_radiance_color     := glGetUniformLocation(sh.id, "light.radiance_color");
 
-    // @Cleanup not used in render_to_gbuffer ??
-    viewer_pos := glGetUniformLocation(shader.id, "camera_position");
-    glUniform3f(viewer_pos, camera.position.x, camera.position.y, camera.position.z);
+    light_use_shadow_cubemap := glGetUniformLocation(sh.id, "light.use_shadow_cubemap");
+    light_shadow_cubemap     := glGetUniformLocation(sh.id, "light.shadow_cube_map");
 
-    // material
+    light_use_csm_shadow_map := glGetUniformLocation(sh.id, "light.use_csm_shadow_map");
+    light_csm_shadow_map     := glGetUniformLocation(sh.id, "light.csm_shadow_map");
+    light_csm_matrices       := glGetUniformLocation(sh.id, "light.csm_matrices");
+    light_csm_parts          := glGetUniformLocation(sh.id, "light.csm_parts");
+
+    glUniform1i(light_is_directional, cast(s32) (light.type == Light_Type.DIRECTIONAL));
+    if light.type == Light_Type.DIRECTIONAL {
+        glUniform3f(light_position_direction, light.direction.x, light.direction.y, light.direction.z);
+    } else {
+        glUniform3f(light_position_direction, light.position.x, light.position.y, light.position.z);
+    }
+    glUniform3f(light_radiance_color,     light.radiance.r, light.radiance.g, light.radiance.b);
+    glUniform1f(light_radius,             light.radius);
+
+
+    if light.type != Light_Type.DIRECTIONAL && light.shadow_cube_map.id {
+        glActiveTexture(GL_TEXTURE5); // @TODO we should have some constants that define the regular slot numbers of textures
+        glBindTexture(GL_TEXTURE_CUBE_MAP, light.shadow_cube_map.id);
+        glUniform1i(light_shadow_cubemap, 5);
+        glUniform1i(light_use_shadow_cubemap, 1);
+        glActiveTexture(GL_TEXTURE0);
+    } else {
+        glUniform1i(light_use_shadow_cubemap, 0);
+    }
+
+    if light.type == Light_Type.DIRECTIONAL && light.csm_shadow_map.id {
+        glActiveTexture(GL_TEXTURE5); // @TODO we should have some constants that define the regular slot numbers of textures
+        glBindTexture(GL_TEXTURE_2D, light.csm_shadow_map.id);
+        glUniform1i(light_csm_shadow_map, 5);
+        glUniform1i(light_use_csm_shadow_map, 1);
+        glActiveTexture(GL_TEXTURE0);
+
+        glUniformMatrix4fv(light_csm_matrices, 4, GL_TRUE, light.csm_matrices[0].flat.data);
+        glUniform1fv(light_csm_parts, 4, light.csm_parts.data);
+    } else {
+        glUniform1i(light_use_csm_shadow_map, 0);
+    }
+}
+
+update_material_uniforms :: (using rdr: GL_Renderer, mat: *Material, shader: *Shader) {
+    assert(mat != null);
+
     mat_diffuse := glGetUniformLocation(shader.id, "material.diffuse");
     use_diffuse_map := glGetUniformLocation(shader.id, "use_diffuse_map");
     use_normal_map := glGetUniformLocation(shader.id, "use_normal_map");
@@ -1604,14 +1649,6 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
     mat_roughness := glGetUniformLocation(shader.id, "material.roughness");
     mat_metallic  := glGetUniformLocation(shader.id, "material.metallic");
 
-    assert(m.material != null);
-
-    mat := m.material;
-
-    if mat.disable_backface_culling then glDisable(GL_CULL_FACE);
-    defer if mat.disable_backface_culling then glEnable(GL_CULL_FACE);
-
-    if !mat.disable_depth_test then glEnable(GL_DEPTH_TEST);
 
     diffuse_tex :=  mat.textures[TEXTURE_DIFFUSE_INDEX];
     normal_tex := mat.textures[TEXTURE_NORMAL_INDEX];
@@ -1630,18 +1667,39 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
         glUniform1i(normal_map, 1);
     }
 
-    if rdr.enable_clip_plane {
-        glEnable(GL_CLIP_DISTANCE0);
-        cp := glGetUniformLocation(shader.id, "clip_plane");
-        glUniform4f(cp, clip_plane.x, clip_plane.y, clip_plane.z, clip_plane.w);
-    }
-
     glActiveTexture(GL_TEXTURE0);
 
     diffuse := *mat.diffuse;
     glUniform3f(mat_diffuse, diffuse.r, diffuse.g, diffuse.b);
     glUniform1f(mat_roughness, mat.roughness);
     glUniform1f(mat_metallic,  mat.metallic);
+}
+
+use_shader :: (using rdr: GL_Renderer, shader: *Shader) {
+    glUseProgram(shader.id);
+    viewer_pos := glGetUniformLocation(shader.id, "camera_position");
+    glUniform3f(viewer_pos, camera.position.x, camera.position.y, camera.position.z);
+}
+
+draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
+    if !shader then shader = current_global_shader;
+    use_shader(rdr, shader);
+    update_matrices(rdr, m.model_matrix, shader);
+    update_material_uniforms(rdr, m.material, shader);
+    
+    // material
+    mat := m.material;
+
+    if mat.disable_backface_culling then glDisable(GL_CULL_FACE);
+    defer if mat.disable_backface_culling then glEnable(GL_CULL_FACE);
+
+    if !mat.disable_depth_test then glEnable(GL_DEPTH_TEST);
+
+    if rdr.enable_clip_plane {
+        glEnable(GL_CLIP_DISTANCE0);
+        cp := glGetUniformLocation(shader.id, "clip_plane");
+        glUniform4f(cp, clip_plane.x, clip_plane.y, clip_plane.z, clip_plane.w);
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, m.buffer_id);
 
@@ -1652,6 +1710,9 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) 0);
     
+    diffuse_tex :=  mat.textures[TEXTURE_DIFFUSE_INDEX];
+    normal_tex := mat.textures[TEXTURE_NORMAL_INDEX];
+
     if (tex_size && (diffuse_tex || normal_tex)) {
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size));

@@ -78,13 +78,13 @@ make_Vector3 :: (x: float, y: float, z: float) -> Vector3 {
     return v;
 }
 
-// make_Vector3 :: (i: Vector4) -> Vector3 {
-//     v: Vector3 = ---;
-//     v.x = i.x;
-//     v.y = i.y;
-//     v.z = i.z;
-//     return v;
-// }
+make_Vector3 :: (i: Vector4) -> Vector3 {
+    v: Vector3 = ---;
+    v.x = i.x;
+    v.y = i.y;
+    v.z = i.z;
+    return v;
+}
 
 operator== :: (a: Vector3, b: Vector3) -> bool #c_callback {
     return a.x == b.x && a.y == b.y && a.z == b.z;
@@ -356,6 +356,10 @@ nlerp :: (t: float, q0: Quaternion, q1: Quaternion) -> Quaternion {
     return normalize((1 - t) * q0 + t * q1);
 }
 
+lerp :: (a: $T, b: T, t: T) -> T {
+    return (1 - t)*a + t*b;
+}
+
 // 4x4 matrix
 
 Matrix4 :: struct {
@@ -621,7 +625,7 @@ matrix_scale :: (x: float, y: float, z: float) -> Matrix4 {
 }
 
 matrix_perspective :: (fov: float, aspect: float, near: float, far: float) -> Matrix4 {
-    t := cast(float) tan(fov * (TAU / 720.0)) * near;
+    t := cast(float) tan(DEGREES_TO_RADIANS * fov / 2.0) * near;
     b := -t;
     l := aspect * b;
     r := aspect * t;
@@ -632,7 +636,7 @@ matrix_perspective :: (fov: float, aspect: float, near: float, far: float) -> Ma
 calculate_bounding_sphere_of_frustum :: (fov: float, width: float, height: float, near: float, far: float) -> (center: Vector3, radius: float) {
     h2 := height*height;
     w2 := width*width;
-    k := sqrt(1 + (h2 / w2)) * tan(fov / 2);
+    k := sqrt(1 + (h2 / w2)) * tan(DEGREES_TO_RADIANS * fov / 2.0);
 
     k2 := k*k;
 
@@ -649,7 +653,7 @@ calculate_bounding_sphere_of_frustum :: (fov: float, width: float, height: float
 }
 
 viewport_scale :: (fov: float, aspect: float, _near: float) -> float, float {
-    t := cast(float) tan(fov * 3.14159 / 720.0) * _near;
+    t := cast(float) tan(DEGREES_TO_RADIANS * fov / 2.0) * _near;
     r := aspect * t;
     return t*2, r*2; 
 }
@@ -679,10 +683,11 @@ matrix_frustum :: (left: float, right: float, bottom: float, top: float, _near: 
 matrix_ortho :: (left: float, right: float, bottom: float, top: float, _near: float, _far: float) -> Matrix4 {
     mat: Matrix4;
     mat.m[0][0] = 2.0 / (right - left);
-    mat.m[0][3] = - (right + left) / (right - left);
     mat.m[1][1] = 2.0 / (top - bottom);
+    mat.m[2][2] = -2.0 / (_far - _near);
+    
+    mat.m[0][3] = - (right + left) / (right - left);
     mat.m[1][3] = - (top + bottom) / (top - bottom);
-    mat.m[2][2] = - 2.0 / (_far - _near);
     mat.m[2][3] = - (_far + _near) / (_far - _near);
     return mat;
 }

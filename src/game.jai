@@ -16,9 +16,13 @@ Game :: struct {
     current_scene: *Scene;
     text_strings: [..] string;
 
+    render_shadow_depth_shader: *Shader;
+
     nuklear: nk_context;
 
-    fov: float = 60;
+    fov: float = 90;
+    far_plane := 100.0;
+    near_plane := 1.0;
 
     water_dudv_texture: *Texture;
 
@@ -241,6 +245,8 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     game.renderer.null_shader = load_shader(asset_man, "assets/shaders/null_shader.glsl");
     game.renderer.light_entity_texture = load_image(asset_man, "assets/lightbulb.png");
 
+    game.render_shadow_depth_shader = load_shader(asset_man, "assets/shaders/render_light_shadowmap.glsl");
+
     // @Temporary
     game.text_strings = load_text_strings(asset_man);
 
@@ -313,7 +319,7 @@ file_update_callback :: (notif: *File_Notification, userdata: *void) {
 }
 
 draw_geometry :: (using game: *Game, water := false) {
-    start_scene(game.renderer);
+    // start_scene(game.renderer);
     draw_scene(game.renderer, <<game.current_scene);
 
     #if DEVELOPER {
@@ -323,7 +329,7 @@ draw_geometry :: (using game: *Game, water := false) {
     if water {
         draw_water(<<renderer, water_dudv_texture, WATER_HEIGHT);
     }
-    finish_scene(game.renderer);
+    // finish_scene(game.renderer);
     set_clip_plane(renderer, false);
 }
 
@@ -356,6 +362,12 @@ render_geometry_cube_map :: (using game: *Game, map: *Cube_Map, point: Vector3) 
         set_frame_buffer_textures(*renderer.temp_frame_buffer, color, depth);
         use_frame_buffer(renderer, *renderer.temp_frame_buffer);
 
+        disable_scissor();
+        clear_screen(0, 0, 0, 1);
+
+        pos := renderer.camera.position;
+        renderer.view_matrix = matrix_rotate(inverse(renderer.camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
+
         draw_geometry(game, water=false);
     }
 
@@ -371,6 +383,74 @@ render_geometry_cube_map :: (using game: *Game, map: *Cube_Map, point: Vector3) 
     renderer.projection_matrix = matrix_perspective(90, 1, near=1.0, far=1000.0) * matrix_scale(1, -1, -1);
     render_face(game, *map.left,   set_angle_vector(-PI/2, 0, 1, 0));
     render_face(game, *map.right,  set_angle_vector( PI/2, 0, 1, 0));
+}
+
+calculate_csm_partition :: (near: float, far: float, index: float, max: float) -> (n: float, f: float) {
+    return near * pow(far / near, index / max), near * pow(far / near, (index + 1) / max);
+    // return lerp(near, far, index * 0.25), lerp(near, far, (index+1)*0.25);
+}
+
+render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
+    old_camera := renderer.camera;
+    defer renderer.camera = old_camera;
+
+    old_proj := renderer.projection_matrix;
+    defer renderer.projection_matrix = old_proj;
+
+    old_frame_buffer := renderer.current_frame_buffer;
+    defer use_frame_buffer(renderer, old_frame_buffer);
+
+    width := game.window.width;
+    height := game.window.height;
+    near := game.near_plane;
+    far := game.far_plane;
+    // fov := game.fov;
+    
+    for 0..3 {
+        n, f := calculate_csm_partition(near, far, cast(float) it, NUM_CSM_PARTITIONS);
+        center, radius := calculate_bounding_sphere_of_frustum(fov, cast(float) width, cast(float) height, n, f);
+
+        camera_view_matrix := matrix_rotate(inverse(old_camera.rotation)) * matrix_translate(-old_camera.position);
+        // camera_view_matrix = inverse(camera_view_matrix);
+        // center = make_Vector3((camera_view_matrix) * make_Vector4(center, 1));
+
+        dir := normalize(light.direction);
+        default_dir := make_Vector3(0, 0, -1);
+        angle := acos(dot(dir, default_dir));
+
+        v := cross(dir, default_dir);
+        orientation := set_angle_vector(angle, v.x, v.y, v.z);
+
+        projection := matrix_ortho(-radius, radius, -radius, radius, light.radius, -light.radius);
+
+        local_light_sphere_view_matrix := matrix_rotate(inverse(orientation)) * matrix_rotate((old_camera.rotation)) * matrix_translate(-center);
+        view := local_light_sphere_view_matrix * (camera_view_matrix);
+
+        renderer.projection_matrix = projection;
+        renderer.view_matrix = view;
+
+        color: *Texture;
+        depth: *Texture;
+
+        if texture.type == Texture.DEPTH {
+            depth = texture;
+        } else {
+            color = texture;
+        }
+        set_frame_buffer_textures(*renderer.temp_frame_buffer, color, depth);
+        use_frame_buffer(renderer, *renderer.temp_frame_buffer);
+
+        vp := make_Viewport(cast(s32) (it * 1024), 0, 1024, 1024);
+        use_viewport(vp);
+        enable_scissor(vp);
+        clear_screen(0, 0, 0, 1);
+
+        draw_geometry(game, water=false);
+
+        light.csm_matrices[it] = projection * view;
+        light.csm_parts[it] = f;
+    }
+
 }
 
 update_game :: (game: *Game, dt: float) {
@@ -402,19 +482,31 @@ render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
 
     for game.current_scene.lights {
         if it.type == Light_Type.DIRECTIONAL {
-            // @TODO
+            if it.csm_shadow_map.id == 0 {
+                create_texture(*it.csm_shadow_map, 1024 * NUM_CSM_PARTITIONS, 1024, null, Texture.DEPTH);
+            }
+
+            old_shader := renderer.current_global_shader;
+            defer renderer.current_global_shader = old_shader;
+
+            renderer.current_global_shader = game.render_shadow_depth_shader;
+            update_light_uniforms(<<renderer, it, renderer.current_global_shader);
+            render_geometry_csm(game, *it.csm_shadow_map, it);
         } else {
-            // if it.shadow_cube_map.id == 0 {
-            //     create_cube_map(*it.shadow_cube_map, 1024, Texture.DEPTH);
-            // }
-            // render_geometry_cube_map(game, *it.shadow_cube_map, it.position);
+            if it.shadow_cube_map.id == 0 {
+                create_cube_map(*it.shadow_cube_map, 1024, Texture.DEPTH);
+            }
+            old_shader := renderer.current_global_shader;
+            defer renderer.current_global_shader = old_shader;
+
+            renderer.current_global_shader = game.render_shadow_depth_shader;
+            update_light_uniforms(<<renderer, it, renderer.current_global_shader);
+            render_geometry_cube_map(game, *it.shadow_cube_map, it.position);
         }
     }
 
     game.renderer.lights = game.current_scene.lights;
 
-    // game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
-    // gl.glViewport(0, 0, xx game.window.width, xx game.window.height);
     use_frame_buffer(game.renderer, target_frame_buffer);
 
     
@@ -429,18 +521,24 @@ render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
 
     use_frame_buffer(renderer, *renderer.water_reflect_frame_buffer);
     set_clip_plane(renderer, true, make_Vector4(0, 1, 0, -WATER_HEIGHT));
+    start_scene(game.renderer);
     draw_geometry(game);
+    finish_scene(game.renderer);
     use_frame_buffer(renderer, target_frame_buffer);
 
 
     game.renderer.camera = old_camera;
     use_frame_buffer(renderer, *renderer.water_refract_frame_buffer);
     set_clip_plane(renderer, true, make_Vector4(0, -1, 0, WATER_HEIGHT));
+    start_scene(game.renderer);
     draw_geometry(game);
+    finish_scene(game.renderer);
     use_frame_buffer(renderer, target_frame_buffer);
 
     set_clip_plane(renderer, false);
+    start_scene(game.renderer);
     draw_geometry(game, true);
+    finish_scene(game.renderer);
 }
 
 #if SUPPORTS_OCULUS {
@@ -673,7 +771,7 @@ render_game :: (using game: *Game, target_frame_buffer: *Frame_Buffer = null) {
             height = vp.h;
         }
 
-        game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) width/cast(float) height, 1.0, 100000.0);
+        game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) width/cast(float) height, game.near_plane, game.far_plane);
         resize_rendering_buffers(game.renderer, width, height);
         glViewport(0, 0, width, height);
 

@@ -371,12 +371,12 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
             } else if (name == "map_Ks") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                filepath := tok._string;
-                p := path_of(mtl_filepath);
-                filepath = concatenate(p, "/", filepath);
+                // filepath := tok._string;
+                // p := path_of(mtl_filepath);
+                // filepath = concatenate(p, "/", filepath);
 
-                tex := load_image(game.asset_man, filepath);
-                mat.textures[TEXTURE_SPECULAR_INDEX] = tex;
+                // tex := load_image(game.asset_man, filepath);
+                // mat.textures[TEXTURE_SPECULAR_INDEX] = tex;
 
                 ml_get_token(*st, *tok);
             } else {

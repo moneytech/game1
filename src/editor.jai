@@ -252,7 +252,7 @@ update_editor :: (game: *Game, dt: float) {
 
     if input_intercepted return;
 
-    game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, 1.0, 100000.0);
+    game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, game.near_plane, game.far_plane);
     x, y, success := get_mouse_pointer_position(true);
     if !success return;
 

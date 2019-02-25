@@ -29,6 +29,9 @@ ML_Token_Type :: enum s32 {
     ML_TOKEN_CPP_MINUS_EQUAL;   // -=
     ML_TOKEN_CPP_TIMES_EQUAL;   // *=
     ML_TOKEN_CPP_DIVIDE_EQUAL;  // /=
+    ML_TOKEN_CPP_GREATER_EQUAL; // >=
+    ML_TOKEN_CPP_LESS_EQUAL;    // <=
+    ML_TOKEN_CPP_AND_AND;       // &&
 
     // HTML tokens
     ML_TOKEN_HTML_COMMENT;     // <!
@@ -43,13 +46,16 @@ print_token_to_builder :: (builder: *String_Builder, tok: ML_Token) {
         case ML_TOKEN_INTEGER; print_to_builder(builder, "% ", tok.integer);
         case ML_TOKEN_FLOAT;   print_to_builder(builder, "% ", formatFloat(tok._float, 20, trailing_width=20));
         case ML_TOKEN_STRING;  print_to_builder(builder, "\"%\" ", tok._string);
-        case ML_TOKEN_IDENTIFIER; append(builder, tok._string); append(builder, " ");
-        case ML_TOKEN_CPP_EQUAL_EQUAL; append(builder, "==");
-        case ML_TOKEN_CPP_NOT_EQUAL; append(builder, "!=");
-        case ML_TOKEN_CPP_PLUS_EQUAL; append(builder, "+=");
-        case ML_TOKEN_CPP_MINUS_EQUAL; append(builder, "-=");
-        case ML_TOKEN_CPP_TIMES_EQUAL; append(builder, "*=");
-        case ML_TOKEN_CPP_DIVIDE_EQUAL; append(builder, "/=");
+        case ML_TOKEN_IDENTIFIER;        append(builder, tok._string); append(builder, " ");
+        case ML_TOKEN_CPP_EQUAL_EQUAL;   append(builder, "==");
+        case ML_TOKEN_CPP_NOT_EQUAL;     append(builder, "!=");
+        case ML_TOKEN_CPP_PLUS_EQUAL;    append(builder, "+=");
+        case ML_TOKEN_CPP_MINUS_EQUAL;   append(builder, "-=");
+        case ML_TOKEN_CPP_TIMES_EQUAL;   append(builder, "*=");
+        case ML_TOKEN_CPP_DIVIDE_EQUAL;  append(builder, "/=");
+        case ML_TOKEN_CPP_GREATER_EQUAL; append(builder, ">=");
+        case ML_TOKEN_CPP_LESS_EQUAL;    append(builder, "<=");
+        case ML_TOKEN_CPP_AND_AND;       append(builder, "&&");
         case ML_TOKEN_CPP_STYLE_COMMENT;
         //     append(builder, "//");
         //     append(builder, tok._string);
@@ -370,6 +376,30 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
     } else if (<<current == #char "/" && (current+1) < end) {
         if (current[1] == #char "=") {
             ml__token(st, tok, ML_TOKEN_CPP_DIVIDE_EQUAL);
+            current += 2;
+            st.character_number += 2;
+            st.current = current;
+            return;
+        }
+    } else if (<<current == #char ">" && (current+1) < end) {
+        if (current[1] == #char "=") {
+            ml__token(st, tok, ML_TOKEN_CPP_GREATER_EQUAL);
+            current += 2;
+            st.character_number += 2;
+            st.current = current;
+            return;
+        }
+    } else if (<<current == #char "<" && (current+1) < end) {
+        if (current[1] == #char "=") {
+            ml__token(st, tok, ML_TOKEN_CPP_LESS_EQUAL);
+            current += 2;
+            st.character_number += 2;
+            st.current = current;
+            return;
+        }
+    } else if (<<current == #char "&" && (current+1) < end) {
+        if (current[1] == #char "&") {
+            ml__token(st, tok, ML_TOKEN_CPP_AND_AND);
             current += 2;
             st.character_number += 2;
             st.current = current;
