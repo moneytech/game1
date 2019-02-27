@@ -59,7 +59,7 @@ vec3 microfacet_brdf(vec3 N, vec3 L, vec3 H, vec3 V, float Roughness, vec3 F0) {
     float v_dot_h = max(0.0, dot(V, H));
     float n_dot_h = max(0.0, dot(N, H));
 
-    vec3 numer = distrubtion_ggx(n_dot_h, Roughness*Roughness) *
+    vec3 numer = distrubtion_ggx(n_dot_h, Roughness) *
                     schlick_fresnel(F0, v_dot_h) *
                     geometric_ggx(n_dot_l, n_dot_v, Roughness);
     float denom = 4 * n_dot_l * n_dot_v;

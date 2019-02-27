@@ -205,6 +205,6 @@ create_skybox_model :: (up: *Texture, down: *Texture, left: *Texture, right: *Te
     array_add(*mod.meshes, create_textured_rect_mesh(v6, v2, v3, v7, front));
     array_add(*mod.meshes, create_textured_rect_mesh(v1, v5, v4, v0, back));
 
-    mod.model_matrix = matrix_scale(10000, 10000, 10000);
+    mod.model_matrix = matrix_scale(50, 50, 50);
     return mod;
 }

@@ -20,16 +20,43 @@ Tool_Mode :: enum u16 {
 Action :: enum {
     NONE;
     DRAG;
+    ROLL;
 }
 
 action_info: struct {
     drag: struct {
-        target_position: Vector3;
+        delta_position: Vector3;
+        xyz_lock: Vector3;
+    };
+
+    roll: struct {
+        delta_rotation: Quaternion = ---;
         xyz_lock: Vector3;
     };
 
 };
 editor_action: Action;
+
+editor_action_is_valid_for_object :: (object: *Scene_Object) -> bool {
+    return true;
+}
+
+editor_apply_action_to_object :: (object: *Scene_Object) {
+    if editor_action == Action.DRAG {
+        if object.object_type == Actor {
+            actor := cast(*Actor) object;
+            if actor.body then actor.body.position += action_info.drag.delta_position;
+        }
+
+        object.position += action_info.drag.delta_position;
+    } else if editor_action == Action.ROLL {
+        if object.object_type == Actor {
+            actor := cast(*Actor) object;
+            actor.orientation *= action_info.roll.delta_rotation;
+        }
+    }
+}
+
 
 under_cursor: s32 = -1;
 terrain_texture: Texture;
@@ -83,6 +110,9 @@ init_editor :: (game: *Game) {
     picking_position_buf.count = game.window.width * game.window.height;
     picking_position_buf.data = alloc(picking_position_buf.count*size_of(s32));
     action_info.drag.xyz_lock = make_Vector3(1, 1, 1);
+    action_info.roll.xyz_lock = make_Vector3(1, 1, 1);
+
+    action_info.roll.delta_rotation = set_angle_vector(0, 0, 1, 0);
 
     /*
     m := New(Mesh);
@@ -401,22 +431,21 @@ update_editor :: (game: *Game, dt: float) {
         if input_button_states[#char "G"] & START && editor_action != Action.DRAG {
             editor_action = Action.DRAG;
             action_info.drag.xyz_lock = make_Vector3(1, 1, 1);
-            action_info.drag.target_position = obj.position;
+            action_info.drag.delta_position = make_Vector3(0, 0, 0);
+        }
+
+        if input_button_states[#char "R"] & START && editor_action != Action.DRAG {
+            editor_action = Action.ROLL;
+            action_info.roll.xyz_lock = make_Vector3(1, 1, 1);
+            action_info.roll.delta_rotation = set_angle_vector(0, 0, 1, 0);
         }
 
         if editor_action == Action.DRAG {
 
             if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
                 // apply the action
+                editor_apply_action_to_object(obj);
                 editor_action = Action.NONE;
-
-                if obj.object_type == Actor {
-                    actor := cast(*Actor) obj;
-                    if actor.body then actor.body.position = action_info.drag.target_position;
-                }
-
-                obj.position = action_info.drag.target_position;
-
                 return;
             }
 
@@ -429,17 +458,17 @@ update_editor :: (game: *Game, dt: float) {
             // that way preserving the movement along the desired axis that has already been done
             if input_button_states[#char "X"] & START {
                 action_info.drag.xyz_lock = make_Vector3(1, 0, 0);
-                action_info.drag.target_position = obj.position;
+                action_info.drag.delta_position = make_Vector3(0, 0, 0);
             }
 
             if input_button_states[#char "Y"] & START {
                 action_info.drag.xyz_lock = make_Vector3(0, 1, 0);
-                action_info.drag.target_position = obj.position;
+                action_info.drag.delta_position = make_Vector3(0, 0, 0);
             }
 
             if input_button_states[#char "Z"] & START {
                 action_info.drag.xyz_lock = make_Vector3(0, 0, 1);
-                action_info.drag.target_position = obj.position;
+                action_info.drag.delta_position = make_Vector3(0, 0, 0);
             }
 
             delta := make_Vector3(xx -mouse_delta_x, xx mouse_delta_y, 0);
@@ -454,7 +483,51 @@ update_editor :: (game: *Game, dt: float) {
             delta = q * delta;
 
             delta = delta 'mul' action_info.drag.xyz_lock;
-            action_info.drag.target_position -= delta;
+            action_info.drag.delta_position -= delta;
+        } else if editor_action == Action.ROLL {
+            if input_button_states[Key_Code.MOUSE_BUTTON_LEFT] & START {
+                // apply the action
+                editor_apply_action_to_object(obj);
+                editor_action = Action.NONE;
+                return;
+            }
+
+            if input_button_states[Key_Code.MOUSE_BUTTON_RIGHT] & START {
+                editor_action = Action.NONE;
+                return;
+            }
+
+            // @TODO maybe in these we only reset the part of the target position that the user doesn't want to affect
+            // that way preserving the movement along the desired axis that has already been done
+            if input_button_states[#char "X"] & START {
+                action_info.roll.xyz_lock = make_Vector3(1, 0, 0);
+                action_info.roll.delta_rotation = set_angle_vector(0, 0, 1, 0);
+            }
+
+            if input_button_states[#char "Y"] & START {
+                action_info.roll.xyz_lock = make_Vector3(0, 1, 0);
+                action_info.roll.delta_rotation = set_angle_vector(0, 0, 1, 0);
+            }
+
+            if input_button_states[#char "Z"] & START {
+                action_info.roll.xyz_lock = make_Vector3(0, 0, 1);
+                action_info.roll.delta_rotation = set_angle_vector(0, 0, 1, 0);
+            }
+
+            delta := make_Vector3(xx mouse_delta_x, xx mouse_delta_y, 0);
+            delta = mul(delta, make_Vector3(1.0/cast(float)game.window.width, 1.0/cast(float)game.window.height, 0)); // nomalize pixels to viewport
+            // sx, sy := viewport_scale(game.fov, cast(float)game.window.width / cast(float)game.window.height, 1.0);
+            // delta = mul(delta, make_Vector3(sx, sy, 1));
+
+            angle := length(delta);
+
+            q := game.renderer.camera.rotation;
+            axis := q * make_Vector3(xx mouse_delta_y, xx -mouse_delta_x, 0);
+
+            mask := action_info.roll.xyz_lock;
+            quat := set_angle_vector(-angle * 1, axis.x * mask.x, axis.y * mask.y, axis.z * mask.z);
+
+            action_info.roll.delta_rotation *= quat;
         }
     } else {
         editor_action = Action.NONE;
@@ -512,15 +585,20 @@ render_editor :: (using game: *Game) {
             if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID_AND_WIREFRAME;
 
             old_position: Vector3;
+            old_rotation: Quaternion;
             if editor_action == Action.DRAG {
                 old_position = actor.position;
-                actor.position = action_info.drag.target_position;
+                actor.position += action_info.drag.delta_position;
+            } else if editor_action == Action.ROLL {
+                old_rotation = actor.orientation;
+                actor.orientation *= action_info.roll.delta_rotation;
             }
 
             render_game(game);
 
-            if editor_action == Action.DRAG {
-                actor.position = old_position;
+            if editor_action == {
+                case Action.DRAG; actor.position = old_position;
+                case Action.ROLL; actor.orientation = old_rotation;
             }
 
             if selected_game_object then actor.model.draw_mode = DRAW_MODE_SOLID;
@@ -534,7 +612,7 @@ render_editor :: (using game: *Game) {
             old_position: Vector3;
             if editor_action == Action.DRAG {
                 old_position = light.position;
-                light.position = action_info.drag.target_position;
+                light.position += action_info.drag.delta_position;
             }
 
             render_game(game);

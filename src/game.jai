@@ -421,9 +421,9 @@ render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
         v := cross(dir, default_dir);
         orientation := set_angle_vector(angle, v.x, v.y, v.z);
 
-        projection := matrix_ortho(-radius, radius, -radius, radius, light.radius, -light.radius);
+        projection := matrix_ortho(-radius, radius, -radius, radius, -100.0, 100.0);
 
-        local_light_sphere_view_matrix := matrix_rotate(inverse(orientation)) * matrix_rotate((old_camera.rotation)) * matrix_translate(-center);
+        local_light_sphere_view_matrix := matrix_rotate((orientation)) * matrix_rotate((old_camera.rotation)) * matrix_translate(-center);
         view := local_light_sphere_view_matrix * (camera_view_matrix);
 
         renderer.projection_matrix = projection;

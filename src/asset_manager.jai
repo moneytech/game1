@@ -426,9 +426,10 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
             } else if (name == "o") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
+                print("Start mesh: %\n", tok._string);
                 mesh = New(Mesh);
                 array_add(*mod.meshes, mesh);
-                array_reset(*vertices);
+                // array_reset(*vertices);
 
                 ml_get_token(*st, *tok);
             } else if (!mesh) {
@@ -768,11 +769,7 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
                     in := material.instance;
 
                     mat := New(Material);
-                    // mat.specular_exp = in.shininess;
-                    // mat.ambient = make_Color(in.ambient[0], in.ambient[1], in.ambient[2]);
                     mat.diffuse = make_Color(in.diffuse[0], in.diffuse[1], in.diffuse[2]);
-                    // mat.specular = make_Color(in.specular[0], in.specular[1], in.specular[2]);
-                    // mat.emissive = make_Color(in.emission[0], in.emission[1], in.emission[2]);
 
                     if material.textures[material.bump_index] mat.textures[TEXTURE_NORMAL_INDEX] = load_image(asset_man, concatenate(path_of(path), "/", material.textures[material.bump_index].filepath));
 

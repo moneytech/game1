@@ -24,7 +24,7 @@ float get_shadow_distance(mat4 LS_matrix, vec3 WS_frag_pos, int index) {
     LS_frag_pos = LS_frag_pos * 0.5 + 0.5;
     LS_frag_pos.xyz /= LS_frag_pos.w;
 
-    const float EPSILON = 0.001;
+    const float EPSILON = 0.0001;
     if (LS_frag_pos.x >= 0 && LS_frag_pos.x <= 1 && LS_frag_pos.y <= 1 && LS_frag_pos.y >= 0) {
         vec2 coord = LS_frag_pos.xy;
         coord.x = (coord.x / 4) + (0.25 * index);
@@ -49,11 +49,12 @@ void main() {
         return;
     }
 
+    vec4 shadow_distribution = vec4(0);
+
     if (light.use_shadow_cubemap != 0) {
         float dist = texture(light.shadow_cube_map, (frag_pos-light.position)).r * light.radius;
         if ((dist + 0.1) < (length(frag_pos-light.position))) {
-            frag_color = vec4(0);
-            return;
+            shadow_distribution = vec4(0.8);
         }
     } else if (light.use_csm_shadow_map != 0) {
         float parts[4] = light.csm_parts;
@@ -68,8 +69,7 @@ void main() {
         if (dist == 0) dist = get_shadow_distance(light.csm_matrices[3], frag_pos, 3);
 
         if (dist < 0) {
-            frag_color = vec4(0);
-            return;
+            shadow_distribution = vec4(0.8);
         }
     }
 
@@ -79,7 +79,7 @@ void main() {
     F0 = mix(F0, in_diffuse, vec3(Metallic));
 
     // ambient light will be set by ambient shader
-    // vec3 ambient = vec3(0.01) * in_diffuse;
+    vec3 ambient = vec3(0.1) * in_diffuse;
 
     vec3 L = vec3(0);
     if (light.is_directional != 0) {
@@ -110,8 +110,8 @@ void main() {
     float n_dot_l = max(0.0, dot(N, L));
 
     vec3 diff = (in_diffuse / PI) * kd;
-    vec3 Lo = (diff + ks) * radiance * n_dot_l * falloff;
-    frag_color = vec4(Lo, 1.0);
+    vec3 Lo = (diff + ks) * radiance * n_dot_l * falloff + ambient;
+    frag_color = vec4(Lo, 1.0) * (1.0 - shadow_distribution);
 }
 
 #endif // FRAGMENT_SHADER
