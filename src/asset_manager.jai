@@ -22,6 +22,137 @@ Material_Lib :: struct {
 }
 // Material_Lib :: Hash_Map(#type (*Material));
 
+#load "nbt.jai";
+
+// @TODO maybe these should be Lists?
+serialize_vector3 :: (file: *File, v: Vector3, name: string) {
+    write_list_start(file, Tag.Float, name, 3);
+    write_tag(file, nbt_float(v.x), is_in_list=true);
+    write_tag(file, nbt_float(v.y), is_in_list=true);
+    write_tag(file, nbt_float(v.z), is_in_list=true);
+}
+
+serialize_quaternion :: (file: *File, q: Quaternion, name: string) {
+    write_list_start(file, Tag.Float, name, 4);
+    write_tag(file, nbt_float(q.x), is_in_list=true);
+    write_tag(file, nbt_float(q.y), is_in_list=true);
+    write_tag(file, nbt_float(q.z), is_in_list=true);
+    write_tag(file, nbt_float(q.w), is_in_list=true);
+}
+
+serialize_actor :: (file: *File, actor: *Actor) {
+    serialize_quaternion(file, actor.orientation, "orientation");
+    if actor.model then write_tag(file, nbt_string(actor.model.source_path, "Model"));
+    else write_tag(file, nbt_string("", "Model"));
+}
+
+serialze_object :: (file: *File, obj: *Scene_Object) {
+    assert(obj.object_id >= 0);
+    write_tag_header(file, Tag.Compound, tprint("ID%", obj.object_id));
+    write_tag(file, nbt_string(tprint("%", obj.object_type), "object_type"));
+    write_tag(file, nbt_int(obj.object_id, "object_id"));
+    serialize_vector3(file, obj.position, "position");
+    if obj.object_type == Actor {
+        serialize_actor(file, cast(*Actor) obj);
+    }
+    write_tag_header(file, Tag.End, "");
+}
+
+serialze_scene :: (filename: string, scene: Scene) {
+    file := file_open(filename, for_writing=true);
+    defer file_close(*file);
+
+    write_tag_header(*file, Tag.Compound, "");
+    for scene.all_objects {
+        serialze_object(*file, it);
+    }
+    write_tag_header(*file, Tag.End, "");
+}
+
+deserialize_vector3 :: (file: *File) -> Vector3 {
+    payload_type, name, count := read_list_start(file);
+    v: Vector3;
+    v.x = read_tag(file, is_in_list=true, payload_type)._float;
+    v.y = read_tag(file, is_in_list=true, payload_type)._float;
+    v.z = read_tag(file, is_in_list=true, payload_type)._float;
+    return v;
+}
+
+deserialize_quaternion :: (file: *File) -> Quaternion {
+    payload_type, name, count := read_list_start(file);
+    v: Quaternion;
+    v.x = read_tag(file, is_in_list=true, payload_type)._float;
+    v.y = read_tag(file, is_in_list=true, payload_type)._float;
+    v.z = read_tag(file, is_in_list=true, payload_type)._float;
+    v.w = read_tag(file, is_in_list=true, payload_type)._float;
+    return v;
+}
+
+deserialize_actor :: (asset_man: *Asset_Manager, file: *File, actor: *Actor) {
+    actor.orientation = deserialize_quaternion(file);
+    model_path := read_tag(file)._string;
+    print("Model: %\n", model_path);
+    if model_path != "" {
+        actor.model = load_model(asset_man, model_path);
+    }
+}
+
+deserialize_object :: (asset_man: *Asset_Manager, file: *File) -> *Scene_Object {
+    type, name := read_tag_header(file);
+    assert(type == Tag.Compound);
+
+    print("Deserializing object name: %\n", name);
+    type_name := read_tag(file)._string;
+    print("Type: %\n", type_name);
+    
+    obj: *Scene_Object;
+    if type_name == {
+        case "Actor"; obj = New(Actor); obj.object_type = Actor;
+        case "Light"; obj = New(Light); obj.object_type = Light;
+        case "Model"; obj = New(Model); obj.object_type = Model;
+        case "Camera"; obj = New(Camera); obj.object_type = Camera;
+    }
+
+    obj.object_id = read_tag(file)._int;
+    obj.position = deserialize_vector3(file);
+
+    if obj.object_type == Actor {
+        deserialize_actor(asset_man, file, cast(*Actor) obj);
+    }
+
+    read_tag_header(file); // Tag.End
+
+    return obj;
+}
+
+deserialize_scene :: (asset_man: *Asset_Manager, file: *File, scene: *Scene) {
+    type := read_tag_header(file); // Tag.Compound
+    assert(type == Tag.Compound);
+
+    while peek_next_tag(file) != Tag.End {
+        obj := deserialize_object(asset_man, file);
+
+        if obj.object_type == {
+            case Actor; add_to_scene_with_id(scene, cast(*Actor) obj, obj.object_id);
+            case Light; add_to_scene_with_id(scene, cast(*Light) obj, obj.object_id);
+            case Model; add_to_scene_with_id(scene, cast(*Model) obj, obj.object_id);
+            case Camera; add_to_scene_with_id(scene, cast(*Camera) obj, obj.object_id);
+            
+        }
+    }
+
+    read_tag_header(file); // Tag.End
+}
+
+load_scene :: (using asset_man: *Asset_Manager, filepath: string) -> *Scene {
+    file := file_open(filepath);
+    defer file_close(*file);
+
+    scene := New(Scene);
+    deserialize_scene(asset_man, *file, scene);
+    return scene;
+}
+
 load_text_strings :: (using asset_man: *Asset_Manager, filepath: string = "") -> [..] string {
     // @Incomplete this is just a @Hack so we have something to get going
     strings: [..] string;
@@ -129,6 +260,7 @@ load_model :: (using asset_man: *Asset_Manager, filepath: string) -> *Model {
         return mod;
     }
 
+    mod.source_path = filepath;
     set_slot(*models, filepath, mod);
     return mod;
 }
@@ -426,7 +558,6 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
             } else if (name == "o") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                print("Start mesh: %\n", tok._string);
                 mesh = New(Mesh);
                 array_add(*mod.meshes, mesh);
                 // array_reset(*vertices);

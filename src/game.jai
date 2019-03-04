@@ -21,8 +21,8 @@ Game :: struct {
     nuklear: nk_context;
 
     fov: float = 90;
-    far_plane := 100.0;
-    near_plane := 1.0;
+    far_plane := 1000.0;
+    near_plane := 0.1;
 
     water_dudv_texture: *Texture;
 
@@ -68,28 +68,35 @@ Scene :: struct {
     active_camera: *Camera;
 }
 
-add_to_scene :: (sc: *Scene, thing: *$T) #body_text {
+add_to_scene :: (sc: *Scene, thing: *$T) {
+    next_id := sc.next_available_id;
+    sc.next_available_id += 1;
+    add_to_scene_with_id(sc, thing, next_id);
+}
+
+add_to_scene_with_id :: (sc: *Scene, thing: *$T, id: s32)  #body_text {
     builder: String_Builder;
 ACTOR_STRING :: #string DONE
-    assert(thing.object_id == -1);
-    thing.object_id = sc.next_available_id;
-    sc.next_available_id += 1;
+    assert(thing.object_id != -1);
+    thing.object_id = id;
     #if DEBUG {
          if find_object_by_id(sc, thing.object_id) != null {
             logprint("Scene", "Error: object id % is already registered in scene!\n", thing.object_id);
          }
     }
+
+    thing.object_type = T;
+
+    array_add(*sc.all_objects, thing);
 DONE
     append(*builder, ACTOR_STRING);
 
     // @Warning idk if this is safe in the long run
     array_name := sprint("%", <<cast(*Type) *T);
-    print_to_builder(*builder, "thing.object_type = %;\n", array_name);
 
     to_lower(array_name);
     defer free(array_name);
     print_to_builder(*builder, "array_add(*sc.%s, thing);\n", array_name);
-    append(*builder, "array_add(*sc.all_objects, thing);\n");
     return builder_to_string(*builder);
 }
 
@@ -139,7 +146,7 @@ Actor :: struct {
     body: *Rigid_Body;
 
     // position: Vector3;
-    orientation: Quaternion; // orientiation around Y axis
+    orientation: Quaternion;
 
     update_callback: (game: *Game, actor: *Actor, dt: float);
     picked_by_player: (game: *Game, actor: *Actor, player: *Actor, dt: float);
@@ -386,9 +393,15 @@ render_geometry_cube_map :: (using game: *Game, map: *Cube_Map, point: Vector3) 
 }
 
 calculate_csm_partition :: (near: float, far: float, index: float, max: float) -> (n: float, f: float) {
-    return near * pow(far / near, index / max), near * pow(far / near, (index + 1) / max);
-    // return lerp(near, far, index * 0.25), lerp(near, far, (index+1)*0.25);
+    n, f := near * pow(far / near, index / max), near * pow(far / near, (index + 1) / max);
+    ln, lf := lerp(near, far, index / max), lerp(near, far, (index+1) / max);
+
+    BLEND_FACTOR :: 0.01;
+    return lerp(n, lf, BLEND_FACTOR), lerp(f, lf, BLEND_FACTOR);
+    // return n, f;
 }
+
+CSM_SIZE :: 1024;
 
 render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
     old_camera := renderer.camera;
@@ -406,13 +419,13 @@ render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
     far := game.far_plane;
     // fov := game.fov;
     
-    for 0..3 {
+    for 0..NUM_CSM_PARTITIONS-1 {
         n, f := calculate_csm_partition(near, far, cast(float) it, NUM_CSM_PARTITIONS);
         center, radius := calculate_bounding_sphere_of_frustum(fov, cast(float) width, cast(float) height, n, f);
 
-        camera_view_matrix := matrix_rotate(inverse(old_camera.rotation)) * matrix_translate(-old_camera.position);
-        // camera_view_matrix = inverse(camera_view_matrix);
-        // center = make_Vector3((camera_view_matrix) * make_Vector4(center, 1));
+        camera_view_matrix := matrix_translate(old_camera.position) * matrix_rotate((old_camera.rotation));
+        center = make_Vector3((camera_view_matrix) * make_Vector4(center, 1));
+
 
         dir := normalize(light.direction);
         default_dir := make_Vector3(0, 0, -1);
@@ -421,10 +434,23 @@ render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
         v := cross(dir, default_dir);
         orientation := set_angle_vector(angle, v.x, v.y, v.z);
 
-        projection := matrix_ortho(-radius, radius, -radius, radius, -100.0, 100.0);
+        min := make_Vector3(-radius, -radius, 0);
+        max := make_Vector3(radius, radius, 0);
 
-        local_light_sphere_view_matrix := matrix_rotate((orientation)) * matrix_rotate((old_camera.rotation)) * matrix_translate(-center);
-        view := local_light_sphere_view_matrix * (camera_view_matrix);
+
+        projection := matrix_ortho(min.x, max.x, min.y, max.y, -200.0, 200.0);
+        view := matrix_rotate((orientation)) * matrix_translate(-center);
+
+        {
+            shadow_origin := make_Vector3((projection * view) * make_Vector4(0, 0, 0, 1));
+            shadow_origin *= CSM_SIZE / 2;
+            rounded_origin := make_Vector3(round(shadow_origin.x), round(shadow_origin.y), round(shadow_origin.z));
+            rounding := rounded_origin - shadow_origin;
+            rounding /= CSM_SIZE / 2;
+            round_matrix := matrix_translate(rounding.x, rounding.y, 0.0);
+
+            projection = round_matrix * projection;
+        }
 
         renderer.projection_matrix = projection;
         renderer.view_matrix = view;
@@ -440,7 +466,7 @@ render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
         set_frame_buffer_textures(*renderer.temp_frame_buffer, color, depth);
         use_frame_buffer(renderer, *renderer.temp_frame_buffer);
 
-        vp := make_Viewport(cast(s32) (it * 1024), 0, 1024, 1024);
+        vp := make_Viewport(cast(s32) (it * CSM_SIZE), 0, CSM_SIZE, CSM_SIZE);
         use_viewport(vp);
         enable_scissor(vp);
         clear_screen(0, 0, 0, 1);
@@ -448,7 +474,7 @@ render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
         draw_geometry(game, water=false);
 
         light.csm_matrices[it] = projection * view;
-        light.csm_parts[it] = f;
+        light.csm_parts[it] = n;
     }
 
 }
@@ -483,7 +509,7 @@ render_scene :: (using game: *Game, target_frame_buffer: *Frame_Buffer) {
     for game.current_scene.lights {
         if it.type == Light_Type.DIRECTIONAL {
             if it.csm_shadow_map.id == 0 {
-                create_texture(*it.csm_shadow_map, 1024 * NUM_CSM_PARTITIONS, 1024, null, Texture.DEPTH);
+                create_texture(*it.csm_shadow_map, CSM_SIZE * NUM_CSM_PARTITIONS, CSM_SIZE, null, Texture.DEPTH);
             }
 
             old_shader := renderer.current_global_shader;

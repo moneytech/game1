@@ -9,6 +9,8 @@ struct Material {
     float metallic;
 };
 
+const int NUM_CSM_PARTS = 4;
+
 // match Light in renderer.jai
 struct Light {
     int is_directional;
@@ -21,9 +23,9 @@ struct Light {
 
     int use_csm_shadow_map;
     sampler2D csm_shadow_map;
+    float csm_parts[NUM_CSM_PARTS];
 
-    mat4 csm_matrices[4];
-    float csm_parts[4];
+    mat4 csm_matrices[NUM_CSM_PARTS];
 
     // @TODO we probably want information on things like spherical lights and area lights
 };
@@ -59,7 +61,7 @@ vec3 microfacet_brdf(vec3 N, vec3 L, vec3 H, vec3 V, float Roughness, vec3 F0) {
     float v_dot_h = max(0.0, dot(V, H));
     float n_dot_h = max(0.0, dot(N, H));
 
-    vec3 numer = distrubtion_ggx(n_dot_h, Roughness) *
+    vec3 numer = distrubtion_ggx(n_dot_h, Roughness*Roughness) *
                     schlick_fresnel(F0, v_dot_h) *
                     geometric_ggx(n_dot_l, n_dot_v, Roughness);
     float denom = 4 * n_dot_l * n_dot_v;
@@ -68,4 +70,8 @@ vec3 microfacet_brdf(vec3 N, vec3 L, vec3 H, vec3 V, float Roughness, vec3 F0) {
 
 float saturate(float value) {
     return clamp(value, 0.0, 1.0);
+}
+
+vec2 saturate(vec2 v) {
+    return vec2(saturate(v.x), saturate(v.y));
 }

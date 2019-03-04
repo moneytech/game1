@@ -27,6 +27,19 @@ ceil :: (x: float) -> float #foreign crt "ceilf";                   // x64 & arm
 floor :: (x: float) -> float #foreign crt "floorf";                 // x64 & arm only.
 fmod :: (x: float, divisor: float) -> float #foreign crt;           // x64 & arm only.
 
+round :: (x: float) -> float {
+    integer := cast(float) cast(s64) x;
+    frac := x - integer;
+
+    if frac >= 0 {
+        if frac >= 0.5 then return ceil(x);
+        return floor(x);
+    } else {
+        if frac < -0.5 then return floor(x);
+        return ceil(x);
+    }
+}
+
 #if OS_WINDOWS {
     crt :: #foreign_system_library "msvcrt";
 } else {
@@ -119,6 +132,14 @@ operator* :: (a: Vector3, s: float) -> Vector3 #symmetric {
     out.x = a.x * s;
     out.y = a.y * s;
     out.z = a.z * s;
+    return out;
+}
+
+operator/ :: (a: Vector3, s: float) -> Vector3 #symmetric {
+    out: Vector3 = ---;
+    out.x = a.x / s;
+    out.y = a.y / s;
+    out.z = a.z / s;
     return out;
 }
 

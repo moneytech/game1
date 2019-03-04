@@ -627,11 +627,53 @@ render_editor :: (using game: *Game) {
         render_game(game);
     }
 
+    game.renderer.projection_matrix = matrix_perspective(game.fov, cast(float) game.window.width/cast(float) game.window.height, game.near_plane, game.far_plane);
+    game.renderer.view_matrix = matrix_rotate(inverse(renderer.camera.rotation)) * matrix_translate(-renderer.camera.position);
+    for renderer.lights {
+        if it.type == Light_Type.DIRECTIONAL {
+            // @TODO use a different texture to differentiate between point and directional light objects
+            mat := matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_rotate((renderer.camera.rotation)) * matrix_scale(1, -1, 1);
+            // draw_textured_rect(rdr, null, it.position.x, it.position.y, 1.0, 1.0, null, *mat);
+            white := make_Color(1, 1, 1);
+            // glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            draw_textured_rect(<<renderer, renderer.light_entity_texture, -0.5, -0.5, 1.0, 1.0, null, *mat);
+
+            glDisable(GL_BLEND);
+            glEnable(GL_CULL_FACE);
+        } else {
+            mat := matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_rotate((renderer.camera.rotation)) * matrix_scale(1, -1, 1);
+            // draw_textured_rect(rdr, null, it.position.x, it.position.y, 1.0, 1.0, null, *mat);
+            white := make_Color(1, 1, 1);
+            // glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            draw_textured_rect(<<renderer, renderer.light_entity_texture, -0.5, -0.5, 1.0, 1.0, null, *mat);
+
+            glDisable(GL_BLEND);
+            glEnable(GL_CULL_FACE);
+        }
+    }
+
     // renderer.projection_matrix = matrix_ortho(0, 1, 0, 1, -1, 1);
     // draw_textured_rect(<<renderer, water_reflect_frame_buffer.color_texture, 0, 0, 0.25, 0.25);
     // draw_textured_rect(<<renderer, water_refract_frame_buffer.color_texture, 0, 0.25, 0.25, 0.25);
 
     renderer.projection_matrix = matrix_ortho(0, xx game.window.width, xx game.window.height, 0, -1, 1);
+    renderer.view_matrix = matrix_identity();
+
+    white := make_Color(1, 1, 1);
+    // glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // draw_textured_rect(<<renderer, *renderer.lights[0].csm_shadow_map, 10, 10, 400.0*2, 100.0*2, null, null);
+
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
 
     render_imgui(game.renderer, *nuklear);
     nk_clear(*nuklear);

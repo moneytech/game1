@@ -307,6 +307,9 @@ Model :: struct {
     model_matrix: Matrix4;
     draw_mode := DRAW_MODE_SOLID;
 
+    // For hot-reloading, asset-management
+    source_path: string;
+
     #constructor init_model;
 };
 
@@ -448,6 +451,8 @@ GL_Renderer :: struct {
     projection_matrix: Matrix4;
     view_matrix: Matrix4;
     model_matrix_stack: [..] Matrix4;
+
+    debug_csm_selection: s32;
 }
 
 resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
@@ -1505,26 +1510,6 @@ finish_scene :: (using rdr: *GL_Renderer) {
     glDepthMask(GL_TRUE);
     glCullFace(GL_BACK);
     glDisable(GL_BLEND);
-
-    #if DEVELOPER {
-        for lights {
-            if it.type == Light_Type.DIRECTIONAL {
-                // @TODO
-            } else {
-                mat := matrix_translate(it.position.x, it.position.y, it.position.z) * matrix_rotate((camera.rotation)) * matrix_scale(1, -1, 1);
-                // draw_textured_rect(rdr, null, it.position.x, it.position.y, 1.0, 1.0, null, *mat);
-                white := make_Color(1, 1, 1);
-                // glDisable(GL_DEPTH_TEST);
-                glDisable(GL_CULL_FACE);
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                draw_textured_rect(<<rdr, rdr.light_entity_texture, -0.5, -0.5, 1.0, 1.0, null, *mat);
-
-                glDisable(GL_BLEND);
-                glEnable(GL_CULL_FACE);
-            }
-        }
-    }
 }
 
 _draw_cube :: (x: float, y: float, z: float, size: float) {
@@ -1679,6 +1664,13 @@ use_shader :: (using rdr: GL_Renderer, shader: *Shader) {
     glUseProgram(shader.id);
     viewer_pos := glGetUniformLocation(shader.id, "camera_position");
     glUniform3f(viewer_pos, camera.position.x, camera.position.y, camera.position.z);
+
+    camera_view_matrix := glGetUniformLocation(shader.id, "camera_view_matrix");
+    pos := camera.position;
+    vm := matrix_rotate(inverse(camera.rotation)) * matrix_translate(-pos.x, -pos.y, -pos.z);
+    glUniformMatrix4fv(camera_view_matrix, 1, GL_TRUE, vm.flat.data);
+
+    glUniform1i(glGetUniformLocation(shader.id, "debug_csm_selection"), debug_csm_selection);
 }
 
 draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
@@ -1730,6 +1722,8 @@ draw_mesh :: (using rdr: GL_Renderer, m: Mesh, shader: *Shader = null) {
             glEnableVertexAttribArray(3);
             glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, cast(*void) (vertex_size+normal_size+tex_size));
         }
+    } else {
+        glVertexAttrib3f(1, 0, 0, 0);
     }
 
     if m.colors.count && !mat.disable_vertex_colors {

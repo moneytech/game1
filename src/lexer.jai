@@ -32,6 +32,9 @@ ML_Token_Type :: enum s32 {
     ML_TOKEN_CPP_GREATER_EQUAL; // >=
     ML_TOKEN_CPP_LESS_EQUAL;    // <=
     ML_TOKEN_CPP_AND_AND;       // &&
+    ML_TOKEN_CPP_OR_OR;         // ||
+    ML_TOKEN_CPP_PLUS_PLUS;     // ++
+    ML_TOKEN_CPP_MINUS_MINUS;   // --
 
     // HTML tokens
     ML_TOKEN_HTML_COMMENT;     // <!
@@ -56,6 +59,9 @@ print_token_to_builder :: (builder: *String_Builder, tok: ML_Token) {
         case ML_TOKEN_CPP_GREATER_EQUAL; append(builder, ">=");
         case ML_TOKEN_CPP_LESS_EQUAL;    append(builder, "<=");
         case ML_TOKEN_CPP_AND_AND;       append(builder, "&&");
+        case ML_TOKEN_CPP_OR_OR;         append(builder, "||");
+        case ML_TOKEN_CPP_PLUS_PLUS;     append(builder, "++");
+        case ML_TOKEN_CPP_MINUS_MINUS;   append(builder, "--");
         case ML_TOKEN_CPP_STYLE_COMMENT;
         //     append(builder, "//");
         //     append(builder, tok._string);
@@ -356,10 +362,22 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
             st.character_number += 2;
             st.current = current;
             return;
+        } else if (current[1] == #char "+") {
+            ml__token(st, tok, ML_TOKEN_CPP_PLUS_PLUS);
+            current += 2;
+            st.character_number += 2;
+            st.current = current;
+            return;
         }
     } else if (<<current == #char "-" && (current+1) < end) {
         if (current[1] == #char "=") {
             ml__token(st, tok, ML_TOKEN_CPP_MINUS_EQUAL);
+            current += 2;
+            st.character_number += 2;
+            st.current = current;
+            return;
+        } else if (current[1] == #char "-") {
+            ml__token(st, tok, ML_TOKEN_CPP_MINUS_MINUS);
             current += 2;
             st.character_number += 2;
             st.current = current;
@@ -400,6 +418,14 @@ ml_get_token :: (st: *ML_State, tok: *ML_Token) {
     } else if (<<current == #char "&" && (current+1) < end) {
         if (current[1] == #char "&") {
             ml__token(st, tok, ML_TOKEN_CPP_AND_AND);
+            current += 2;
+            st.character_number += 2;
+            st.current = current;
+            return;
+        }
+    } else if (<<current == #char "|" && (current+1) < end) {
+        if (current[1] == #char "|") {
+            ml__token(st, tok, ML_TOKEN_CPP_OR_OR);
             current += 2;
             st.character_number += 2;
             st.current = current;
