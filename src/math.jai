@@ -25,7 +25,7 @@ sqrt :: (theta: float) -> float #foreign crt "sqrtf";
 pow  :: (x: float, power: float) -> float #foreign crt "powf";
 ceil :: (x: float) -> float #foreign crt "ceilf";                   // x64 & arm only.
 floor :: (x: float) -> float #foreign crt "floorf";                 // x64 & arm only.
-fmod :: (x: float, divisor: float) -> float #foreign crt;           // x64 & arm only.
+fmod :: (x: float, divisor: float) -> float #foreign crt "fmodf";   // x64 & arm only.
 
 round :: (x: float) -> float {
     integer := cast(float) cast(s64) x;
