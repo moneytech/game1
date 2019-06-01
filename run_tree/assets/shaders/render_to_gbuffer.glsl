@@ -4,8 +4,7 @@
 layout (location = 0) out vec3 g_position;
 layout (location = 1) out vec3 g_normal;
 layout (location = 2) out vec4 g_albedospec;
-layout (location = 3) out float g_roughness;
-layout (location = 4) out float g_metallic;
+layout (location = 3) out vec2 g_roughness;
 
 in vec2 tex_coords;
 in vec3 frag_pos;
@@ -50,8 +49,8 @@ void main() {
 
     g_albedospec.a = 1; // @Cleanup really shouldnt need to set this at all
 
-    g_roughness = material.roughness;
-    g_metallic  = material.metallic;
+    g_roughness.r = material.roughness;
+    g_roughness.g = material.metallic;
 
     // gl_FragDepth = length(view_space_frag_pos.xyz) / 100.0;
 }

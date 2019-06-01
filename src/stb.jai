@@ -1,7 +1,6 @@
 
 #scope_file
-// stb :: #foreign_library "stb";
-// #placeholder stb;
+stb :: #foreign_library "../run_tree/stb";
 #scope_export
 
 stbtt_bakedchar :: struct {

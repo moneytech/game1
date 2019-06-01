@@ -65,7 +65,9 @@ Scene :: struct {
 
     next_available_id: s32 = 1;
 
-    active_camera: *Camera;
+    active_camera: *Camera; // @TODO should this be an index ?
+
+    source_path: string;
 }
 
 add_to_scene :: (sc: *Scene, thing: *$T) {
@@ -77,7 +79,7 @@ add_to_scene :: (sc: *Scene, thing: *$T) {
 add_to_scene_with_id :: (sc: *Scene, thing: *$T, id: s32)  #body_text {
     builder: String_Builder;
 ACTOR_STRING :: #string DONE
-    assert(thing.object_id != -1);
+    // assert(thing.object_id != -1);
     thing.object_id = id;
     #if DEBUG {
          if find_object_by_id(sc, thing.object_id) != null {
@@ -401,7 +403,7 @@ calculate_csm_partition :: (near: float, far: float, index: float, max: float) -
     // return n, f;
 }
 
-CSM_SIZE :: 1024;
+CSM_SIZE :: 2048;
 
 render_geometry_csm :: (using game: *Game, texture: *Texture, light: *Light) {
     old_camera := renderer.camera;

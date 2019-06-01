@@ -1,5 +1,5 @@
 
-Hash_Table :: #import "Hash_Table";
+// Hash_Table :: #import "Hash_Table";
 
 Tag :: struct {
     using Tag_Type :: enum u8 {

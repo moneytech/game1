@@ -28,7 +28,7 @@ float get_shadow_distance(mat4 LS_matrix, vec3 WS_frag_pos, float n_dot_l, int i
 
     LS_frag_pos.xy += texcoord_offset;
 
-    const float EPSILON = 0.0008;
+    const float EPSILON = 0.00008;
     float bias = max(EPSILON * (1.0 - n_dot_l), 0.00005);
     bias = 0.0001;
     vec2 coord = saturate(LS_frag_pos.xy);
@@ -98,7 +98,7 @@ vec4 get_csm_debug_color(vec3 WS_frag_pos) {
 
 float sample_shadow_distribution(vec3 WS_frag_pos, float n_dot_l) {
     float dist = sample_csm_distance(WS_frag_pos, n_dot_l, vec2(0, 0));
-    return (dist < 0) ? 0.8 : 0.0;
+    return (dist < 0) ? 1.0 : 0.0;
 
     // float distribution = 0.0;
     // int size = 4;
@@ -127,8 +127,10 @@ void main() {
     vec3 frag_pos = texture(g_position, tex_coords).rgb;
     vec3 normal = texture(g_normal, tex_coords).rgb;
     vec3 in_diffuse = texture(g_albedospec, tex_coords).rgb;
-    float Roughness = texture(g_roughness, tex_coords).r;
-    float Metallic = texture(g_metallic, tex_coords).r;
+
+    vec2 roughness_metallic = texture(g_roughness, tex_coords).rg;
+    float Roughness = roughness_metallic.r;
+    float Metallic  = roughness_metallic.g;
 
     if (length(normal) < 0.5) {
         frag_color = vec4(in_diffuse, 1);
@@ -144,23 +146,26 @@ void main() {
         L = normalize(light.position-frag_pos);
     }
 
-    vec4 shadow_distribution = vec4(0);
+    float shadow_distribution = 0;
     vec4 csm_color = vec4(1);
 
     if (light.use_shadow_cubemap != 0) {
         float dist = texture(light.shadow_cube_map, (frag_pos-light.position)).r * light.radius;
         if ((dist + 0.1) < (length(frag_pos-light.position))) {
-            shadow_distribution = vec4(0.8);
+            shadow_distribution = 1.0;
         }
     } else if (light.use_csm_shadow_map != 0) {
         vec3 VS_frag_pos = (view * vec4(frag_pos, 1.0)).xyz;
 
-        float n_dot_l = max(0.0, dot(N, L));
-        float distrib = sample_shadow_distribution(frag_pos, n_dot_l);
-        shadow_distribution = vec4(distrib);
+        float n_dot_l = dot(N, L);
 
-        if (debug_csm_selection != 0) {
-            csm_color = get_csm_debug_color(frag_pos);
+        if (n_dot_l > 0) {
+            float distrib = sample_shadow_distribution(frag_pos, n_dot_l);
+            shadow_distribution = distrib;
+
+            if (debug_csm_selection != 0) {
+                csm_color = get_csm_debug_color(frag_pos);
+            }
         }
     }
 
@@ -168,7 +173,7 @@ void main() {
     F0 = mix(F0, in_diffuse, vec3(Metallic));
 
     // ambient light will be set by ambient shader
-    vec3 ambient = vec3(0.1) * in_diffuse;
+    vec3 ambient = vec3(0.01) * in_diffuse;
 
     
 
@@ -194,8 +199,8 @@ void main() {
     float n_dot_l = max(0.0, dot(N, L));
 
     vec3 diff = (in_diffuse / PI) * kd;
-    vec3 Lo = (diff + ks) * radiance * n_dot_l * falloff + ambient;
-    vec4 final_color = vec4(Lo, 1.0) * (1.0 - shadow_distribution);
+    vec3 Lo = (diff + ks) * radiance * n_dot_l * falloff * (1.0 - shadow_distribution) + ambient;
+    vec4 final_color = vec4(Lo, 1.0);
     frag_color = csm_color * final_color;
 }
 

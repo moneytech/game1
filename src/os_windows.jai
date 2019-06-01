@@ -1,76 +1,12 @@
 
-#import "Basic";
-#import "Compiler";
-#import "Window_Creation";
 
 #scope_file
-User32   :: #foreign_system_library "user32";
-Kernel32 :: #foreign_system_library "kernel32";
-crt :: #foreign_system_library "msvcrt";
-
 #import "Windows";
-
-GetOverlappedResult :: (hFile: HANDLE, lpOverlapped: *OVERLAPPED, lpNumberOfBytesTrasferred: *s32, bWait: BOOL) -> BOOL #foreign Kernel32;
-LoadLibraryA :: (lpFileName: *u8) -> HMODULE #foreign Kernel32;
-LoadLibraryA :: (name: string) -> HMODULE {
-    c_name := to_c_string(name);
-    ret := LoadLibraryA(c_name);
-    free(c_name);
-    return ret;
-}
-
-GetProcAddress :: (hModule: HMODULE, lpProcName: *u8) -> *void #foreign Kernel32;
-GetProcAddress :: (hModule: HMODULE, name: string) -> *void {
-    c_name := to_c_string(name);
-    ret := GetProcAddress(hModule, c_name);
-    free(c_name);
-    return ret;
-}
-
-DestroyWindow :: (hWnd: HWND) -> BOOL #foreign User32;
-CreateFileA :: (lpFileName: *u8, dwDesiredAccess: s32, dwShareMode: s32, sec: *void, dwCreationDisposition: s32, dwFlags: s32, hTemplate: *void) -> HANDLE #foreign Kernel32;
-GetModuleHandleA :: (lpModuleName: *u8) -> HMODULE #foreign Kernel32;
-GetModuleFileNameA :: (hModule: HMODULE, lpFileName: *u8, nSize: s32) -> s32 #foreign Kernel32;
-
-FILE_NOTIFY_CHANGE_FILE_NAME   :: 0x0000001;
-FILE_NOTIFY_CHANGE_DIR_NAME    :: 0x0000002;
-FILE_NOTIFY_CHANGE_ATTRIBUTES  :: 0x0000004;
-FILE_NOTIFY_CHANGE_SIZE        :: 0x0000008;
-FILE_NOTIFY_CHANGE_LAST_WRITE  :: 0x0000010;
-FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x0000020;
-FILE_NOTIFY_CHANGE_CREATION    :: 0x0000040;
-FILE_NOTIFY_CHANGE_SECURITY    :: 0x0000100;
-
-FILE_LIST_DIRECTORY :: 1;
-
-WGL_DRAW_TO_WINDOW_ARB        :: 0x2001;
-WGL_SUPPORT_OPENGL_ARB        :: 0x2010;
-WGL_DOUBLE_BUFFER_ARB         :: 0x2011;
-WGL_PIXEL_TYPE_ARB            :: 0x2013;
-WGL_TYPE_RGBA_ARB             :: 0x202B;
-WGL_COLOR_BITS_ARB            :: 0x2014;
-WGL_DEPTH_BITS_ARB            :: 0x2022;
-WGL_STENCIL_BITS_ARB          :: 0x2023;
-
-FILE_NOTIFY_INFORMATION :: struct {
-    NextEntryOffset: s32;
-    Action: s32;
-    FileNameLength: s32;
-    FileName: [1] u16;
-}
-
-HMODULE :: HANDLE;
-
-STATUS_PENDING       : s32 : 0x00000103;
-
-HasOverlappedIoCompleted :: inline (overlapped: OVERLAPPED) -> bool {
-    return (cast (s32) overlapped.Internal) != STATUS_PENDING;
-}
-
 #scope_export
 
 OS_Window :: HWND;
 OS_GL_Context :: HGLRC;
+
 
 XINPUT_GAMEPAD :: struct {
     wButtons: s16;
@@ -397,7 +333,7 @@ os_watch_dir :: (path: string)  {
     }
 
     dir.name = copy_string(path);
-    convert_slashes(dir.name);
+    replace_chars(dir.name, "\\", #char "/");
     if (dir.name[path.count-1] != #char "/") {
         n := dir.name;
         dir.name = concatenate(n, "/");
@@ -423,11 +359,11 @@ os_pump_file_notifications :: (callback: FILE_NOTIF_FUNC, userdata: *void) {
         info := cast(*FILE_NOTIFY_INFORMATION) it.notif_data;
         while (true) {
             buf: [1000] u8;
-            len := WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, info.FileName.data, info.FileNameLength/2, buf.data, 1000, null, null);
+            len := WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, cast(*u16) info.FileName.data, info.FileNameLength/2, buf.data, 1000, null, null);
             buf[len] = 0;
 
-            path := concatenate(it.name, point_at_c_string(buf.data));
-            convert_slashes(path);
+            path := concatenate(it.name, to_string(buf.data));
+            replace_chars(path, "\\", #char "/");
             print("%\n", path);
             f: File_Notification;
             f.name = path;

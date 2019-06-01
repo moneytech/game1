@@ -24,7 +24,6 @@ Material_Lib :: struct {
 
 #load "nbt.jai";
 
-// @TODO maybe these should be Lists?
 serialize_vector3 :: (file: *File, v: Vector3, name: string) {
     write_list_start(file, Tag.Float, name, 3);
     write_tag(file, nbt_float(v.x), is_in_list=true);
@@ -40,20 +39,31 @@ serialize_quaternion :: (file: *File, q: Quaternion, name: string) {
     write_tag(file, nbt_float(q.w), is_in_list=true);
 }
 
-serialize_actor :: (file: *File, actor: *Actor) {
+serialize_actor :: (file: *File, actor: *Actor, scene: *Scene) {
     serialize_quaternion(file, actor.orientation, "orientation");
-    if actor.model then write_tag(file, nbt_string(actor.model.source_path, "Model"));
+    if actor.model then {
+        model := actor.model;
+        if model.source_path == "" {
+            name := sprint("Unnamed_Model.%.obj", scene.next_available_id);
+            scene.next_available_id += 1;
+            // name := get_unnamed_model_name(".obj");
+            defer free(name);
+            model.source_path = concatenate(scene.source_path, "/", name);
+            export_model_as_obj(model);
+        }
+        write_tag(file, nbt_string(actor.model.source_path, "Model")); // @TODO this should probably be an object ID/index into a pool of models in the scene
+    }
     else write_tag(file, nbt_string("", "Model"));
 }
 
-serialze_object :: (file: *File, obj: *Scene_Object) {
+serialze_object :: (file: *File, obj: *Scene_Object, scene: Scene) {
     assert(obj.object_id >= 0);
     write_tag_header(file, Tag.Compound, tprint("ID%", obj.object_id));
     write_tag(file, nbt_string(tprint("%", obj.object_type), "object_type"));
     write_tag(file, nbt_int(obj.object_id, "object_id"));
     serialize_vector3(file, obj.position, "position");
     if obj.object_type == Actor {
-        serialize_actor(file, cast(*Actor) obj);
+        serialize_actor(file, cast(*Actor) obj, *scene);
     }
     write_tag_header(file, Tag.End, "");
 }
@@ -64,7 +74,7 @@ serialze_scene :: (filename: string, scene: Scene) {
 
     write_tag_header(*file, Tag.Compound, "");
     for scene.all_objects {
-        serialze_object(*file, it);
+        serialze_object(*file, it, scene);
     }
     write_tag_header(*file, Tag.End, "");
 }
@@ -144,11 +154,126 @@ deserialize_scene :: (asset_man: *Asset_Manager, file: *File, scene: *Scene) {
     read_tag_header(file); // Tag.End
 }
 
+export_model_as_obj :: (model: *Model) {
+    assert(model.source_path != "");
+
+    mtllib_fullpath := concatenate(path_strip_extension(model.source_path), ".mtllib");
+    defer free(mtllib_fullpath);
+    mtllib_path := concatenate(path_strip_extension(path_filename(model.source_path)), ".mtllib");
+    defer free(mtllib_path);
+
+    obj_builder: String_Builder;
+    mtl_builder: String_Builder;
+
+    mesh_index := 0;
+    mtl_index := 0;
+
+    print_to_builder(*obj_builder, "mtllib %\n", mtllib_path);
+
+    vertex_offset := 1;
+    texture_offset := 1;
+    normal_offset := 1;
+
+    for mesh: model.meshes {
+        mat := mesh.material;
+        assert(mat != null);
+
+        material_name := sprint("Material.%", mtl_index);
+        mtl_index += 1;
+        defer free(material_name);
+
+        Material :: struct {
+            textures: [MAX_TEXTURES_PER_MESH] *Texture;
+            diffuse: Color;
+            roughness: float = 0.4;
+            metallic: float = 0;
+
+            // maybe these should be Mesh properties since they're rendering options as opposed to rendering attributes ?
+            disable_lighting := false;
+            disable_backface_culling := false;
+            disable_vertex_colors := false;
+            disable_depth_test := false;
+
+            #constructor (using m: *Material) {
+                diffuse = make_Color(1.0, 1.0, 1.0);
+            }
+        };
+
+        { // write the material info
+            print_to_builder(*mtl_builder, "newmtl %\n", material_name);
+            print_to_builder(*mtl_builder, "Kd % % %\n", mat.diffuse.r, mat.diffuse.g, mat.diffuse.b);
+            print_to_builder(*mtl_builder, "Pr %\n", mat.roughness); // @TODO idk what Blender would actually accept for the parameter name
+            print_to_builder(*mtl_builder, "Pm %\n", mat.metallic);
+
+            // @TODO textures
+        }
+
+        mesh_name := sprint("Mesh.%\n", mesh_index);
+        mesh_index += 1;
+        defer free(mesh_name);
+
+        print_to_builder(*obj_builder, "o %\n", mesh_name);
+
+        for mesh.vertices {
+            print_to_builder(*obj_builder, "v % % %\n", it.x, it.y, it.z);
+        }
+
+        for mesh.normals {
+            print_to_builder(*obj_builder, "vn % % %\n", it.x, it.y, it.z);
+        }
+
+        for mesh.tex_coords {
+            print_to_builder(*obj_builder, "vt % %\n", it.x, it.y);
+        }
+
+        print_to_builder(*obj_builder, "usemtl %\n", material_name);
+
+        if mesh.normals.count    then assert(mesh.vertices.count == mesh.normals.count);
+        if mesh.tex_coords.count then assert(mesh.tex_coords.count == mesh.vertices.count);
+
+        for mesh.vertices {
+            if it_index % 3 == 0 {
+                append(*obj_builder, "\nf ");
+            }
+            print_to_builder(*obj_builder, "%/", it_index + vertex_offset);
+            if mesh.tex_coords.count then print_to_builder(*obj_builder, "%", it_index + texture_offset);
+            append(*obj_builder, "/");
+
+            if mesh.normals.count then print_to_builder(*obj_builder, "%", it_index + normal_offset);
+            append(*obj_builder, " ");
+        }
+
+        append(*obj_builder, "\n");
+
+        vertex_offset += mesh.vertices.count;
+        texture_offset += mesh.tex_coords.count;
+        normal_offset += mesh.normals.count; 
+    }
+
+    obj_string := builder_to_string(*obj_builder);
+    mtl_string := builder_to_string(*mtl_builder);
+    write_entire_file(model.source_path, obj_string);
+    write_entire_file(mtllib_fullpath, mtl_string);
+}
+
+export_scene :: (scene: Scene) {
+    assert(scene.source_path != "");
+
+    make_directory_if_it_does_not_exist(scene.source_path);
+    data_dat_path := concatenate(scene.source_path, "/", "data.dat");
+    serialze_scene(data_dat_path, scene);
+    free(data_dat_path);
+}
+
 load_scene :: (using asset_man: *Asset_Manager, filepath: string) -> *Scene {
-    file := file_open(filepath);
+    data_dat_path := concatenate(filepath, "/", "data.dat");
+    defer free(data_dat_path);
+
+    file := file_open(data_dat_path);
     defer file_close(*file);
 
     scene := New(Scene);
+    scene.source_path = filepath; // @ copy ?
     deserialize_scene(asset_man, *file, scene);
     return scene;
 }
@@ -181,7 +306,7 @@ load_image :: (using asset_man: *Asset_Manager, filepath: string) -> *Texture {
         return tex;
     }
 
-    print("ERROR: can't open '%' because '%s'\n", filepath, point_at_c_string(stbi_failure_reason()));
+    print("ERROR: can't open '%' because '%s'\n", filepath, to_string(stbi_failure_reason()));
     return null;
 }
 
@@ -213,7 +338,7 @@ load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> Height_
         return map, m;
     }
 
-    print("ERROR:%s\n", point_at_c_string(stbi_failure_reason()));
+    print("ERROR:%s\n", to_string(stbi_failure_reason()));
     return map, null;
 }
 
@@ -455,10 +580,26 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
             } else if (name == "d") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_FLOAT || tok.type == ML_TOKEN_INTEGER);
+                // if (tok.type == ML_TOKEN_FLOAT)
+                //     mat.transparency = cast(float) tok._float;
+                // else if (tok.type == ML_TOKEN_INTEGER)
+                //     mat.transparency = cast(float) tok.integer;
+                ml_get_token(*st, *tok);
+            } else if (name == "Pr") {
+                ml_get_token(*st, *tok);
+                assert(tok.type == ML_TOKEN_FLOAT || tok.type == ML_TOKEN_INTEGER);
                 if (tok.type == ML_TOKEN_FLOAT)
-                    mat.transparency = cast(float) tok._float;
+                    mat.roughness = cast(float) tok._float;
                 else if (tok.type == ML_TOKEN_INTEGER)
-                    mat.transparency = cast(float) tok.integer;
+                    mat.roughness = cast(float) tok.integer;
+                ml_get_token(*st, *tok);
+            } else if (name == "Pm") {
+                ml_get_token(*st, *tok);
+                assert(tok.type == ML_TOKEN_FLOAT || tok.type == ML_TOKEN_INTEGER);
+                if (tok.type == ML_TOKEN_FLOAT)
+                    mat.metallic = cast(float) tok._float;
+                else if (tok.type == ML_TOKEN_INTEGER)
+                    mat.metallic = cast(float) tok.integer;
                 ml_get_token(*st, *tok);
             } else if (name == "illum") {
                 ml_get_token(*st, *tok);

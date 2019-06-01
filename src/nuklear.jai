@@ -1,4 +1,4 @@
-// #placeholder libnuklear;
+libnuklear :: #foreign_library "../run_tree/nuklear";
 
 nk_char :: u8;
 

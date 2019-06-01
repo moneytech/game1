@@ -8,3 +8,7 @@
 // @FixMe the water reflection rotates dramatically when the camera is rolled (tilted) about the Z axis, breaking VR immersion
 
 // @TODO @FixMe remove the dollar signs here once bug261 is fixed.
+
+#run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
+
+// @TODO using GL functions outside this file is against the rules!

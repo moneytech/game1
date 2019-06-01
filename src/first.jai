@@ -16,6 +16,7 @@
 }
 
 ENGINE_SRC_PATH :: #filepath;
+ENGINE_RUNTREE_PATH :: #run concatenate(ENGINE_SRC_PATH, "/../run_tree/");
 
 make_directory_tree :: (_path: string) {
     path := _path;
@@ -32,6 +33,8 @@ make_directory_tree :: (_path: string) {
 }
 
 copy_engine_assets_to :: (path: string) {
+    // @TODO maybe use the C-build file-copy system so we only do expensive copies
+    // for files that have changed?
     engine_path := concatenate(#filepath, "../run_tree/assets");
     paths: [2] string;
     paths[0] = engine_path;
@@ -70,17 +73,17 @@ setup_build :: (output_path: string) -> Build_Options {
     nuklear_src := C_compiler_make_source_file(concatenate(#filepath, "/nuklear.c"));
     // compile stb lib
      #if OS_WINDOWS {
-        stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/stb.dll"), true, stb_src);
-        miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/miniz.dll"), true, miniz_src);
-        nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/nuklear.dll"), true, nuklear_src);
+        stb_lib := C_compiler_make_copy(concatenate(options.output_path, "/stb.dll"), C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/stb.dll"), true, stb_src));
+        miniz_lib := C_compiler_make_copy(concatenate(options.output_path, "/miniz.dll"), C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/miniz.dll"), true, miniz_src));
+        nuklear_lib := C_compiler_make_copy(concatenate(options.output_path, "/nuklear.dll"), C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/nuklear.dll"), true, nuklear_src));
     } else {
-        stb_lib := C_compiler_make_lib(concatenate(options.output_path, "/stb", DLL_EXT), true, stb_src);
-        miniz_lib := C_compiler_make_lib(concatenate(options.output_path, "/miniz", DLL_EXT), true, miniz_src);
-        nuklear_lib := C_compiler_make_lib(concatenate(options.output_path, "/nuklear", DLL_EXT), true, nuklear_src);
+        stb_lib := C_compiler_make_copy(concatenate(options.output_path, "/stb"), C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/stb", DLL_EXT), true, stb_src));
+        miniz_lib := C_compiler_make_copy(concatenate(options.output_path, "/miniz"), C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/miniz", DLL_EXT), true, miniz_src));
+        nuklear_lib := C_compiler_make_copy(concatenate(options.output_path, "/nuklear"), C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/nuklear", DLL_EXT), true, nuklear_src));
 
-        stb_stat := C_compiler_make_lib(concatenate(options.output_path, "/stb.a"), false,  C_compiler_make_object(concatenate(options.output_path, "/stb.o"), stb_src));
-        miniz_stat := C_compiler_make_lib(concatenate(options.output_path, "/miniz.a"), false, C_compiler_make_object(concatenate(options.output_path, "/miniz.o"), miniz_src));
-        nuklear_stat := C_compiler_make_lib(concatenate(options.output_path, "/nuklear.a"), false, C_compiler_make_object(concatenate(options.output_path, "/nuklear.o"), nuklear_src));
+        stb_stat := C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/stb.a"), false,  C_compiler_make_object(concatenate(options.output_path, "/stb.o"), stb_src));
+        miniz_stat := C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/miniz.a"), false, C_compiler_make_object(concatenate(options.output_path, "/miniz.o"), miniz_src));
+        nuklear_stat := C_compiler_make_lib(concatenate(ENGINE_RUNTREE_PATH, "/nuklear.a"), false, C_compiler_make_object(concatenate(options.output_path, "/nuklear.o"), nuklear_src));
 
         C_compiler_build_target(<< stb_stat);
         C_compiler_build_target(<< miniz_stat);
@@ -90,6 +93,12 @@ setup_build :: (output_path: string) -> Build_Options {
     C_compiler_build_target(<< stb_lib);
     C_compiler_build_target(<< miniz_lib);
     C_compiler_build_target(<< nuklear_lib);
+
+    // SUPPORTS_OCULUS @TODO
+    #if OS_WINDOWS {
+        copy_libovr := C_compiler_make_copy(concatenate(options.output_path, "/LibOVR_out.dll"), C_compiler_make_source_file(concatenate(ENGINE_RUNTREE_PATH, "/LibOVR_out.dll")));
+        C_compiler_build_target(<< copy_libovr);
+    }
 
     // compiler_add_library_search_directory(options.output_path);
 
@@ -103,21 +112,6 @@ setup_build :: (output_path: string) -> Build_Options {
 };
 
 add_engine_to_workspace :: (w: Workspace) {
-LIBS :: #string DONE
-    libnuklear :: #foreign_library "/run_tree/nuklear";
-    stb :: #foreign_library "/run_tree/stb";
-    miniz :: #foreign_library "/run_tree/miniz";
-DONE
-
-VR_LIBS :: #string DONE
-#if SUPPORTS_OCULUS {
-    LibOVR :: #foreign_library "/run_tree/libOVR_out";
-}
-DONE
-    
-    add_build_string(LIBS, w);
-    add_build_string(VR_LIBS, w);
-
     add_build_file("physics.jai", w);
     add_build_file("renderer.jai", w);
     add_build_file("asset_manager.jai", w);
@@ -133,6 +127,7 @@ build_workspace :: (name: string, output_path: string) -> Workspace, Build_Optio
     options := setup_build(output_path);
     options.output_type = Build_Output_Type.EXECUTABLE;
     options.output_executable_name = name;
+    options.intermediate_path = concatenate(output_path, "../build");
     
     w := compiler_create_workspace(name);
     file_path := copy_string(#filepath);
@@ -344,10 +339,11 @@ C_compiler_build_target :: (target: C_Target, flag_string: ..string) -> string {
         case C_Output_Type.COPY_FILE;
             assert(target.dependencies.count == 1);
             in := target.dependencies[0];
-            if copy_file(in.output_path, target.output_path)
-                print("Copied % to %\n", in, target.output_path);
+            path := C_compiler_build_target(<< in);
+            if copy_file(path, target.output_path)
+                print("Copied % to %\n", path, target.output_path);
             else
-                print("Error copying % to %\n", in, target.output_path);
+                print("Error copying % to %\n", path, target.output_path);
 
             return target.output_path;
     }

@@ -1,9 +1,13 @@
 
 #load "stb.jai";
-#import "GL";
 
 #scope_file
-using gl;
+// GL :: #import "GL";
+// using GL;
+// using GL.gl;
+
+// @TODO using GL functions outside this file is against the rules!
+#import "GL";
 
 #scope_export
 
@@ -246,7 +250,6 @@ Material :: struct {
     diffuse: Color;
     roughness: float = 0.4;
     metallic: float = 0;
-    transparency: float = 1.0;
 
     // maybe these should be Mesh properties since they're rendering options as opposed to rendering attributes ?
     disable_lighting := false;
@@ -396,9 +399,6 @@ Camera :: struct {
     dual_lens := false;
 };
 
-
-#run print("@Incomplete: make a flag on model to differentiate between water and non-water models.\n");
-
 GL_Renderer :: struct {
     game: *Game;
 
@@ -410,7 +410,6 @@ GL_Renderer :: struct {
     gbuffer_normal: u32;
     gbuffer_albedo_spec: u32;
     gbuffer_roughness: u32;
-    gbuffer_metallic: u32;
     gbuffer_depth: u32;
     gbuffer_viewport: Viewport;
 
@@ -474,12 +473,7 @@ resize_rendering_buffers :: (using rdr: *GL_Renderer, w: u32, h: u32) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glBindTexture(GL_TEXTURE_2D, gbuffer_roughness);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, xx w, xx h, 0, GL_RED, GL_FLOAT, null);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    glBindTexture(GL_TEXTURE_2D, gbuffer_metallic);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, xx w, xx h, 0, GL_RED, GL_FLOAT, null);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, xx w, xx h, 0, GL_RG, GL_FLOAT, null);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -525,7 +519,7 @@ debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, l
 			// print("message: %\n", message);
 			// print("userParam: %\n", userParam);
 			if type == GL_DEBUG_TYPE_ERROR {
-                print("GL Error:%\n", point_at_c_string(message));
+                print("GL Error:%\n", to_string(message));
                 assert(false);
             }
 		}
@@ -577,7 +571,6 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     glGenTextures(1, *gbuffer_normal);
     glGenTextures(1, *gbuffer_albedo_spec);
     glGenTextures(1, *gbuffer_roughness);
-    glGenTextures(1, *gbuffer_metallic);    
     glGenRenderbuffers(1, *gbuffer_depth);
 
     resize_rendering_buffers(rdr, width, height);
@@ -586,9 +579,8 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gbuffer_normal, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gbuffer_albedo_spec, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, gbuffer_roughness, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, gbuffer_metallic, 0);
 
-    attach: [] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+    attach: [] u32 = {:u32: GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
     glDrawBuffers(xx attach.count, attach.data);
 
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gbuffer_depth);
@@ -743,7 +735,7 @@ compile_shader :: (type: GLenum, _source: string) -> u32 {
         glGetShaderiv(v, GL_INFO_LOG_LENGTH, *len);
         buf := cast(*u8) alloc(len);
         glGetShaderInfoLog(v, xx len, xx *len, buf);
-        print("ERROR: %\n", point_at_c_string(buf));
+        print("ERROR: %\n", to_string(buf));
         free(buf);
 
         glDeleteShader(v);
@@ -852,7 +844,7 @@ compile_shader_source :: (out: *Shader, vertex: string, pixel: string) {
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, *len);
         buf := cast(*u8) alloc(len);
         glGetProgramInfoLog(program, xx len, xx *len, buf);
-        print("ERROR: %\n", point_at_c_string(buf));
+        print("ERROR: %\n", to_string(buf));
         free(buf);
 
         glDeleteProgram(program);
@@ -1451,8 +1443,6 @@ finish_scene :: (using rdr: *GL_Renderer) {
     
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, gbuffer_roughness);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, gbuffer_metallic);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gbuffer_position);

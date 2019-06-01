@@ -1,10 +1,9 @@
 
 #import "Input";
-#import "GL";
 
-Window_Creation :: #import "Window_Creation";
+#import "Window_Creation";
 
-os_create_window :: Window_Creation.create_window;
+os_create_window :: create_window;
 
 JOYSTICK_BUTTON_A       :: (1 << 0);
 JOYSTICK_BUTTON_B       :: (1 << 1);

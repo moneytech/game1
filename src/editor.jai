@@ -219,16 +219,12 @@ do_material_properties :: (nuklear: *nk_context, material: *Material) {
     nk_label(nuklear, "Base Color:", NK_TEXT_LEFT);
     material.diffuse = color_chooser_combo_box(nuklear, material.diffuse);
 
-    nk_layout_row_begin(nuklear, NK_STATIC, 50, 2);
-    nk_layout_row_push(nuklear, 100);
-    nk_label(nuklear, "Roughness:", NK_TEXT_LEFT);
+    nk_layout_row_begin(nuklear, NK_STATIC, 50, 1);
     nk_layout_row_push(nuklear, 200);
-    nk_slider_float(nuklear, 0.0, *material.roughness, 1.0, 0.01);
-    
-    nk_layout_row_push(nuklear, 100);
-    nk_label(nuklear, "Metallic:", NK_TEXT_LEFT);
+    material.roughness = nk_propertyf(nuklear, "#Roughness:", 0, material.roughness, 1.0, 0.01, 0.005);
+
     nk_layout_row_push(nuklear, 200);
-    nk_slider_float(nuklear, 0.0, *material.metallic, 1.0, 0.01);
+    material.metallic = nk_propertyf(nuklear, "#Metallic:", 0, material.metallic, 1.0, 0.01, 0.005);
 }
 
 #scope_export
@@ -251,7 +247,7 @@ update_editor :: (game: *Game, dt: float) {
         if selected_game_object.object_type == Actor {
             actor := cast(*Actor) selected_game_object;
 
-            if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 300, 400), (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+            if (nk_begin(*nuklear, "Actor", _nk_rect(50, 50, 400, 400), (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
                 do_material_properties(*nuklear, actor.model.meshes[0].material);
             }
 
@@ -259,7 +255,7 @@ update_editor :: (game: *Game, dt: float) {
         } else if selected_game_object.object_type == Light {
             light := cast(*Light) selected_game_object;
 
-            if (nk_begin(*nuklear, "Light", _nk_rect(50, 50, 300, 400), (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
+            if (nk_begin(*nuklear, "Light", _nk_rect(50, 50, 400, 400), (NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) ) {
                 /* fixed widget pixel width */
                 nk_layout_row_dynamic(*nuklear, 200, 1);
     
