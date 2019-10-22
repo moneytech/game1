@@ -40,13 +40,13 @@ copy_engine_assets_to :: (path: string) {
     paths[0] = engine_path;
     paths[1] = path;
 
-    visitor :: (short_name: string, full_name: string, paths: [2] string) {
-        relative_path := full_name;
+    visitor :: (info: *File_Visit_Info, paths: [2] string) {
+        relative_path := info.full_name;
         advance(*relative_path, paths[0].count);
         out_path := concatenate(paths[1], "/", relative_path);
         // print("out: %\n", out_path);
         make_directory_tree(path_strip_filename(out_path));
-        copy_file(full_name, out_path);
+        copy_file(info.full_name, out_path);
     }
 
     res := visit_files(engine_path, true, paths, visitor);
@@ -95,7 +95,7 @@ setup_build :: (output_path: string) -> Build_Options {
     C_compiler_build_target(<< nuklear_lib);
 
     // SUPPORTS_OCULUS @TODO
-    #if OS_WINDOWS {
+    #if false {
         copy_libovr := C_compiler_make_copy(concatenate(options.output_path, "/LibOVR_out.dll"), C_compiler_make_source_file(concatenate(ENGINE_RUNTREE_PATH, "/LibOVR_out.dll")));
         C_compiler_build_target(<< copy_libovr);
     }

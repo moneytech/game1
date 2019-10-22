@@ -99,7 +99,7 @@ make_Vector3 :: (i: Vector4) -> Vector3 {
     return v;
 }
 
-operator== :: (a: Vector3, b: Vector3) -> bool #c_callback {
+operator== :: (a: Vector3, b: Vector3) -> bool #c_call {
     return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
@@ -160,7 +160,7 @@ mul :: (a: Vector3, b: Vector3) -> Vector3 {
     return out;
 }
 
-dot :: (a: Vector3, b: Vector3) -> float #c_callback {
+dot :: (a: Vector3, b: Vector3) -> float #c_call {
     return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
@@ -172,7 +172,7 @@ cross :: (a: Vector3, b: Vector3) -> Vector3 {
     return out;
 }
 
-length :: (v: Vector3) -> float #c_callback {
+length :: (v: Vector3) -> float #c_call {
     return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
 
@@ -227,11 +227,11 @@ operator* :: (a: Vector2, f64: float64) -> Vector2 #symmetric {
     return out;
 }
 
-dot :: (a: Vector2, b: Vector2) -> float #c_callback {
+dot :: (a: Vector2, b: Vector2) -> float #c_call {
     return a.x*b.x + a.y*b.y;
 }
 
-length :: (v: Vector2) -> float #c_callback {
+length :: (v: Vector2) -> float #c_call {
     return sqrt(v.x*v.x + v.y*v.y);
 }
 
@@ -251,7 +251,7 @@ Quaternion :: struct {
     y: float;
     z: float;
 
-    #constructor (q: *Quaternion) {
+    init :: (q: *Quaternion) {
         <<q = set_angle_vector(0, 0, 1, 0);
     }
 }
@@ -337,7 +337,7 @@ operator- :: (q0: Quaternion, q1: Quaternion) -> Quaternion {
     return o;
 }
 
-length :: (q: Quaternion) -> float #c_callback {
+length :: (q: Quaternion) -> float #c_call {
     return sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
 }
 
@@ -362,7 +362,7 @@ normalize :: (q: Quaternion) -> Quaternion {
     return o;
 }
 
-dot :: (a: Quaternion, b: Quaternion) -> float #c_callback {
+dot :: (a: Quaternion, b: Quaternion) -> float #c_call {
     return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
@@ -387,8 +387,6 @@ Matrix4 :: struct {
 	m: [4][4] float;
 	#place m;
 	flat: [16] float;
-
-    #constructor identity;
 }
 
 // float& operator[](unsigned int index) {
@@ -396,7 +394,7 @@ Matrix4 :: struct {
 //     return flat[index];
 // }
 
-determinate :: (using mat: Matrix4) -> float #c_callback {
+determinate :: (using mat: Matrix4) -> float #c_call {
     return
     m[0][3] * m[1][2] * m[2][1] * m[3][0] - m[0][2] * m[1][3] * m[2][1] * m[3][0] -
 
@@ -715,6 +713,7 @@ matrix_ortho :: (left: float, right: float, bottom: float, top: float, _near: fl
 
 matrix_identity :: () -> Matrix4 {
     mat: Matrix4;
+    identity(*mat);
     return mat;
 }
 
@@ -724,8 +723,6 @@ Matrix3 :: struct {
     m: [3][3] float;
     #place m;
     flat: [9] float;
-
-    #constructor identity;
 }
 
 orthonormalize :: (using _mat: *Matrix3) {
@@ -861,6 +858,12 @@ to_mat4 :: (m: Matrix3) -> Matrix4 {
     out.m[2][1] = m.m[2][1];
     out.m[2][2] = m.m[2][2];
     return out;
+}
+
+matrix3_identity :: () -> Matrix3 {
+    m: Matrix3;
+    identity(*m);
+    return m;
 }
 
 

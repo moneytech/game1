@@ -148,7 +148,7 @@ make_Capsule :: (center: Vector3, radius: float, height: float) -> Capsule {
 }
 
 moment_of_inertia :: (s: Sphere, body: Rigid_Body) -> Matrix3 {
-    m: Matrix3;
+    m: Matrix3 = matrix3_identity();
     t := 2.0 * ((1.0 / body.inverse_mass) * s.radius * s.radius) / 5.0;
     m.m[0][0] = t;
     m.m[1][1] = t;
@@ -168,7 +168,7 @@ moment_of_inertia :: (b: AABB, body: Rigid_Body) -> Matrix3 {
 
     mass := (1.0 / 12.0) * (1.0 / body.inverse_mass);
 
-    m: Matrix3;
+    m: Matrix3 = matrix3_identity();
     m.m[0][0] = mass * (h2 + d2);
     m.m[1][1] = mass * (w2 + d2);
     m.m[2][2] = mass * (w2 + h2);
@@ -191,7 +191,7 @@ moment_of_inertia :: (c: Capsule, body: Rigid_Body) -> Matrix3 {
 
     p1 := mcy * (h2/12.0 +  r2/4.0) + (2 * mhs * ((2*r2/5.0) + (h2/2.0) + (3*hr/8.0)) );
 
-    mat: Matrix3;
+    mat: Matrix3 = matrix3_identity();
     mat.m[0][0] = p1;
     mat.m[1][1] = mcy*(r2/2.0) + 2*mhs*(2*r2/5.0);
     mat.m[2][2] = p1;

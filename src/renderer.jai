@@ -32,8 +32,6 @@ Texture :: struct {
 
     id: u32;
     gl_binding: u32;
-
-    #destructor delete_texture;
 };
 
 // Right now if you want a Cube_Map, you can only have either depth or color per face, not both.
@@ -182,8 +180,8 @@ create_frame_buffer :: (using rdr: *GL_Renderer, width: u32, height: u32) -> Fra
 
 delete_frame_buffer :: (fb: *Frame_Buffer) {
     glDeleteFramebuffers(1, *fb.id);
-    Delete(fb.color_texture);
-    Delete(fb.depth_texture);
+    delete_texture(fb.color_texture);
+    delete_texture(fb.depth_texture);
 
     fb.id = xx -1;
     fb.color_texture = null;
@@ -257,8 +255,14 @@ Material :: struct {
     disable_vertex_colors := false;
     disable_depth_test := false;
 
-    #constructor (using m: *Material) {
+    init :: (using m: *Material) {
         diffuse = make_Color(1.0, 1.0, 1.0);
+    }
+
+    new :: () -> *Material {
+        m := New(Material);
+        init(m);
+        return m;
     }
 };
 
@@ -289,7 +293,15 @@ Mesh :: struct {
         map_position: [..] Vector2;
     }
 
-    #constructor Mesh_con;
+    init :: (using m: *Mesh) {
+        Mesh_con(m);
+    }
+
+    new :: () -> *Mesh {
+        m := New(Mesh);
+        init(m);
+        return m;
+    }
 }
 
 Mesh_con :: (m: *Mesh) {
@@ -313,11 +325,15 @@ Model :: struct {
     // For hot-reloading, asset-management
     source_path: string;
 
-    #constructor init_model;
-};
+    init :: (using m: *Model) {
+        init_model(m);
+    }
 
-init_model :: (m: *Model) {
-    m.model_matrix = matrix_identity();
+    new :: () -> *Model {
+        m := New(Model);
+        init(m);
+        return m;
+    }
 }
 
 DRAW_MODE_SOLID     :: 0;
@@ -376,8 +392,14 @@ Light :: struct {
     csm_matrices: [NUM_CSM_PARTITIONS] Matrix4;
     csm_parts: [4] float;
 
-    #constructor (using light: *Light) {
+    init :: (using light: *Light) {
         memset(*shadow_cube_map, 0, size_of(Cube_Map));
+    }
+
+    new :: () -> *Light {
+        l := New(Light);
+        init(l);
+        return l;
     }
 };
 
@@ -506,7 +528,7 @@ resize_frame_buffer :: (fb: *Frame_Buffer, w: u32, h: u32) {
 }
 
 
-debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_callback {
+debug_callback :: (source: GLenum, type: GLenum, id: GLuint, severity: GLenum, length: GLsizei, message: *u8, userParam: *void) #c_call {
 	pctx := cast(*Context) userParam;
     ctx := <<pctx;
 	push_context ctx {
@@ -614,13 +636,13 @@ init :: (using rdr: *GL_Renderer, width: u32, height: u32) {
 
     current_global_shader = render_to_gbuffer;
 
-    wireframe_material = New(Material);
+    wireframe_material = Material.new();
     wireframe_material.diffuse = make_Color(1.0, 0.5, 0.0);
     wireframe_material.disable_lighting = true;
     wireframe_material.disable_backface_culling = true;
     wireframe_material.disable_vertex_colors = true;
 
-    light_material := New(Material);
+    light_material := Material.new();
     <<light_material = <<wireframe_material;
     light_material.disable_backface_culling = false;
     light_material.disable_depth_test = true;
@@ -1999,8 +2021,8 @@ create_sphere :: (radius: float, latitude_slices: int, longitude_slices: int) ->
 }
 
 create_capsule :: (radius: float, latitude_slices: int, longitude_slices: int, length: float = 1.0) -> *Model {
-    mod := New(Model);
-    m := New(Mesh);
+    mod := Model.new();
+    m := Mesh.new();
     array_add(*mod.meshes, m);
 
     xstep: float = 1.0 / cast(float) longitude_slices;
@@ -2246,7 +2268,7 @@ generate_terrain_mesh :: (map: Height_Map) -> Mesh {
     m: Mesh;
     generate_terrain_mesh(map, *m);
 
-    mat := New(Material);
+    mat := Material.new();
     mat.diffuse = make_Color(1, 1, 1);
     m.material = mat;
     return m;
@@ -2285,7 +2307,7 @@ generate_terrain_line_mesh :: (map: Height_Map) -> Mesh {
     m.primitive_type = Primitive_Type.LINES;
     generate_terrain_line_mesh(map, *m);
 
-    mat := New(Material);
+    mat := Material.new();
     mat.diffuse = make_Color(1, 1, 1);
     m.material = mat;
     return m;

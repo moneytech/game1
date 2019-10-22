@@ -79,11 +79,11 @@ ERROR_DEVICE_NOT_CONNECTED :: 1167;
 ERROR_INSUFFICIENT_BUFFER :: 122;
 ERROR_SUCCESS :: 0;
 
-XInputGetStateStub :: (dwUserIndex: s32, pState: *XINPUT_STATE) -> s32 #c_callback {
+XInputGetStateStub :: (dwUserIndex: s32, pState: *XINPUT_STATE) -> s32 #c_call {
     return ERROR_DEVICE_NOT_CONNECTED;
 }
 
-XInputSetStateStub :: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #c_callback {
+XInputSetStateStub :: (dwUserIndex: s32, pState: *XINPUT_VIBRATION) -> s32 #c_call {
     return ERROR_DEVICE_NOT_CONNECTED;
 }
 

@@ -7,7 +7,7 @@ create_checker_board_mesh :: (rotation: Quaternion, width: s16, height: s16) -> 
     x_start := -hw;
     y_start := -hh;
 
-    m := New(Mesh);
+    m := Mesh.new();
 
     off_white := make_Color(0.1, 0.3, 0.1);
     // white := make_Color(1, 1, 1);
@@ -50,7 +50,7 @@ create_checker_board_mesh :: (rotation: Quaternion, width: s16, height: s16) -> 
         }
     }
 
-    mat := New(Material);
+    mat := Material.new();
     mat.diffuse = make_Color(1, 1, 1);
     m.material = mat;
     store_mesh_in_buffer(m);
@@ -71,7 +71,7 @@ create_checker_board_box :: (width: s16, height: s16, depth: s16) -> *Model {
     back := create_checker_board_mesh(set_angle_vector(PI / 2, 1, 0, 0), width, height);
     back.model_matrix = matrix_translate(0, 0, cast(float) depth / 2);
 
-    mod := New(Model);
+    mod := Model.new();
     array_add(*mod.meshes, up);
     array_add(*mod.meshes, down);
     array_add(*mod.meshes, left);
@@ -83,7 +83,7 @@ create_checker_board_box :: (width: s16, height: s16, depth: s16) -> *Model {
 
 make_sphere_mesh :: (sp: Sphere) -> *Model {
     out := create_sphere(sp.radius, 8, 8);
-    out.meshes[0].material = New(Material);
+    out.meshes[0].material = Material.new();
     out.meshes[0].material.diffuse = make_Color(1, 1, 1);
     out.meshes[0].model_matrix = matrix_translate(sp.center);
     out.meshes[0].normals.count = 0;
@@ -93,7 +93,7 @@ make_sphere_mesh :: (sp: Sphere) -> *Model {
 
 make_capsule_mesh :: (cap: Capsule) -> *Model {
     out := create_capsule(cap.radius, 8, 8, 1.0);
-    out.meshes[0].material = New(Material);
+    out.meshes[0].material = Material.new();
     out.meshes[0].material.diffuse = make_Color(1, 1, 1);
     out.meshes[0].model_matrix = matrix_translate(cap.center);
     out.meshes[0].normals.count = 0;
@@ -110,10 +110,10 @@ add_line :: (m: *Mesh, a: Vector3, b: Vector3, color: Color) {
 }
 
 make_aabb_mesh :: (a: AABB) -> *Model {
-    out := New(Model);
+    out := Model.new();
 
-    m := New(Mesh);
-    m.material = New(Material);
+    m := Mesh.new();
+    m.material = Material.new();
     m.material.diffuse = make_Color(1, 1, 1);
 
     m.primitive_type = Primitive_Type.LINES;
@@ -159,7 +159,7 @@ make_aabb_mesh :: (a: AABB) -> *Model {
 
 
 create_textured_rect_mesh :: (v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3, tex: *Texture) -> *Mesh {
-    m := New(Mesh);
+    m := Mesh.new();
     
     V2 :: make_Vector2;
     t0 := V2(0, 0);
@@ -170,7 +170,7 @@ create_textured_rect_mesh :: (v0: Vector3, v1: Vector3, v2: Vector3, v3: Vector3
     add_quad(*m.vertices, v0, v1, v2, v3);
     add_quad(*m.tex_coords, t0, t1, t2, t3);
 
-    mat := New(Material);
+    mat := Material.new();
     mat.diffuse = make_Color(1, 1, 1);
     m.material = mat;
     mat.textures[TEXTURE_DIFFUSE_INDEX] = tex;
@@ -186,7 +186,7 @@ create_skybox_model :: (up: *Texture, down: *Texture, left: *Texture, right: *Te
     set_texture_wrap(front, true);
     set_texture_wrap(back, true);
 
-    mod := New(Model);
+    mod := Model.new();
 
     V3 :: make_Vector3;
     v0 := V3(-1, -1, -1);

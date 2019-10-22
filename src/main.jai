@@ -29,7 +29,9 @@ Signpost :: struct {
     using actor: Actor;
     text: Text;
 
-    #constructor con_signpost;
+    init :: (using s: *Signpost) {
+        con_signpost(s);
+    }
 }
 
 con_signpost :: (s: *Signpost) {
@@ -43,12 +45,13 @@ signpost_picked_by_player :: (game: *Game, actor: *Actor, player: *Actor, dt: fl
 
 make_signpost :: (text: Text) -> *Signpost {
     ret := New(Signpost);
+    Signpost.init(ret);
     ret.text = text;
     return ret;
 }
 
 make_crate :: (game: *Game) -> *Actor {
-    actor := New(Actor);
+    actor := Actor.new();
     actor.model = load_model(game.asset_man, "assets/crate.dae");
     actor.body = New(Rigid_Body);
 
@@ -191,7 +194,7 @@ create_test_scene :: (game: *Game) -> Scene {
     }
 
     {
-        test_model := New(Model);
+        test_model := Model.new();
         test_mesh := create_checker_board_mesh(set_angle_vector(0, 1, 0, 0), 50, 50);
         array_add(*test_model.meshes, test_mesh);
         array_add(*sc.models, test_model);
@@ -228,7 +231,7 @@ create_test_scene :: (game: *Game) -> Scene {
 
 
     {
-        player_actor := New(Actor);
+        player_actor := Actor.new();
         player_actor.model = load_model(game.asset_man, "assets/player.fbx");
         assert(player_actor.model != null);
         array_add(*sc.actors, player_actor);
@@ -275,7 +278,7 @@ create_test_scene :: (game: *Game) -> Scene {
     }
 
     {
-        box := New(Actor);
+        box := Actor.new();
         box.model = create_checker_board_box(50, 4, 5);
         array_add(*sc.actors, box);
         array_add(*sc.models, box.model);

@@ -115,8 +115,8 @@ init_editor :: (game: *Game) {
     action_info.roll.delta_rotation = set_angle_vector(0, 0, 1, 0);
 
     /*
-    m := New(Mesh);
-    m.material = New(Material);
+    m := Mesh.new();
+    m.material = Material.new();
     m.material.diffuse = make_Color(1.0, 0.5, 0.0);
     m.primitive_type = Primitive_Type.POINTS;
 
@@ -126,7 +126,7 @@ init_editor :: (game: *Game) {
 
     // terrain_map, __terrain = new_terrain_map(128, 128);
     terrain_map, __terrain = load_heightmap(game.asset_man, "assets/heightmap.png");
-    __terrain_line_mesh = New(Mesh);
+    __terrain_line_mesh = Mesh.new();
     <<__terrain_line_mesh = generate_terrain_line_mesh(terrain_map);
 
     for * terrain_texture_buffer {

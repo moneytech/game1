@@ -117,9 +117,9 @@ deserialize_object :: (asset_man: *Asset_Manager, file: *File) -> *Scene_Object 
     
     obj: *Scene_Object;
     if type_name == {
-        case "Actor"; obj = New(Actor); obj.object_type = Actor;
-        case "Light"; obj = New(Light); obj.object_type = Light;
-        case "Model"; obj = New(Model); obj.object_type = Model;
+        case "Actor"; obj = Actor.new(); obj.object_type = Actor;
+        case "Light"; obj = Light.new(); obj.object_type = Light;
+        case "Model"; obj = Model.new(); obj.object_type = Model;
         case "Camera"; obj = New(Camera); obj.object_type = Camera;
     }
 
@@ -182,6 +182,7 @@ export_model_as_obj :: (model: *Model) {
         mtl_index += 1;
         defer free(material_name);
 
+        /*
         Material :: struct {
             textures: [MAX_TEXTURES_PER_MESH] *Texture;
             diffuse: Color;
@@ -197,7 +198,8 @@ export_model_as_obj :: (model: *Model) {
             #constructor (using m: *Material) {
                 diffuse = make_Color(1.0, 1.0, 1.0);
             }
-        };
+        }
+        */
 
         { // write the material info
             print_to_builder(*mtl_builder, "newmtl %\n", material_name);
@@ -319,7 +321,7 @@ load_heightmap :: (using asset_man: *Asset_Manager, filepath: string) -> Height_
     if (data) {
         m := get_slot(*heightmaps, filepath);
         if !m {
-            m = New(Mesh);
+            m = Mesh.new();
         }
         map.width = width;
         map.height = height;
@@ -479,7 +481,7 @@ model_loader_parse_mtl :: (game: *Game, src: string, lib: *Material_Lib, mtl_fil
             if (name == "newmtl") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                mat = New(Material);
+                mat = Material.new();
                 set_slot(lib, tok._string, mat);
 
                 ml_get_token(*st, *tok);
@@ -668,7 +670,7 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
     init(*st, src);
     tok: ML_Token;
 
-    mod := New(Model);
+    mod := Model.new();
     mesh: *Mesh = null;
     vertices: [..] Vector3;
     normals: [..] Vector3;
@@ -699,7 +701,7 @@ model_loader_parse_obj :: (game: *Game, src: string, obj_filepath: string) -> *M
             } else if (name == "o") {
                 ml_get_token(*st, *tok);
                 assert(tok.type == ML_TOKEN_IDENTIFIER);
-                mesh = New(Mesh);
+                mesh = Mesh.new();
                 array_add(*mod.meshes, mesh);
                 // array_reset(*vertices);
 
@@ -839,8 +841,8 @@ print_node :: (n: *FBX_Node, depth: int) {
 }
 
 Model_load_fbx :: (path: string) -> *Model {
-    model := New(Model);
-    mesh := New(Mesh);
+    model := Model.new();
+    mesh := Mesh.new();
     array_add(*model.meshes, mesh);
 
     // @TODO this is one giant hack
@@ -941,7 +943,7 @@ Model_load_fbx :: (path: string) -> *Model {
     }
 
     // @Temporary material
-    mat := New(Material);
+    mat := Material.new();
     mesh.material = mat;
     mat.diffuse = make_Color(0.8, 0.8, 0.8);
 
@@ -1040,7 +1042,7 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
 
                     in := material.instance;
 
-                    mat := New(Material);
+                    mat := Material.new();
                     mat.diffuse = make_Color(in.diffuse[0], in.diffuse[1], in.diffuse[2]);
 
                     if material.textures[material.bump_index] mat.textures[TEXTURE_NORMAL_INDEX] = load_image(asset_man, concatenate(path_of(path), "/", material.textures[material.bump_index].filepath));
@@ -1048,9 +1050,9 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
                     assert(material.textures[material.bump_index] != null);
                     assert(mat.textures[TEXTURE_NORMAL_INDEX] != null);
                     {
-                        model := New(Model);
+                        model := Model.new();
                         for mesh: geom.meshes {
-                            me := New(Mesh);
+                            me := Mesh.new();
 
                             if mesh.position_index > -1 {
                                 vdata := mesh.vertex_data[mesh.position_index];
@@ -1091,9 +1093,9 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
     }
 
     // for geom: collada.library_geometries {
-    //     model := New(Model);
+    //     model := Model.new();
     //     for mesh: geom.meshes {
-    //         me := New(Mesh);
+    //         me := Mesh.new();
 
     //         if mesh.position_index > -1 {
     //             vdata := mesh.vertex_data[mesh.position_index];
@@ -1120,7 +1122,7 @@ Model_load_dae :: (asset_man: *Asset_Manager, src: string, path: string) -> *Mod
     //         }
 
     //         array_add(*model.meshes, me);
-    //         mat := New(Material);
+    //         mat := Material.new();
     //         me.material = mat;
     //         mat.diffuse = make_Color(0.8, 0.8, 0.8);
     //     }

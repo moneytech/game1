@@ -183,15 +183,15 @@ using nk_tree_type :: enum s32 {
     NK_TREE_TAB :: 1;
 }
 
-nk_plugin_alloc :: #type (a0: nk_handle, a1: *void, a2: nk_size) -> *void #c_callback;
+nk_plugin_alloc :: #type (a0: nk_handle, a1: *void, a2: nk_size) -> *void #c_call;
 
-nk_plugin_free :: #type (a0: nk_handle, a1: *void) -> void #c_callback;
+nk_plugin_free :: #type (a0: nk_handle, a1: *void) -> void #c_call;
 
-nk_plugin_filter :: #type (a0: *nk_text_edit, a1: nk_rune) -> s32 #c_callback;
+nk_plugin_filter :: #type (a0: *nk_text_edit, a1: nk_rune) -> s32 #c_call;
 
-nk_plugin_paste :: #type (a0: nk_handle, a1: *nk_text_edit) -> void #c_callback;
+nk_plugin_paste :: #type (a0: nk_handle, a1: *nk_text_edit) -> void #c_call;
 
-nk_plugin_copy :: #type (a0: nk_handle, a1: *u8, a2: s32) -> void #c_callback;
+nk_plugin_copy :: #type (a0: nk_handle, a1: *u8, a2: s32) -> void #c_call;
 
 nk_allocator :: struct {
     userdata: nk_handle;
@@ -736,7 +736,7 @@ nk_chart_end :: (unk0: *nk_context) -> void #foreign libnuklear;
 
 nk_plot :: (unk0: *nk_context, unk1: nk_chart_type, values: *float32, count: s32, offset: s32) -> void #foreign libnuklear;
 
-nk_plot_function :: (unk0: *nk_context, unk1: nk_chart_type, userdata: *void, value_getter: #type (a0: *void, a1: s32) -> float32 #c_callback, count: s32, offset: s32) -> void #foreign libnuklear;
+nk_plot_function :: (unk0: *nk_context, unk1: nk_chart_type, userdata: *void, value_getter: #type (a0: *void, a1: s32) -> float32 #c_call, count: s32, offset: s32) -> void #foreign libnuklear;
 
 nk_popup_begin :: (unk0: *nk_context, unk1: nk_popup_type, unk2: *u8, unk3: nk_flags, bounds: nk_rect) -> s32 #foreign libnuklear;
 
@@ -750,7 +750,7 @@ nk_combo_separator :: (unk0: *nk_context, items_separated_by_separator: *u8, sep
 
 nk_combo_string :: (unk0: *nk_context, items_separated_by_zeros: *u8, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign libnuklear;
 
-nk_combo_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **u8) -> void #c_callback, userdata: *void, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign libnuklear;
+nk_combo_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **u8) -> void #c_call, userdata: *void, selected: s32, count: s32, item_height: s32, size: nk_vec2) -> s32 #foreign libnuklear;
 
 nk_combobox :: (unk0: *nk_context, items: **u8, count: s32, selected: *s32, item_height: s32, size: nk_vec2) -> void #foreign libnuklear;
 
@@ -758,7 +758,7 @@ nk_combobox_string :: (unk0: *nk_context, items_separated_by_zeros: *u8, selecte
 
 nk_combobox_separator :: (unk0: *nk_context, items_separated_by_separator: *u8, separator: s32, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign libnuklear;
 
-nk_combobox_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **u8) -> void #c_callback, unk1: *void, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign libnuklear;
+nk_combobox_callback :: (unk0: *nk_context, item_getter: #type (a0: *void, a1: s32, a2: **u8) -> void #c_call, unk1: *void, selected: *s32, count: s32, item_height: s32, size: nk_vec2) -> void #foreign libnuklear;
 
 nk_combo_begin_text :: (unk0: *nk_context, selected: *u8, unk1: s32, size: nk_vec2) -> s32 #foreign libnuklear;
 
@@ -1112,9 +1112,9 @@ nk_utf_at :: (buffer: *u8, length: s32, index: s32, unicode: *nk_rune, len: *s32
 nk_user_font_glyph :: struct {
 }
 
-nk_text_width_f :: #type (a0: nk_handle, a1: float32, a2: *u8, a3: s32) -> float32 #c_callback;
+nk_text_width_f :: #type (a0: nk_handle, a1: float32, a2: *u8, a3: s32) -> float32 #c_call;
 
-nk_query_font_glyph_f :: #type (a0: nk_handle, a1: float32, a2: *nk_user_font_glyph, a3: nk_rune, a4: nk_rune) -> void #c_callback;
+nk_query_font_glyph_f :: #type (a0: nk_handle, a1: float32, a2: *nk_user_font_glyph, a3: nk_rune, a4: nk_rune) -> void #c_call;
 
 nk_user_font :: struct {
     userdata: nk_handle;
@@ -1514,7 +1514,7 @@ nk_command_image :: struct {
     col: nk_color;
 }
 
-nk_command_custom_callback :: #type (a0: *void, a1: s16, a2: s16, a3: u16, a4: u16, a5: nk_handle) -> void #c_callback;
+nk_command_custom_callback :: #type (a0: *void, a1: s16, a2: s16, a3: u16, a4: u16, a5: nk_handle) -> void #c_call;
 
 nk_command_custom :: struct {
     header: nk_command;
@@ -1690,8 +1690,8 @@ nk_style_button :: struct {
     image_padding: nk_vec2;
     touch_padding: nk_vec2;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_toggle :: struct {
@@ -1711,8 +1711,8 @@ nk_style_toggle :: struct {
     spacing: float32;
     border: float32;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_selectable :: struct {
@@ -1735,8 +1735,8 @@ nk_style_selectable :: struct {
     touch_padding: nk_vec2;
     image_padding: nk_vec2;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_slider :: struct {
@@ -1763,8 +1763,8 @@ nk_style_slider :: struct {
     inc_symbol: nk_symbol_type;
     dec_symbol: nk_symbol_type;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_progress :: struct {
@@ -1782,8 +1782,8 @@ nk_style_progress :: struct {
     cursor_rounding: float32;
     padding: nk_vec2;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_scrollbar :: struct {
@@ -1806,8 +1806,8 @@ nk_style_scrollbar :: struct {
     inc_symbol: nk_symbol_type;
     dec_symbol: nk_symbol_type;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_edit :: struct {
@@ -1852,8 +1852,8 @@ nk_style_property :: struct {
     inc_button: nk_style_button;
     dec_button: nk_style_button;
     userdata: nk_handle;
-    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
-    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_callback;
+    draw_begin: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
+    draw_end: #type (a0: *nk_command_buffer, a1: nk_handle) -> void #c_call;
 }
 
 nk_style_chart :: struct {

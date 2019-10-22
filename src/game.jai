@@ -1,5 +1,5 @@
 
-SUPPORTS_OCULUS :: OS_WINDOWS;
+SUPPORTS_OCULUS :: false;
 
 #if SUPPORTS_OCULUS {
     #load "OVR.jai";
@@ -150,6 +150,16 @@ Actor :: struct {
     // position: Vector3;
     orientation: Quaternion;
 
+    init :: (using a: *Actor) {
+        Quaternion.init(*orientation);
+    }
+
+    new :: () -> *Actor {
+        a := New(Actor);
+        init(a);
+        return a;
+    }
+
     update_callback: (game: *Game, actor: *Actor, dt: float);
     picked_by_player: (game: *Game, actor: *Actor, player: *Actor, dt: float);
 }
@@ -280,7 +290,7 @@ init_game :: (window_title: string, options: ..string) -> *Game {
     os_set_vsync(false);
 
 
-    nuklear_text_width_calc :: (handle: nk_handle, height: float, text: *u8, len: s32) -> float #c_callback {
+    nuklear_text_width_calc :: (handle: nk_handle, height: float, text: *u8, len: s32) -> float #c_call {
         ft := cast(*Font) handle.ptr;
         str := to_string(text, len);
 
